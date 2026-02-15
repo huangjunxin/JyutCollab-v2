@@ -154,7 +154,7 @@
                     v-model="ex.jyutping"
                     type="text"
                     placeholder="粵拼"
-                    class="w-full max-w-xs px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-mono"
+                    class="w-full px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-mono"
                     @input="entry._isDirty = true"
                   />
                 </div>
@@ -245,14 +245,14 @@
                         v-model="subEx.jyutping"
                         type="text"
                         placeholder="粵拼"
-                        class="w-24 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-mono text-xs"
+                        class="flex-1 min-w-[100px] px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-mono"
                         @input="entry._isDirty = true"
                       />
                       <input
                         v-model="subEx.translation"
                         type="text"
                         placeholder="翻譯"
-                        class="w-28 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                        class="flex-1 min-w-[100px] px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
                         @input="entry._isDirty = true"
                       />
                       <UButton
