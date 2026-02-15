@@ -783,6 +783,14 @@ const statusOptions = [
   { value: 'rejected', label: '已拒絕' }
 ]
 
+/** 狀態值 → 中文標籤（用於表格顯示，與角色無關，避免貢獻者看到 approved/rejected 時顯示英文） */
+const STATUS_LABELS: Record<string, string> = {
+  draft: '草稿',
+  pending_review: '待審核',
+  approved: '已發佈',
+  rejected: '已拒絕'
+}
+
 // 審核員/管理員新建詞條時的預設方言（僅用於此角色；貢獻者用其貢獻語言，無需選擇）
 const REVIEWER_NEW_ENTRY_DIALECT_KEY = 'jyutcollab_reviewer_new_entry_dialect'
 const newEntryDialectOptions = DIALECT_OPTIONS_FOR_SELECT
@@ -906,6 +914,10 @@ function getCellDisplay(entry: Entry, col: any) {
     // 特殊處理方言列，使用映射顯示中文名稱
     if (col.key === 'dialect') {
       return dialectCodeToName[value] || value || '-'
+    }
+    // 狀態列：始終用完整對照表顯示，貢獻者雖不能選「已發佈/已拒絕」，但看到時應顯示中文
+    if (col.key === 'status') {
+      return STATUS_LABELS[value] || value || '-'
     }
     const options = getColumnOptions(col)
     const opt = options?.find((o: any) => o.value === value)
