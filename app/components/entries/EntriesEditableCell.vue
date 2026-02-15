@@ -178,7 +178,7 @@
               size="xs"
               icon="i-heroicons-sparkles"
               title="AI 釋義"
-              class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              class="flex-shrink-0"
               :loading="aiLoadingDefinition"
               @click="$emit('ai-definition')"
             />
@@ -189,7 +189,7 @@
               size="xs"
               icon="i-heroicons-sparkles"
               title="AI 分類"
-              class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              class="flex-shrink-0"
               :loading="aiLoadingTheme"
               @click="$emit('ai-theme')"
             />
@@ -200,7 +200,7 @@
               size="xs"
               :icon="isExpanded ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
               :title="isExpanded ? '收起釋義詳情' : '展開釋義詳情（例句、分義項）'"
-              class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              class="flex-shrink-0"
               @click="$emit('expand-click')"
             />
           </div>
@@ -223,7 +223,7 @@
             size="xs"
             :icon="isExpanded ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
             :title="isExpanded ? '收起釋義詳情' : '展開釋義詳情（例句、分義項）'"
-            class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            class="flex-shrink-0"
             @click="$emit('expand-click')"
           />
         </div>

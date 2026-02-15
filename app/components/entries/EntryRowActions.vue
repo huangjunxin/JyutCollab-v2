@@ -1,6 +1,6 @@
 <template>
   <td class="w-20 px-2 py-1 text-center">
-    <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div class="flex items-center justify-center gap-1">
       <UButton
         v-if="canEdit && (entry._isNew || entry._isDirty)"
         color="success"
