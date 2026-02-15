@@ -222,6 +222,7 @@
                 v-for="(col, colIndex) in editableColumns"
                 :key="`${entry.id ?? (entry as any)._tempId}-${col.key}`"
                 :col="col"
+                :can-edit="canEditEntry(entry)"
                 :is-editing="isEditing(entry.id ?? (entry as any)._tempId, col.key)"
                 v-model:edit-value="editValue"
                 :display-text="getCellDisplay(entry, col)"
@@ -252,6 +253,7 @@
               />
               <EntryRowActions
                 :entry="entry"
+                :can-edit="canEditEntry(entry)"
                 @save="entry._isNew ? saveNewEntry(entry) : saveEntryChanges(entry)"
                 @duplicate="duplicateEntry(entry)"
                 @delete="deleteEntry(entry)"
@@ -1146,6 +1148,14 @@ function getCellClass(entry: Entry, field: string) {
   return classes
 }
 
+/** 貢獻者只能編輯自己創建的詞條；審核員/管理員可編輯任意詞條。新建詞條（_isNew）視為可編輯。 */
+function canEditEntry(entry: Entry): boolean {
+  const role = user.value?.role
+  if (role === 'reviewer' || role === 'admin') return true
+  if (entry._isNew) return true
+  return entry.createdBy === user.value?.id
+}
+
 // Cell editing handlers
 // Notion 風格：首次點擊僅選中格（focusedCell），再次點擊同一格或按 Enter 進入編輯；forceEdit 為 true 時（如鍵盤 Enter）直接進入編輯
 function handleCellClick(entry: Entry, field: string, event: MouseEvent | KeyboardEvent, rowIndex?: number, colIndex?: number, forceEdit?: boolean) {
@@ -1175,6 +1185,9 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
   // 貢獻者不編輯狀態列：保存時會自動改為待審核，無需手動選擇
   const role = user.value?.role
   if (field === 'status' && role !== 'reviewer' && role !== 'admin') return
+
+  // 貢獻者只能編輯自己創建的詞條；審核員/管理員可編輯任意詞條
+  if (!canEditEntry(entry)) return
 
   const entryId = entry.id ?? (entry as any)._tempId ?? ''
   editingCell.value = { entryId: String(entryId), field }

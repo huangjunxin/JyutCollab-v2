@@ -2,7 +2,7 @@
   <td class="w-20 px-2 py-1 text-center">
     <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
       <UButton
-        v-if="entry._isNew || entry._isDirty"
+        v-if="canEdit && (entry._isNew || entry._isDirty)"
         color="success"
         variant="ghost"
         size="xs"
@@ -20,7 +20,7 @@
         @click.stop="$emit('duplicate')"
       />
       <UButton
-        v-if="!entry._isNew"
+        v-if="canEdit && !entry._isNew"
         color="error"
         variant="ghost"
         size="xs"
@@ -29,7 +29,7 @@
         @click.stop="$emit('delete')"
       />
       <UButton
-        v-if="entry._isNew || entry._isDirty"
+        v-if="canEdit && (entry._isNew || entry._isDirty)"
         color="neutral"
         variant="ghost"
         size="xs"
@@ -46,6 +46,8 @@ import type { Entry } from '~/types'
 
 defineProps<{
   entry: Entry
+  /** 是否可編輯此詞條（貢獻者僅自己創建的可編輯；審核員/管理員任意） */
+  canEdit: boolean
 }>()
 
 defineEmits<{

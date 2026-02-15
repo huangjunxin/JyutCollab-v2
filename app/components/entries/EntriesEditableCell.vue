@@ -3,7 +3,8 @@
     class="cell-td px-1 py-1 border-r border-gray-200 dark:border-gray-700 relative transition-[box-shadow]"
     :class="[
       isSelected && !isEditing && 'ring-2 ring-primary/60 ring-inset',
-      wrap && 'cell-td-wrap'
+      wrap && 'cell-td-wrap',
+      !canEdit && 'cursor-default'
     ]"
     :style="cellStyle"
     @click="$emit('click', $event)"
@@ -241,6 +242,8 @@ const themeEditWrapperRef = ref<HTMLElement | null>(null)
 const props = withDefaults(
   defineProps<{
     col: { key: string; type: string; width?: string }
+    /** 是否可編輯此詞條（貢獻者僅自己創建的可編輯） */
+    canEdit?: boolean
     isEditing: boolean
     editValue: any
     displayText: string
@@ -266,6 +269,7 @@ const props = withDefaults(
     themeExpandHint?: string
   }>(),
   {
+    canEdit: true,
     columnOptions: () => [],
     reviewNotes: '',
     showAiDefinition: false,
