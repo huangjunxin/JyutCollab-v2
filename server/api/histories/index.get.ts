@@ -2,19 +2,32 @@ import type { EditHistory as EditHistoryType, PaginatedResponse } from '~/types'
 
 export default defineEventHandler(async (event): Promise<PaginatedResponse<EditHistoryType>> => {
   try {
+    if (!event.context.auth) {
+      throw createError({
+        statusCode: 401,
+        message: '請先登錄'
+      })
+    }
+
     await connectDB()
 
     const page = parseInt(getQuery(event).page as string) || 1
     const perPage = parseInt(getQuery(event).perPage as string) || 20
     const entryId = getQuery(event).entryId as string | undefined
     const action = getQuery(event).action as string | undefined
+    const userRole = event.context.auth.role
+    const userId = event.context.auth.id
 
-    const filter: any = {}
+    const filter: Record<string, unknown> = {}
     if (entryId) {
       filter.entryId = entryId
     }
     if (action && ['create', 'update', 'delete', 'status_change'].includes(action)) {
       filter.action = action
+    }
+    // 貢獻者只能看見自己的編輯歷史；審核員/管理員可看見全部
+    if (userRole === 'contributor') {
+      filter.userId = userId
     }
 
     const skip = (page - 1) * perPage

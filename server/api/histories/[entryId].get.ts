@@ -2,15 +2,54 @@ import type { EditHistory as EditHistoryType, PaginatedResponse } from '~/types'
 
 export default defineEventHandler(async (event): Promise<PaginatedResponse<EditHistoryType>> => {
   try {
+    if (!event.context.auth) {
+      throw createError({
+        statusCode: 401,
+        message: '請先登錄'
+      })
+    }
+
     await connectDB()
 
-    const entryId = getRouterParam(event, 'entryId')
+    const entryIdParam = getRouterParam(event, 'entryId')
+    if (!entryIdParam) {
+      throw createError({
+        statusCode: 400,
+        message: '缺少詞條ID'
+      })
+    }
+
     const page = parseInt(getQuery(event).page as string) || 1
     const perPage = parseInt(getQuery(event).perPage as string) || 20
+    const userRole = event.context.auth.role
+    const userId = event.context.auth.id
 
-    const filter: any = {}
-    if (entryId) {
-      filter.entryId = entryId
+    // 解析 entryId（可能為自定義 id 或 MongoDB _id），歷史記錄存的是 entry._id.toString()
+    let entry = await Entry.findOne({ id: entryIdParam })
+    if (!entry && /^[a-f\d]{24}$/i.test(entryIdParam)) {
+      entry = await Entry.findById(entryIdParam)
+    }
+    if (!entry) {
+      throw createError({
+        statusCode: 404,
+        message: '詞條不存在'
+      })
+    }
+
+    const filter: Record<string, unknown> = {}
+    if (entry) {
+      filter.entryId = entry._id.toString()
+    }
+
+    // 貢獻者只能查看自己創建的詞條的歷史，且僅顯示自己的操作記錄；審核員/管理員可查看任意詞條的全部歷史
+    if (userRole === 'contributor') {
+      if (!entry || entry.createdBy !== userId) {
+        throw createError({
+          statusCode: 403,
+          message: '無權查看此詞條的編輯歷史'
+        })
+      }
+      filter.userId = userId
     }
 
     const skip = (page - 1) * perPage
