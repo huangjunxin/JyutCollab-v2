@@ -1,16 +1,75 @@
 /**
  * 方言點常數（單一來源，hardcode，不寫入數據庫）
- * 香港繁體標籤。
+ * 覆蓋廣東、廣西主要粵語方言點，香港繁體標籤。
  */
 
-export const DIALECT_IDS = ['guangzhou', 'hongkong', 'taishan', 'overseas'] as const
+export const DIALECT_IDS = [
+  // 廣東
+  'guangzhou',
+  'hongkong',
+  'macau',
+  'foshan',
+  'shunde',
+  'zhongshan',
+  'jiangmen',
+  'taishan',
+  'kaiping',
+  'enping',
+  'heshan',
+  'xinhui',
+  'zhuhai',
+  'dongguan',
+  'shenzhen',
+  'zhaoqing',
+  'yunfu',
+  'yangjiang',
+  'maoming',
+  'zhanjiang',
+  'qingyuan',
+  // 廣西
+  'nanning',
+  'wuzhou',
+  'yulin',
+  'beihai',
+  'qinzhou',
+  'fangchenggang',
+  // 其他
+  'overseas'
+] as const
 export type DialectId = (typeof DIALECT_IDS)[number]
 
 /** 方言代碼 → 顯示名稱（香港繁體） */
 export const DIALECT_LABELS: Record<DialectId, string> = {
+  // 廣東
   guangzhou: '廣州',
   hongkong: '香港',
+  macau: '澳門',
+  foshan: '佛山',
+  shunde: '順德',
+  zhongshan: '中山',
+  jiangmen: '江門',
   taishan: '台山',
+  kaiping: '開平',
+  enping: '恩平',
+  heshan: '鶴山',
+  xinhui: '新會',
+  zhuhai: '珠海',
+  dongguan: '東莞',
+  shenzhen: '深圳',
+  zhaoqing: '肇慶',
+  yunfu: '雲浮',
+  yangjiang: '陽江',
+  maoming: '茂名',
+  zhanjiang: '湛江',
+  qingyuan: '清遠',
+  // 廣西
+  nanning: '南寧',
+  wuzhou: '梧州',
+  yulin: '玉林',
+  beihai: '北海',
+  qinzhou: '欽州',
+  fangchenggang: '防城港',
+  // 其他
   overseas: '海外'
 }
 
@@ -29,8 +88,32 @@ export function getDialectLabel(id: string): string {
 export const DIALECT_COLORS: Record<DialectId, string> = {
   guangzhou: 'blue',
   hongkong: 'green',
+  macau: 'teal',
+  foshan: 'orange',
+  shunde: 'amber',
+  zhongshan: 'yellow',
+  jiangmen: 'purple',
   taishan: 'orange',
-  overseas: 'purple'
+  kaiping: 'pink',
+  enping: 'indigo',
+  heshan: 'cyan',
+  xinhui: 'teal',
+  zhuhai: 'blue',
+  dongguan: 'green',
+  shenzhen: 'red',
+  zhaoqing: 'purple',
+  yunfu: 'orange',
+  yangjiang: 'pink',
+  maoming: 'indigo',
+  zhanjiang: 'cyan',
+  qingyuan: 'teal',
+  nanning: 'blue',
+  wuzhou: 'green',
+  yulin: 'orange',
+  beihai: 'purple',
+  qinzhou: 'pink',
+  fangchenggang: 'indigo',
+  overseas: 'gray'
 }
 
 export function getDialectColor(id: string): string {
