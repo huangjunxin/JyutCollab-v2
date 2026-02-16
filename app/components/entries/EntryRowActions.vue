@@ -1,6 +1,6 @@
 <template>
-  <td class="w-20 px-2 py-1 text-center">
-    <div class="flex items-center justify-center gap-1">
+  <td class="min-w-[6rem] w-24 px-2 py-1.5 text-center align-middle overflow-visible">
+    <div class="flex flex-wrap items-center justify-center gap-1">
       <UButton
         v-if="canEdit && (entry._isNew || entry._isDirty)"
         color="success"
