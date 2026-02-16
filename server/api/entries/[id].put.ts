@@ -4,8 +4,11 @@ import { canContributeToDialect } from '../../utils/auth'
 const UpdateEntrySchema = z.object({
   // 新格式
   headword: z.object({
-    display: z.string(),
-    normalized: z.string().optional()
+    // 允許僅更新 search（異形詞）而不改 display
+    display: z.string().optional(),
+    normalized: z.string().optional(),
+    // 支援前端傳入 search（包含異形詞），若缺省則在後面用 display 推導
+    search: z.string().optional()
   }).optional(),
   dialect: z.object({
     name: z.string(),
@@ -117,10 +120,11 @@ export default defineEventHandler(async (event) => {
 
     // Update headword
     if (data.headword) {
-      const displayText = convertToHongKongTraditional(data.headword.display)
-      // 使用客戶端傳入的 search 字段（包含其他詞形），如果沒有則使用 display 的小写版本
+      const displayRaw = data.headword.display ?? existingEntry.headword?.display ?? ''
+      const displayText = convertToHongKongTraditional(displayRaw)
+      // search 用於匹配/儲存異形詞，保留用戶原始輸入（只在缺省時用 display.lowercase 作後備）
       const searchText = data.headword.search
-        ? convertToHongKongTraditional(data.headword.search)
+        ? data.headword.search
         : displayText.toLowerCase().trim()
       existingEntry.headword = {
         display: displayText,
