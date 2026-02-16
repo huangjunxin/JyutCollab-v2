@@ -497,6 +497,7 @@ import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, DIALECT_CODE_TO_NAME, getDialectLabel } from '~/utils/dialects'
 import type { DialectId } from '~shared/dialects'
 import { queryJyutdict, getSuggestedPronunciation } from '~/composables/useJyutdict'
+import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
 import type { Entry, Register } from '~/types'
 import type { CharPronunciationData } from '~/types/jyutdict'
 import AISuggestionRow from '~/components/entries/AISuggestionRow.vue'
@@ -2294,6 +2295,8 @@ async function saveNewEntry(entry: Entry) {
           jyutdictHandled.value.delete(String(prev._tempId))
           jyutdictHandled.value = new Set(jyutdictHandled.value)
         }
+        // 从本地存储中移除已保存的条目
+        removeEntryFromLocalStorage(prev?._tempId || entry.id || '')
       }
       pagination.total++
       // 聚合視圖下保存新條目後重新拉取，使新條目歸入對應詞形組
@@ -2382,6 +2385,8 @@ async function saveEntryChanges(entry: Entry) {
     if (response.success) {
       entry._isDirty = false
       if (response.data?.status) entry.status = response.data.status as Entry['status']
+      // 从本地存储中移除已保存的条目
+      removeEntryFromLocalStorage(entry.id || '')
     }
   } catch (error: any) {
     console.error('Failed to save entry changes:', error)
@@ -2397,6 +2402,8 @@ function cancelEdit(entry: Entry) {
     const index = entries.value.findIndex(e => e.id === entry.id || e._tempId === entry.id)
     if (index !== -1) {
       entries.value.splice(index, 1)
+      // 从本地存储中移除取消的条目
+      removeEntryFromLocalStorage((entry as any)._tempId || entry.id || '')
     }
   } else {
     // Reset dirty flag and reload data
@@ -2418,6 +2425,8 @@ async function deleteEntry(entry: Entry) {
     if (index !== -1) {
       entries.value.splice(index, 1)
       pagination.total--
+      // 从本地存储中移除已删除的条目
+      removeEntryFromLocalStorage(entry.id || '')
     }
   } catch (error: any) {
     console.error('Failed to delete entry:', error)
@@ -2456,6 +2465,39 @@ async function fetchEntries() {
       entries.value = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
       aggregatedGroups.value = []
     }
+    
+    // 恢复本地存储的草稿（仅在首次加载或第一页且无搜索/过滤条件时）
+    if (currentPage.value === 1 && !searchQuery.value && filters.region === ALL_FILTER_VALUE && filters.status === ALL_FILTER_VALUE && filters.theme === ALL_FILTER_VALUE) {
+      const restoredEntries = restoreEntriesFromLocalStorage()
+      if (restoredEntries.length > 0) {
+        if (viewMode.value === 'aggregated') {
+          // 聚合视图：将恢复的草稿添加到 entries（会在 displayGroups 中显示）
+          restoredEntries.forEach((restoredEntry) => {
+            const exists = aggregatedGroups.value.some(g => 
+              g.entries.some(e => 
+                (e as any)._tempId === (restoredEntry as any)._tempId || 
+                (e.id && restoredEntry.id && String(e.id) === String(restoredEntry.id))
+              )
+            )
+            if (!exists) {
+              entries.value.unshift(restoredEntry)
+            }
+          })
+        } else {
+          // 平铺视图：将恢复的草稿添加到列表顶部
+          restoredEntries.forEach((restoredEntry) => {
+            const exists = entries.value.some(
+              (e) => (e as any)._tempId === (restoredEntry as any)._tempId || 
+                     (e.id && restoredEntry.id && String(e.id) === String(restoredEntry.id))
+            )
+            if (!exists) {
+              entries.value.unshift(restoredEntry)
+            }
+          })
+        }
+      }
+    }
+    
     pagination.total = response.total
     pagination.page = response.page
     pagination.totalPages = response.totalPages
@@ -2493,6 +2535,34 @@ watch([() => filters.region, () => filters.status, () => filters.theme], () => {
   currentPage.value = 1
   fetchEntries()
 })
+
+// 监听 entries 和 aggregatedGroups 变化，实时保存到本地存储
+watch(
+  [() => entries.value, () => aggregatedGroups.value],
+  () => {
+    // 收集所有需要保存的条目（新建或已修改的）
+    const allEntries: Entry[] = []
+    
+    // 从 entries 中收集
+    entries.value.forEach(e => {
+      if ((e as any)._isNew || e._isDirty) {
+        allEntries.push(e)
+      }
+    })
+    
+    // 从 aggregatedGroups 中收集
+    aggregatedGroups.value.forEach(g => {
+      g.entries.forEach(e => {
+        if ((e as any)._isNew || e._isDirty) {
+          allEntries.push(e)
+        }
+      })
+    })
+    
+    saveEntriesToLocalStorage(allEntries)
+  },
+  { deep: true }
+)
 
 // Initial fetch
 onMounted(fetchEntries)
