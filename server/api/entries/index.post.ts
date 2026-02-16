@@ -6,7 +6,9 @@ const CreateEntrySchema = z.object({
   // 新格式
   headword: z.object({
     display: z.string().min(1, '請輸入詞條文本').max(200, '詞條文本過長'),
-    normalized: z.string().optional()
+    normalized: z.string().optional(),
+    // 支援前端傳入 search（包含異形詞），若缺省則在後面用 display 推導
+    search: z.string().optional()
   }).optional(),
   dialect: z.object({
     name: z.string(),
@@ -88,12 +90,12 @@ export default defineEventHandler(async (event) => {
     const data = validated.data
     const userId = event.context.auth.id
 
-    // 轉換文本為港式繁體
+    // 轉換文本為港式繁體（顯示/標準化用）
     const displayText = convertToHongKongTraditional(data.headword?.display || data.text || '')
     const normalizedText = convertToHongKongTraditional(data.headword?.normalized || displayText)
-    // 使用客戶端傳入的 search 字段（包含其他詞形），如果沒有則使用 display 的小写版本
-    const searchText = data.headword?.search 
-      ? convertToHongKongTraditional(data.headword.search)
+    // search 用於匹配/儲存異形詞，保留用戶原始輸入（只在缺省時用 display.lowercase 作後備）
+    const searchText = data.headword?.search
+      ? data.headword.search
       : displayText.toLowerCase().trim()
 
     // 構建詞頭
