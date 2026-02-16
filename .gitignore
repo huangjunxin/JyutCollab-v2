@@ -25,3 +25,6 @@ logs
 
 # Claude settings
 .claude
+
+# Documentation
+docs
