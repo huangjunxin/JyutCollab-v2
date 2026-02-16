@@ -380,6 +380,7 @@
 import { useAuth } from '~/composables/useAuth'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, DIALECT_CODE_TO_NAME, getDialectLabel } from '~/utils/dialects'
+import type { DialectId } from '~shared/dialects'
 import { queryJyutdict, getSuggestedPronunciation } from '~/composables/useJyutdict'
 import type { Entry, Register } from '~/types'
 import type { CharPronunciationData } from '~/types/jyutdict'
@@ -794,7 +795,7 @@ const STATUS_LABELS: Record<string, string> = {
 // 審核員/管理員新建詞條時的預設方言（僅用於此角色；貢獻者用其貢獻語言，無需選擇）
 const REVIEWER_NEW_ENTRY_DIALECT_KEY = 'jyutcollab_reviewer_new_entry_dialect'
 const newEntryDialectOptions = DIALECT_OPTIONS_FOR_SELECT
-const reviewerDefaultDialectForNew = ref('hongkong')
+const reviewerDefaultDialectForNew = ref<DialectId>('hongkong')
 const isReviewerOrAdmin = computed(() => {
   const r = user.value?.role
   return r === 'reviewer' || r === 'admin'
@@ -1330,7 +1331,7 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   if (entry && col) {
     const oldValue = col.get(entry)
     if (oldValue !== editValue.value) {
-      col.set(entry, editValue.value)
+      ;(col.set as (e: Entry, v: string | number | undefined) => void)(entry, editValue.value)
       entry._isDirty = true
     }
   }
@@ -2101,7 +2102,7 @@ onMounted(() => {
   if (import.meta.client) {
     const stored = localStorage.getItem(REVIEWER_NEW_ENTRY_DIALECT_KEY)
     if (stored && newEntryDialectOptions.some(o => o.value === stored)) {
-      reviewerDefaultDialectForNew.value = stored
+      reviewerDefaultDialectForNew.value = stored as DialectId
     }
   }
 })
