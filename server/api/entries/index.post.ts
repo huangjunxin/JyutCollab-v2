@@ -91,11 +91,15 @@ export default defineEventHandler(async (event) => {
     // 轉換文本為港式繁體
     const displayText = convertToHongKongTraditional(data.headword?.display || data.text || '')
     const normalizedText = convertToHongKongTraditional(data.headword?.normalized || displayText)
+    // 使用客戶端傳入的 search 字段（包含其他詞形），如果沒有則使用 display 的小写版本
+    const searchText = data.headword?.search 
+      ? convertToHongKongTraditional(data.headword.search)
+      : displayText.toLowerCase().trim()
 
     // 構建詞頭
     const headword = {
       display: displayText,
-      search: displayText.toLowerCase().trim(),
+      search: searchText,
       normalized: normalizedText,
       isPlaceholder: displayText.includes('□')
     }

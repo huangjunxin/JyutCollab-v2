@@ -118,9 +118,13 @@ export default defineEventHandler(async (event) => {
     // Update headword
     if (data.headword) {
       const displayText = convertToHongKongTraditional(data.headword.display)
+      // 使用客戶端傳入的 search 字段（包含其他詞形），如果沒有則使用 display 的小写版本
+      const searchText = data.headword.search
+        ? convertToHongKongTraditional(data.headword.search)
+        : displayText.toLowerCase().trim()
       existingEntry.headword = {
         display: displayText,
-        search: displayText.toLowerCase().trim(),
+        search: searchText,
         normalized: data.headword.normalized || displayText,
         isPlaceholder: displayText.includes('□')
       }

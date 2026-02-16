@@ -216,11 +216,15 @@ EntrySchema.index({ createdAt: -1 })
 
 // Pre-save hook to auto-populate search field
 EntrySchema.pre('save', function() {
-  if (this.headword && !this.headword.search) {
-    this.headword.search = this.headword.display.toLowerCase().trim()
-  }
-  if (this.headword && !this.headword.normalized) {
-    this.headword.normalized = this.headword.display
+  if (this.headword) {
+    // 如果 search 為空，設為 display 的小写版本（僅作為後備，API 層應該已經設置了）
+    if (!this.headword.search || this.headword.search.trim() === '') {
+      this.headword.search = this.headword.display.toLowerCase().trim()
+    }
+    // 如果 normalized 為空，設為 display
+    if (!this.headword.normalized || this.headword.normalized.trim() === '') {
+      this.headword.normalized = this.headword.display
+    }
   }
 })
 

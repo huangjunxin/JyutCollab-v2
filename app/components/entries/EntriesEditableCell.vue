@@ -203,6 +203,16 @@
               class="flex-shrink-0"
               @click="$emit('expand-click')"
             />
+            <UButton
+              v-if="col.key === 'headword' && !headwordExpandHint"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              :icon="isHeadwordExpanded ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
+              :title="isHeadwordExpanded ? '收起詞頭詳情' : '展開詞頭詳情（其他詞形）'"
+              class="flex-shrink-0"
+              @click="$emit('headword-expand-click')"
+            />
           </div>
         </div>
         <!-- 第二行：展開提示 -->
@@ -225,6 +235,28 @@
             :title="isExpanded ? '收起釋義詳情' : '展開釋義詳情（例句、分義項）'"
             class="flex-shrink-0"
             @click="$emit('expand-click')"
+          />
+        </div>
+        <!-- 詞頭展開提示 -->
+        <div
+          v-if="col.key === 'headword' && headwordExpandHint"
+          class="flex items-center justify-between px-1 py-0.5 min-h-[24px]"
+          @click.stop
+        >
+          <span
+            class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+            :title="`${headwordExpandHint}，點擊展開查看`"
+          >
+            {{ headwordExpandHint }}
+          </span>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            :icon="isHeadwordExpanded ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
+            :title="isHeadwordExpanded ? '收起詞頭詳情' : '展開詞頭詳情（其他詞形）'"
+            class="flex-shrink-0"
+            @click="$emit('headword-expand-click')"
           />
         </div>
       </div>
@@ -261,6 +293,10 @@ const props = withDefaults(
     showExpand?: boolean
     isExpanded?: boolean
     expandHint?: string
+    /** 詞頭展開狀態 */
+    isHeadwordExpanded?: boolean
+    /** 詞頭展開提示文字 */
+    headwordExpandHint?: string
     /** 主題 ID，用於顯示 tooltip 路徑 */
     themeId?: number
     /** 主題展開狀態 */
@@ -280,6 +316,8 @@ const props = withDefaults(
     showExpand: false,
     isExpanded: false,
     expandHint: '',
+    isHeadwordExpanded: false,
+    headwordExpandHint: '',
     themeId: undefined,
     isThemeExpanded: false,
     themeExpandHint: ''
@@ -325,6 +363,7 @@ const emit = defineEmits<{
   'ai-definition': []
   'ai-theme': []
   'expand-click': []
+  'headword-expand-click': []
   'theme-expand-click': []
   'accept-theme-ai': []
   'dismiss-theme-ai': []

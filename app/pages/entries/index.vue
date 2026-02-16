@@ -317,6 +317,8 @@
                 :show-expand="col.key === 'definition'"
                 :is-expanded="expandedEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
                 :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
+                :is-headword-expanded="col.key === 'headword' && expandedHeadwordEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                :headword-expand-hint="col.key === 'headword' ? getHeadwordExpandHint(row.entry) : undefined"
                 :theme-id="col.key === 'theme' ? row.entry.theme?.level3Id : undefined"
                 :is-theme-expanded="expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
                 @click="handleCellClick(row.entry, col.key, $event, rowIndex, colIndex)"
@@ -326,6 +328,7 @@
                 @ai-definition="generateAIDefinition(row.entry)"
                 @ai-theme="generateAICategorization(row.entry)"
                 @expand-click="toggleSensesExpand(row.entry)"
+                @headword-expand-click="toggleHeadwordExpand(row.entry)"
                 @theme-expand-click="toggleThemeExpand(row.entry)"
                 @accept-theme-ai="acceptThemeAI(row.entry)"
                 @dismiss-theme-ai="dismissThemeAI(row.entry)"
@@ -430,6 +433,18 @@
                 />
               </td>
             </tr>
+            <!-- 詞頭詳情展開區 -->
+            <tr
+              v-if="row.type === 'entry' && expandedHeadwordEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+              class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
+            >
+              <td :colspan="editableColumns.length + 2" class="p-0 align-top">
+                <EntryHeadwordExpand
+                  :entry="row.entry"
+                  @close="toggleHeadwordExpand(row.entry)"
+                />
+              </td>
+            </tr>
             <!-- 主題分類展開區 -->
             <tr
               v-if="row.type === 'entry' && expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
@@ -482,6 +497,7 @@ import AISuggestionRow from '~/components/entries/AISuggestionRow.vue'
 import JyutdictSuggestionRow from '~/components/entries/JyutdictSuggestionRow.vue'
 import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
 import EntryThemeExpand from '~/components/entries/EntryThemeExpand.vue'
+import EntryHeadwordExpand from '~/components/entries/EntryHeadwordExpand.vue'
 import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
@@ -560,6 +576,9 @@ const tableWrapperRef = ref<HTMLElement | null>(null)
 
 // 方案 B：行展開編輯釋義詳情（多義項、例句、分義項）。值為當前展開的 entry id
 const expandedEntryId = ref<string | null>(null)
+
+// 詞頭展開狀態
+const expandedHeadwordEntryId = ref<string | null>(null)
 
 // 主題展開狀態
 const expandedThemeEntryId = ref<string | null>(null)
@@ -925,7 +944,50 @@ const editableColumns = [
     get: (entry: Entry) => entry.headword?.display || entry.text || '',
     set: (entry: Entry, value: string) => {
       if (!entry.headword) entry.headword = { display: '', search: '', normalized: '', isPlaceholder: false }
+      const oldDisplay = entry.headword.display || entry.text || ''
       entry.headword.display = value
+      // 標準化詞頭默認等於顯示詞頭
+      entry.headword.normalized = value
+      
+      // 更新 search 字段：確保顯示詞頭始終包含在搜索詞頭中
+      if (!entry.headword.search || entry.headword.search.trim() === '') {
+        // 如果 search 為空，設為新的 display
+        entry.headword.search = value
+      } else {
+        // 如果 search 已有內容，需要確保新的 display 包含在其中
+        const searchParts = entry.headword.search.split(/\s+/).filter(p => p.trim() !== '')
+        const oldDisplayLower = oldDisplay.toLowerCase().trim()
+        const newDisplayLower = value.toLowerCase().trim()
+        
+        // 檢查 search 中是否已經包含新的 display（不區分大小寫）
+        const hasNewDisplay = searchParts.some(p => p.toLowerCase().trim() === newDisplayLower)
+        
+        if (!hasNewDisplay) {
+          // 如果 search 中沒有新的 display，替換第一個詞（舊的 display）為新的 display
+          if (searchParts.length > 0) {
+            const firstPart = searchParts[0]
+            if (firstPart && firstPart.toLowerCase().trim() === oldDisplayLower) {
+              searchParts[0] = value
+            } else {
+              // 如果第一個詞不是舊的 display，則在開頭添加新的 display
+              searchParts.unshift(value)
+            }
+          } else {
+            // 如果 searchParts 為空，添加新的 display
+            searchParts.push(value)
+          }
+          entry.headword.search = searchParts.join(' ').trim()
+        } else {
+          // 如果 search 中已經有新的 display，確保它在第一個位置
+          const newDisplayIndex = searchParts.findIndex(p => p.toLowerCase().trim() === newDisplayLower)
+          if (newDisplayIndex > 0) {
+            // 將新的 display 移到第一個位置
+            searchParts.splice(newDisplayIndex, 1)
+            searchParts.unshift(value)
+            entry.headword.search = searchParts.join(' ').trim()
+          }
+        }
+      }
       entry.text = value
     }
   },
@@ -1178,6 +1240,30 @@ function getDefinitionExpandHint(entry: Entry): string {
   return parts.join(' · ')
 }
 
+/** 詞頭列展開區旁的數量提示：有其他詞形時顯示「N個詞形」 */
+function getHeadwordExpandHint(entry: Entry): string {
+  const search = entry.headword?.search || ''
+  const display = entry.headword?.display || ''
+  
+  if (!search || !display) return ''
+  
+  // 從 search 字段解析其他詞形
+  const displayLower = display.toLowerCase().trim()
+  const searchLower = search.toLowerCase().trim()
+  
+  // 如果 search 等於 display（小寫），則沒有其他詞形
+  if (searchLower === displayLower) return ''
+  
+  // 分割搜索字段，計算其他詞形數量
+  const parts = search.split(/\s+/).filter(p => p.trim() !== '')
+  const variantCount = parts.filter(p => p.toLowerCase().trim() !== displayLower).length
+  
+  if (variantCount > 0) {
+    return `${variantCount}異形`
+  }
+  return ''
+}
+
 function getCellDisplay(entry: Entry, col: any) {
   const value = col.get(entry)
   if (col.type === 'theme') {
@@ -1214,6 +1300,11 @@ function toggleSensesExpand(entry: Entry) {
   const opening = expandedEntryId.value !== key
   expandedEntryId.value = expandedEntryId.value === key ? null : key
   if (opening && expandedEntryId.value === key) ensureSensesStructure(entry)
+}
+
+function toggleHeadwordExpand(entry: Entry) {
+  const key = String(entry.id ?? (entry as any)._tempId ?? '')
+  expandedHeadwordEntryId.value = expandedHeadwordEntryId.value === key ? null : key
 }
 
 function toggleThemeExpand(entry: Entry) {
