@@ -379,9 +379,14 @@
               :is-loading="getDuplicateCheckLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               @dismiss="dismissDuplicateCheck(row.entry)"
             />
-            <!-- 其他方言點已有該詞條 -->
+            <!-- 其他方言點已有該詞條（若已觸發同方言詞頭重複檢測則不再顯示，避免重複提示） -->
             <OtherDialectsRefRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length > 0"
+              v-if="
+                row.type === 'entry' &&
+                focusedCell?.rowIndex === rowIndex &&
+                getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length > 0 &&
+                getDuplicateCheckEntriesFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length === 0
+              "
               :colspan="editableColumns.length + 2"
               :entries="getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               @dismiss="dismissDuplicateCheck(row.entry)"
