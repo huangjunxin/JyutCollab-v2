@@ -831,13 +831,11 @@ const userDialectOptions = computed(() => {
     return DIALECT_OPTIONS_FOR_SELECT
   }
 
-  // 貢獻者只能選擇自己有權限的方言
-  return (currentUser.dialectPermissions || [])
-    .filter(p => p.role === 'contributor' || p.role === 'reviewer')
-    .map(p => ({
-      value: p.dialectName,
-      label: dialectCodeToName[p.dialectName] || p.dialectName
-    }))
+  // 貢獻者只能選擇自己有權限的方言（方案 A：dialectPermissions 即可貢獻方言列表）
+  return (currentUser.dialectPermissions || []).map(p => ({
+    value: p.dialectName,
+    label: dialectCodeToName[p.dialectName] || p.dialectName
+  }))
 })
 
 // 獲取用户的默認方言（新建詞條時使用）

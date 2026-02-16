@@ -69,9 +69,9 @@ export default defineEventHandler(async (event) => {
       nativeDialect: u.nativeDialect,
       role: u.role,
       bio: u.bio,
-      dialectPermissions: (u.dialectPermissions as Array<{ dialect_name: string; role: string }>)?.map(p => ({
-        dialectName: p.dialect_name,
-        role: p.role
+      dialectPermissions: (u.dialectPermissions as Array<{ dialectName: string; role?: string }>)?.map(p => ({
+        dialectName: p.dialectName,
+        role: p.role ?? 'contributor'
       })) ?? [],
       contributionCount: u.contributionCount ?? 0,
       reviewCount: u.reviewCount ?? 0,

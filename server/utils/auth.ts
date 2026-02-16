@@ -65,9 +65,9 @@ export async function registerUser(data: RegisterData): Promise<{ user?: AuthUse
 
     const passwordHash = await bcryptHash(data.password)
 
-    // 根據用户選擇的方言自動分配貢獻者權限
+    // 根據用户選擇的方言自動分配貢獻者權限（駝峰命名）
     const dialectPermissions = data.dialect ? [{
-      dialect_name: data.dialect,
+      dialectName: data.dialect,
       role: 'contributor' as const
     }] : []
 
@@ -150,8 +150,8 @@ function toAuthUser(user: IUser): AuthUser {
     displayName: user.displayName,
     role: user.role,
     dialectPermissions: (user.dialectPermissions || []).map(p => ({
-      dialectName: p.dialect_name,
-      role: p.role
+      dialectName: p.dialectName,
+      role: p.role ?? 'contributor'
     }))
   }
 }
@@ -168,4 +168,14 @@ export function hasPermission(userRole: string, requiredRole: string): boolean {
   const requiredLevel = roleHierarchy[requiredRole as keyof typeof roleHierarchy] || 0
 
   return userLevel >= requiredLevel
+}
+
+/** 方案 A：貢獻者僅能在其方言權限內建/改詞條；審核員與管理員不校驗方言 */
+export function canContributeToDialect(
+  auth: { role: string; dialectPermissions?: Array<{ dialectName: string }> },
+  dialectName: string
+): boolean {
+  if (auth.role === 'reviewer' || auth.role === 'admin') return true
+  const allowed = (auth.dialectPermissions || []).map(p => p.dialectName)
+  return allowed.length > 0 && allowed.includes(dialectName)
 }
