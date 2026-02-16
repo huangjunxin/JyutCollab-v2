@@ -289,6 +289,14 @@
               @accept="(pronunciation: string) => acceptJyutdict(entry, pronunciation)"
               @dismiss="dismissJyutdict(entry)"
             />
+            <!-- 詞頭重複檢測（新建詞條離開詞頭格後，若數據庫已有相同詞頭+方言則顯示） -->
+            <DuplicateCheckRow
+              v-if="focusedCell?.rowIndex === rowIndex && getDuplicateCheckVisible(String(entry.id ?? (entry as any)._tempId ?? ''))"
+              :colspan="editableColumns.length + 2"
+              :entries="getDuplicateCheckEntriesFormatted(String(entry.id ?? (entry as any)._tempId ?? ''))"
+              :is-loading="getDuplicateCheckLoading(String(entry.id ?? (entry as any)._tempId ?? ''))"
+              @dismiss="dismissDuplicateCheck(entry)"
+            />
             <!-- 行內釋義建議錯誤 + 重試 -->
             <tr
               v-if="aiInlineError && String(entry.id ?? (entry as any)._tempId) === aiInlineError.entryId && aiInlineError.field === 'definition'"
@@ -390,6 +398,7 @@ import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
 import EntryThemeExpand from '~/components/entries/EntryThemeExpand.vue'
 import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
+import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
 
 definePageMeta({
   layout: 'default',
@@ -484,6 +493,9 @@ const jyutdictVisible = ref<Map<string, boolean>>(new Map())
 /** 已採納或忽略粵拼建議的 entryId，不再重複顯示 */
 const jyutdictHandled = ref<Set<string>>(new Set())
 
+/** 詞頭重複檢測結果（新建詞條離開詞頭格時觸發）。key: entryId, value: { loading } 或 { loading: false, entries } */
+const duplicateCheckResult = ref<Map<string, { loading: boolean, entries?: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }> }>>(new Map())
+
 // 獲取粵拼建議相關數據
 function getJyutdictData(entryId: string): CharPronunciationData[] {
   return jyutdictData.value.get(entryId) || []
@@ -525,6 +537,55 @@ async function queryJyutdictForEntry(entry: Entry) {
   } finally {
     jyutdictLoading.value.set(entryId, false)
   }
+}
+
+/** 新建詞條：離開詞頭格時檢測數據庫是否已有相同詞頭+方言，並將結果存入 duplicateCheckResult */
+async function runDuplicateCheck(entry: Entry) {
+  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
+  const headword = entry.headword?.display?.trim() || ''
+  const dialect = entry.dialect?.name || ''
+  if (!headword || !dialect) return
+
+  duplicateCheckResult.value.set(entryId, { loading: true })
+  duplicateCheckResult.value = new Map(duplicateCheckResult.value)
+
+  try {
+    const res = await $fetch<{ data: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }> }>('/api/entries/check-duplicate', {
+      query: { headword, dialect }
+    })
+    duplicateCheckResult.value.set(entryId, { loading: false, entries: res.data || [] })
+  } catch (e) {
+    duplicateCheckResult.value.set(entryId, { loading: false, entries: [] })
+  }
+  duplicateCheckResult.value = new Map(duplicateCheckResult.value)
+}
+
+function getDuplicateCheckEntriesFormatted(entryId: string): Array<{ id: string, headwordDisplay: string, dialectLabel: string, status: string, statusLabel: string, createdAtLabel: string }> {
+  const raw = duplicateCheckResult.value.get(entryId)
+  if (!raw?.entries?.length) return []
+  return raw.entries.map(e => ({
+    id: e.id,
+    headwordDisplay: e.headword?.display || '-',
+    dialectLabel: DIALECT_CODE_TO_NAME[e.dialect?.name || ''] || e.dialect?.name || '-',
+    status: e.status || 'draft',
+    statusLabel: STATUS_LABELS[e.status || 'draft'] || e.status || '-',
+    createdAtLabel: e.createdAt ? new Date(e.createdAt).toLocaleString('zh-HK', { dateStyle: 'short', timeStyle: 'short' }) : '-'
+  }))
+}
+
+function dismissDuplicateCheck(entry: Entry) {
+  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
+  duplicateCheckResult.value.delete(entryId)
+  duplicateCheckResult.value = new Map(duplicateCheckResult.value)
+}
+
+function getDuplicateCheckVisible(entryId: string): boolean {
+  const r = duplicateCheckResult.value.get(entryId)
+  return !!(r && (r.loading || (r.entries && r.entries.length > 0)))
+}
+
+function getDuplicateCheckLoading(entryId: string): boolean {
+  return duplicateCheckResult.value.get(entryId)?.loading ?? false
 }
 
 // 接受粵拼建議（採納後不再顯示，與分類/釋義一致）
@@ -1296,9 +1357,14 @@ function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
         dismissAISuggestion()
       }
       // 如果有粵拼建議，忽略它
-      if (getJyutdictVisible(String(entry.id ?? (entry as any)._tempId ?? ''))) {
+      else if (getJyutdictVisible(String(entry.id ?? (entry as any)._tempId ?? ''))) {
         dismissJyutdict(entry)
-      } else if (field === 'theme' && themeAISuggestions.value.get(String(entry.id ?? (entry as any)._tempId ?? ''))) {
+      }
+      // 如果有詞頭重複檢測提示，忽略它 (Esc)
+      else if (getDuplicateCheckVisible(String(entry.id ?? (entry as any)._tempId ?? ''))) {
+        dismissDuplicateCheck(entry)
+      }
+      else if (field === 'theme' && themeAISuggestions.value.get(String(entry.id ?? (entry as any)._tempId ?? ''))) {
         dismissThemeAI(entry)
       } else {
         cancelCellEdit()
@@ -1350,6 +1416,10 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   editingCell.value = null
   aiSuggestion.value = null
   aiSuggestionForField.value = null
+  // 新建詞條：離開詞頭格且已填寫詞頭時，做一次重複性檢測
+  if (field === 'headword' && entry && (entry as any)._isNew && entry.headword?.display?.trim()) {
+    runDuplicateCheck(entry)
+  }
   const focusWrapper = options?.focusWrapper !== false
   if (focusWrapper) {
     nextTick(() => tableWrapperRef.value?.focus())
@@ -1474,6 +1544,12 @@ function handleTableKeydown(event: KeyboardEvent) {
       }
       return
     case 'Escape':
+      // 若當前行有詞頭重複檢測提示，Esc 忽略
+      if (currentEntry && getDuplicateCheckVisible(String(currentEntry.id ?? (currentEntry as any)._tempId ?? ''))) {
+        event.preventDefault()
+        dismissDuplicateCheck(currentEntry)
+        return
+      }
       // 若當前在分類列且有待處理的 AI 分類建議，Esc 忽略
       if (colIndex === themeColIndex && currentEntry && themeAISuggestions.value.get(entryKeyForTheme)) {
         event.preventDefault()
