@@ -19,7 +19,8 @@ const QuerySchema = z.object({
   register: z.enum(['口語', '書面', '粗俗', '文雅', '中性']).optional(),
   formalityLevel: z.enum(['formal', 'neutral', 'informal', 'slang', 'vulgar']).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'viewCount', 'likeCount', 'headword']).default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc')
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  groupBy: z.enum(['headword']).optional() // 聚合視圖：按詞形分組
 })
 
 export default defineEventHandler(async (event) => {
@@ -57,7 +58,8 @@ export default defineEventHandler(async (event) => {
       register,
       formalityLevel,
       sortBy,
-      sortOrder
+      sortOrder,
+      groupBy
     } = validated.data
 
     // Build filter
@@ -101,21 +103,10 @@ export default defineEventHandler(async (event) => {
       sort[sortBy] = sortOrder === 'asc' ? 1 : -1
     }
 
-    // Execute query
     const skip = (page - 1) * perPage
-    const [entries, total] = await Promise.all([
-      Entry.find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(perPage)
-        .lean(),
-      Entry.countDocuments(filter)
-    ])
 
-    // Transform entries for response
-    const data = entries.map(entry => ({
-      id: entry.id || entry._id.toString(),
-      // 新格式字段
+    const transformEntry = (entry: any) => ({
+      id: entry.id || entry._id?.toString?.(),
       sourceBook: entry.sourceBook,
       dialect: entry.dialect,
       headword: entry.headword,
@@ -125,7 +116,6 @@ export default defineEventHandler(async (event) => {
       refs: entry.refs,
       theme: entry.theme,
       meta: entry.meta,
-      // 兼容舊格式字段
       text: entry.headword?.display,
       textNormalized: entry.headword?.search,
       region: entry.dialect?.name,
@@ -136,21 +126,63 @@ export default defineEventHandler(async (event) => {
       usageNotes: entry.meta?.usage,
       formalityLevel: entry.meta?.register,
       examples: entry.senses?.[0]?.examples,
-      phoneticNotation: entry.phonetic?.jyutping?.join(' '),
+      phoneticNotation: entry.phonetic?.jyutping?.join?.(' '),
       notationSystem: 'jyutping' as const,
-      // 通用字段
       status: entry.status,
       createdBy: entry.createdBy,
-      contributorId: entry.createdBy, // 兼容
+      contributorId: entry.createdBy,
       updatedBy: entry.updatedBy,
       reviewedBy: entry.reviewedBy,
-      reviewedAt: entry.reviewedAt?.toISOString(),
+      reviewedAt: entry.reviewedAt?.toISOString?.(),
       reviewNotes: entry.reviewNotes,
-      viewCount: entry.viewCount,
-      likeCount: entry.likeCount,
-      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
-      updatedAt: entry.updatedAt?.toISOString?.() || entry.updatedAt
-    }))
+      viewCount: entry.viewCount ?? 0,
+      likeCount: entry.likeCount ?? 0,
+      createdAt: entry.createdAt?.toISOString?.() ?? entry.createdAt,
+      updatedAt: entry.updatedAt?.toISOString?.() ?? entry.updatedAt
+    })
+
+    if (groupBy === 'headword') {
+      const sortStage = Object.keys(sort).length ? { $sort: sort } : { $sort: { 'headword.display': 1 } }
+      const groupKey = { $ifNull: ['$headword.normalized', '$headword.display'] }
+      const facetResult = await Entry.aggregate([
+        { $match: filter },
+        sortStage,
+        {
+          $facet: {
+            totalGroups: [
+              { $group: { _id: groupKey } },
+              { $count: 'count' }
+            ],
+            groups: [
+              { $group: { _id: groupKey, headwordDisplay: { $first: '$headword.display' }, entries: { $push: '$$ROOT' } } },
+              { $sort: { _id: sortOrder === 'asc' ? 1 : -1 } },
+              { $skip: skip },
+              { $limit: perPage }
+            ]
+          }
+        }
+      ])
+      const total = facetResult[0]?.totalGroups?.[0]?.count ?? 0
+      const groups = (facetResult[0]?.groups ?? []).map((g: any) => ({
+        headwordNormalized: g._id,
+        headwordDisplay: g.headwordDisplay ?? g._id,
+        entries: (g.entries ?? []).map((e: any) => transformEntry(e))
+      }))
+      return {
+        data: groups,
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        grouped: true
+      }
+    }
+
+    const [entries, total] = await Promise.all([
+      Entry.find(filter).sort(sort).skip(skip).limit(perPage).lean(),
+      Entry.countDocuments(filter)
+    ])
+    const data = entries.map((entry: any) => transformEntry(entry))
 
     return {
       data,
