@@ -885,7 +885,7 @@ async function batchDeleteSelected() {
   batchDeleting.value = true
   try {
     for (const entry of toDelete) {
-      await $fetch(`/api/entries/${entry.id}`, { method: 'DELETE' })
+      await $fetch<unknown>(`/api/entries/${entry.id}`, { method: 'DELETE' })
       selectedEntryIds.value = new Set([...selectedEntryIds.value].filter((id) => id !== String(entry.id)))
     }
     await fetchEntries()
@@ -2238,7 +2238,7 @@ async function saveAllChanges() {
       entry.status = getStatusForSave(entry)
     })
     await Promise.all(dirtyEntries.map(entry =>
-      $fetch(`/api/entries/${entry.id}`, {
+      $fetch<unknown>(`/api/entries/${entry.id}`, {
         method: 'PUT',
         body: {
           headword: entry.headword,
@@ -2328,7 +2328,7 @@ async function deleteEntry(entry: Entry) {
   }
 
   try {
-    await $fetch(`/api/entries/${entry.id}`, { method: 'DELETE' })
+    await $fetch<unknown>(`/api/entries/${entry.id}`, { method: 'DELETE' })
 
     // Remove from list
     const index = entries.value.findIndex(e => e.id === entry.id)
