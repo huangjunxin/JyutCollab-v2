@@ -216,7 +216,7 @@
                   />
                 </div>
               </th>
-              <th class="w-20 px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <th class="min-w-[6rem] w-24 px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
                 操作
               </th>
             </tr>
@@ -265,7 +265,7 @@
               <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
                 {{ getGroupStatus(row.group) }}
               </td>
-              <td class="w-20 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
+              <td class="min-w-[6rem] w-24 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
                 <UButton
                   :icon="expandedGroupKeys.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
                   color="neutral"
@@ -1451,7 +1451,7 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
   const col = editableColumns.find(c => c.key === field)
   if (!col) return
 
-  const r = rowIndex ?? entries.value.findIndex(e => (e.id ?? (e as any)._tempId) === (entry.id ?? (entry as any)._tempId))
+  const r = rowIndex ?? tableRows.value.findIndex(row => row.type === 'entry' && (row.entry.id ?? (row.entry as any)._tempId) === (entry.id ?? (entry as any)._tempId))
   const c = colIndex ?? editableColumns.findIndex(colDef => colDef.key === field)
   if (r < 0 || c < 0) return
 
@@ -1606,7 +1606,7 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   if (!editingCell.value) return
 
   const { entryId, field } = editingCell.value
-  const entry = entries.value.find(e => String(e.id ?? (e as any)._tempId) === String(entryId))
+  const entry = currentPageEntries.value.find(e => String(e.id ?? (e as any)._tempId) === String(entryId))
   const col = editableColumns.find(c => c.key === field)
 
   if (entry && col) {
@@ -1617,7 +1617,7 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
     }
   }
 
-  const rowIndex = entry ? entries.value.indexOf(entry) : -1
+  const rowIndex = entry ? tableRows.value.findIndex(r => r.type === 'entry' && (r.entry === entry || String(r.entry.id ?? (r.entry as any)._tempId) === String(entryId))) : -1
   const colIndex = editableColumns.findIndex(c => c.key === field)
   if (rowIndex >= 0 && colIndex >= 0) {
     focusedCell.value = { rowIndex, colIndex }
@@ -1644,7 +1644,7 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
 function cancelCellEdit() {
   if (editingCell.value) {
     const { entryId, field } = editingCell.value
-    const rowIndex = entries.value.findIndex(e => (e.id ?? (e as any)._tempId) === entryId)
+    const rowIndex = tableRows.value.findIndex(r => r.type === 'entry' && String(r.entry.id ?? (r.entry as any)._tempId) === String(entryId))
     const colIndex = editableColumns.findIndex(c => c.key === field)
     if (rowIndex >= 0 && colIndex >= 0) {
       focusedCell.value = { rowIndex, colIndex }
@@ -1664,7 +1664,7 @@ function cancelCellEdit() {
 
 /** 保存當前格並跳到下一格（Tab 方向）。返回是否成功打開下一格。 */
 function moveToNextCell(entry: Entry, currentField: string, direction: number): boolean {
-  const currentRowIndex = entries.value.findIndex(e => (e.id ?? (e as any)._tempId) === (entry.id ?? (entry as any)._tempId))
+  const currentRowIndex = tableRows.value.findIndex(r => r.type === 'entry' && (r.entry.id ?? (r.entry as any)._tempId) === (entry.id ?? (entry as any)._tempId))
   const currentColIndex = editableColumns.findIndex(c => c.key === currentField)
   let nextRow = currentRowIndex
   let nextCol = currentColIndex + direction
@@ -1676,8 +1676,17 @@ function moveToNextCell(entry: Entry, currentField: string, direction: number): 
     nextCol = 0
     nextRow++
   }
-  if (nextRow < 0 || nextRow >= entries.value.length) return false
-  const nextEntry = entries.value[nextRow]
+  const rows = tableRows.value
+  if (nextRow < 0 || nextRow >= rows.length) return false
+  // 跳過聚合視圖下的組標題行，只停在可編輯的 entry 行
+  let row = rows[nextRow]
+  if (row?.type === 'group') {
+    nextRow += direction > 0 ? 1 : -1
+    while (nextRow >= 0 && nextRow < rows.length && rows[nextRow]?.type !== 'entry') nextRow += direction > 0 ? 1 : -1
+    if (nextRow < 0 || nextRow >= rows.length) return false
+    row = rows[nextRow]
+  }
+  const nextEntry = row?.type === 'entry' ? row.entry : null
   const nextColDef = editableColumns[nextCol]
   if (!nextEntry || !nextColDef) return false
   handleCellClick(nextEntry, nextColDef.key, new MouseEvent('click'), nextRow, nextCol, true)
@@ -1851,7 +1860,7 @@ async function triggerAISuggestion(entry: Entry, field: string, value: string) {
         ])
 
         // 結果校驗：詞頭已變更則不套用
-        const currentEntry = entries.value.find(e => String(e.id ?? (e as any)._tempId) === entryId)
+        const currentEntry = currentPageEntries.value.find(e => String(e.id ?? (e as any)._tempId) === entryId)
         const currentHeadword = currentEntry?.headword?.display?.trim() || ''
         if (currentHeadword !== headword) {
           return
@@ -2067,7 +2076,7 @@ function acceptAISuggestion() {
   if (defMatch) defText = defMatch[1]?.trim() ?? aiSuggestion.value
 
   if (isDefinition && editingCell.value?.entryId !== undefined) {
-    const entry = entries.value.find(e => String(e.id ?? (e as any)._tempId) === String(editingCell.value!.entryId))
+    const entry = currentPageEntries.value.find(e => String(e.id ?? (e as any)._tempId) === String(editingCell.value!.entryId))
     if (entry) {
       if (!entry.senses || entry.senses.length === 0) {
         entry.senses = [{ definition: defText, examples: [] }]
@@ -2221,7 +2230,7 @@ async function saveNewEntry(entry: Entry) {
 
 async function saveAllChanges() {
   saving.value = true
-  const dirtyEntries = entries.value.filter(e => e._isDirty && !e._isNew)
+  const dirtyEntries = currentPageEntries.value.filter(e => e._isDirty && !(e as any)._isNew)
 
   try {
     // 先更新本地狀態（如審核員保存→已發佈），再發送請求，避免保存後仍顯示「有修改」
