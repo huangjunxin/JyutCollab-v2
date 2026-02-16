@@ -67,8 +67,11 @@ export default defineEventHandler(async (event) => {
 
     if (searchQuery) {
       filter.$or = [
+        // 主詞頭
         { 'headword.display': { $regex: searchQuery, $options: 'i' } },
-        { 'headword.search': { $regex: searchQuery.toLowerCase(), $options: 'i' } },
+        // 異形詞（variants 為 string[]，Mongo 會對每個元素應用 regex）
+        { 'headword.variants': { $regex: searchQuery, $options: 'i' } },
+        // 釋義
         { 'senses.definition': { $regex: searchQuery, $options: 'i' } }
       ]
     }
@@ -117,7 +120,8 @@ export default defineEventHandler(async (event) => {
       theme: entry.theme,
       meta: entry.meta,
       text: entry.headword?.display,
-      textNormalized: entry.headword?.search,
+      // 舊字段：用 display + 第一個異形詞作簡單兼容
+      textNormalized: entry.headword?.variants?.[0] ?? entry.headword?.display,
       region: entry.dialect?.name,
       themeIdL1: entry.theme?.level1Id,
       themeIdL2: entry.theme?.level2Id,

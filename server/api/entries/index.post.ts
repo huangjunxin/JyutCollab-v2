@@ -7,8 +7,8 @@ const CreateEntrySchema = z.object({
   headword: z.object({
     display: z.string().min(1, '請輸入詞條文本').max(200, '詞條文本過長'),
     normalized: z.string().optional(),
-    // 支援前端傳入 search（包含異形詞），若缺省則在後面用 display 推導
-    search: z.string().optional()
+    // 異形／其他詞形列表
+    variants: z.array(z.string()).optional()
   }).optional(),
   dialect: z.object({
     name: z.string(),
@@ -93,17 +93,20 @@ export default defineEventHandler(async (event) => {
     // 轉換文本為港式繁體（顯示/標準化用）
     const displayText = convertToHongKongTraditional(data.headword?.display || data.text || '')
     const normalizedText = convertToHongKongTraditional(data.headword?.normalized || displayText)
-    // search 用於匹配/儲存異形詞，保留用戶原始輸入（只在缺省時用 display.lowercase 作後備）
-    const searchText = data.headword?.search
-      ? data.headword.search
-      : displayText.toLowerCase().trim()
+
+    // 異形詞：直接使用 headword.variants（若缺省則為空陣列）
+    let variants: string[] = []
+    if (Array.isArray(data.headword?.variants)) {
+      variants = data.headword!.variants
+    }
 
     // 構建詞頭
     const headword = {
       display: displayText,
-      search: searchText,
       normalized: normalizedText,
-      isPlaceholder: displayText.includes('□')
+      isPlaceholder: displayText.includes('□'),
+      variants
+      // search 已棄用：如有需要可在後續遷移時重新生成
     }
 
     // 構建方言
@@ -121,9 +124,9 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // 檢查重複
+    // 檢查重複（以 display + dialect 為唯一鍵；異形詞只作輔助信息）
     const existing = await Entry.findOne({
-      'headword.search': headword.search,
+      'headword.display': headword.display,
       'dialect.name': dialect.name
     })
 

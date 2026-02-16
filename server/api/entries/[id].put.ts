@@ -4,11 +4,11 @@ import { canContributeToDialect } from '../../utils/auth'
 const UpdateEntrySchema = z.object({
   // 新格式
   headword: z.object({
-    // 允許僅更新 search（異形詞）而不改 display
+    // 允許僅更新異形詞而不改 display
     display: z.string().optional(),
     normalized: z.string().optional(),
-    // 支援前端傳入 search（包含異形詞），若缺省則在後面用 display 推導
-    search: z.string().optional()
+    // 異形／其他詞形列表
+    variants: z.array(z.string()).optional()
   }).optional(),
   dialect: z.object({
     name: z.string(),
@@ -122,15 +122,19 @@ export default defineEventHandler(async (event) => {
     if (data.headword) {
       const displayRaw = data.headword.display ?? existingEntry.headword?.display ?? ''
       const displayText = convertToHongKongTraditional(displayRaw)
-      // search 用於匹配/儲存異形詞，保留用戶原始輸入（只在缺省時用 display.lowercase 作後備）
-      const searchText = data.headword.search
-        ? data.headword.search
-        : displayText.toLowerCase().trim()
+
+      // 異形詞：優先使用 headword.variants，其次沿用現有 DB 內的 variants
+      let variants: string[] = existingEntry.headword?.variants ?? []
+      if (Array.isArray(data.headword.variants)) {
+        variants = data.headword.variants
+      }
+
       existingEntry.headword = {
         display: displayText,
-        search: searchText,
         normalized: data.headword.normalized || displayText,
-        isPlaceholder: displayText.includes('□')
+        isPlaceholder: displayText.includes('□'),
+        variants
+        // search 已棄用：保留現有值但不再主動更新
       }
       changedFields.push('headword')
     }

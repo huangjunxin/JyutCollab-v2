@@ -35,10 +35,10 @@ export interface Phonetic {
 }
 
 export interface Headword {
-  display: string           // 原書寫法（展示用）
-  search: string            // 清洗後（搜索用）
-  normalized: string        // 推薦標準寫法
+  display: string           // 原書寫法（展示用，港式繁體）
+  normalized: string        // 推薦標準寫法（通常等同 display）
   isPlaceholder: boolean    // 是否包含開天窗字 □
+  variants?: string[]       // 異形／其他詞形列表（原樣，不經字形轉換）
 }
 
 export interface Dialect {

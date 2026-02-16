@@ -14,10 +14,14 @@ export interface Phonetic {
 }
 
 export interface Headword {
+  /** 主詞頭顯示文本（港式繁體） */
   display: string
-  search: string
+  /** 推薦標準寫法（通常等同 display） */
   normalized: string
+  /** 是否包含開天窗字 □ */
   isPlaceholder: boolean
+  /** 異形／其他詞形列表（不經字形轉換，按用戶輸入儲存） */
+  variants?: string[]
 }
 
 export interface Dialect {
