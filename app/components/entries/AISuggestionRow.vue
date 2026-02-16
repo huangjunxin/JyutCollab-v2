@@ -5,17 +5,17 @@
     aria-labelledby="ai-suggestion-inline-title"
   >
     <td :colspan="colspan" class="px-3 py-2 align-top">
-      <div
-        class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 p-3 shadow-sm"
-      >
-        <div class="flex items-center gap-2 mb-2">
-          <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-purple-500 flex-shrink-0" />
-          <h3 id="ai-suggestion-inline-title" class="text-sm font-semibold text-purple-600 dark:text-purple-400">
-            {{ title }}
-          </h3>
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-purple-500 flex-shrink-0" />
+            <h3 id="ai-suggestion-inline-title" class="text-sm font-semibold text-purple-600 dark:text-purple-400">
+              {{ title }}
+            </h3>
+          </div>
+          <p class="text-sm text-gray-700 dark:text-gray-300 break-words">{{ text }}</p>
         </div>
-        <p class="text-gray-700 dark:text-gray-300 text-sm mb-3 break-words">{{ text }}</p>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-shrink-0">
           <UButton size="xs" color="neutral" variant="ghost" @mousedown.prevent="$emit('dismiss')">
             忽略 (Esc)
           </UButton>
