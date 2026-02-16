@@ -11,7 +11,7 @@
             詞條表格
           </h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ pagination.total }}</span> 個詞條
+            共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ pagination.total }}</span> {{ viewMode === 'aggregated' ? '個詞形' : '個詞條' }}
             <span v-if="hasUnsavedChanges" class="ml-2 text-amber-600">· 有未保存的更改</span>
           </p>
         </div>
@@ -99,6 +99,20 @@
           >
             搜索
           </UButton>
+          <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-2">
+            <span class="text-sm text-gray-500 dark:text-gray-400">視圖</span>
+            <USelectMenu
+              :model-value="viewMode"
+              :items="[
+                { value: 'flat', label: '平鋪' },
+                { value: 'aggregated', label: '按詞形聚合' }
+              ]"
+              value-key="value"
+              size="sm"
+              class="w-28"
+              @update:model-value="setViewMode"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -113,13 +127,13 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="entries.length === 0" class="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div v-else-if="isEmpty" class="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
         <UIcon name="i-heroicons-table-cells" class="w-10 h-10 text-gray-400" />
       </div>
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">暫無詞條</h3>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ viewMode === 'aggregated' ? '暫無詞形' : '暫無詞條' }}</h3>
       <p class="text-gray-500 dark:text-gray-400 mb-4 max-w-md mx-auto">
-        {{ searchQuery ? '沒有找到匹配的詞條，請嘗試其他關鍵詞' : '點擊上方按鈕開始創建第一個詞條' }}
+        {{ searchQuery ? (viewMode === 'aggregated' ? '沒有找到匹配的詞形' : '沒有找到匹配的詞條，請嘗試其他關鍵詞') : (viewMode === 'aggregated' ? '可切換為平鋪視圖或點擊上方按鈕新建詞條' : '點擊上方按鈕開始創建第一個詞條') }}
       </p>
       <UButton
         v-if="isAuthenticated && !searchQuery"
@@ -128,7 +142,7 @@
         icon="i-heroicons-plus"
         @click="addNewRow"
       >
-        創建第一個詞條
+        {{ viewMode === 'aggregated' ? '新建詞條' : '創建第一個詞條' }}
       </UButton>
     </div>
 
@@ -208,10 +222,65 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            <template v-for="(entry, rowIndex) in entries" :key="(entry as any)?._tempId || entry.id || `new-${rowIndex}`">
+            <template v-for="(row, rowIndex) in tableRows" :key="row.type === 'group' ? `group-${row.group.headwordNormalized}-${row.groupIndex}` : (row.entry as any)?._tempId ?? row.entry.id ?? `entry-${rowIndex}`">
+            <!-- 聚合視圖：詞形組標題行 -->
             <tr
+              v-if="row.type === 'group'"
+              class="bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-l-2 border-primary/40"
+            >
+              <td class="w-10 px-2 py-1 text-center border-r border-gray-200 dark:border-gray-700 text-xs text-gray-400 align-middle">
+                {{ (pagination.page - 1) * pagination.perPage + row.groupIndex + 1 }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 font-medium text-gray-900 dark:text-white">
+                {{ row.group.headwordDisplay || '—' }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700">
+                <div class="flex flex-wrap gap-1">
+                  <UBadge
+                    v-for="e in row.group.entries"
+                    :key="e.id ?? (e as any)._tempId"
+                    size="xs"
+                    variant="soft"
+                    color="neutral"
+                  >
+                    {{ getDialectLabel(e.dialect?.name || '') || e.dialect?.name || '—' }}
+                  </UBadge>
+                </div>
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                {{ getGroupPhonetic(row.group) }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                {{ getGroupEntryType(row.group) }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                {{ getGroupTheme(row.group) }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                {{ row.group.entries.length > 1 ? `共 ${row.group.entries.length} 個方言點` : (row.group.entries[0]?.senses?.[0]?.definition || row.group.entries[0]?.definition || '—') }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                {{ getGroupRegister(row.group) }}
+              </td>
+              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                {{ getGroupStatus(row.group) }}
+              </td>
+              <td class="w-20 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
+                <UButton
+                  :icon="expandedGroupKeys.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  :aria-label="expandedGroupKeys.has(row.group.headwordNormalized) ? '收合' : '展開'"
+                  @click="toggleGroupExpanded(row.group.headwordNormalized)"
+                />
+              </td>
+            </tr>
+            <!-- 平鋪詞條行 或 聚合視圖下展開的詞條行 -->
+            <tr
+              v-else
               class="group hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
-              :class="{ 'bg-amber-50 dark:bg-amber-900/10': entry._isDirty }"
+              :class="{ 'bg-amber-50 dark:bg-amber-900/10': row.entry._isDirty }"
             >
               <td
                 class="w-10 px-2 py-1 text-center border-r border-gray-200 dark:border-gray-700 text-xs text-gray-400"
@@ -221,102 +290,102 @@
                   <input
                     type="checkbox"
                     class="rounded border-gray-300 cursor-pointer"
-                    :checked="isEntrySelected(entry)"
-                    :aria-label="`${isEntrySelected(entry) ? '取消選中' : '選中'}此詞條`"
-                    @click.stop="toggleSelectEntry(entry, $event)"
+                    :checked="isEntrySelected(row.entry)"
+                    :aria-label="`${isEntrySelected(row.entry) ? '取消選中' : '選中'}此詞條`"
+                    @click.stop="toggleSelectEntry(row.entry, $event)"
                   />
-                  <span class="text-gray-400">{{ (pagination.page - 1) * pagination.perPage + rowIndex + 1 }}</span>
+                  <span class="text-gray-400">{{ row.groupIndex >= 0 ? `${(pagination.page - 1) * pagination.perPage + row.groupIndex + 1}-${(row.entryIndexInGroup ?? 0) + 1}` : (pagination.page - 1) * pagination.perPage + rowIndex + 1 }}</span>
                 </div>
               </td>
               <EntriesEditableCell
                 v-for="(col, colIndex) in editableColumns"
-                :key="`${entry.id ?? (entry as any)._tempId}-${col.key}`"
+                :key="`${row.entry.id ?? (row.entry as any)._tempId}-${col.key}`"
                 :col="col"
-                :can-edit="canEditEntry(entry)"
-                :is-editing="isEditing(entry.id ?? (entry as any)._tempId, col.key)"
+                :can-edit="canEditEntry(row.entry)"
+                :is-editing="isEditing(row.entry.id ?? (row.entry as any)._tempId, col.key)"
                 v-model:edit-value="editValue"
-                :display-text="getCellDisplay(entry, col)"
-                :cell-class="getCellClass(entry, col.key).join(' ')"
+                :display-text="getCellDisplay(row.entry, col)"
+                :cell-class="getCellClass(row.entry, col.key).join(' ')"
                 :wrap="useWrapForField(col.key)"
                 :is-selected="isSelected(rowIndex, colIndex)"
                 :column-options="getColumnOptions(col)"
-                :review-notes="col.key === 'status' && entry.status === 'rejected' ? entry.reviewNotes : undefined"
-                :show-ai-definition="col.key === 'definition' && !!entry.headword?.display && !entry.senses?.[0]?.definition"
-                :show-ai-theme="col.key === 'theme' && !!entry.headword?.display && !entry.theme?.level3Id"
-                :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && String(entry.id ?? (entry as any)._tempId ?? '') === aiLoadingInlineFor.entryId)"
-                :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && String(entry.id ?? (entry as any)._tempId ?? '') === aiLoadingInlineFor.entryId)"
+                :review-notes="col.key === 'status' && row.entry.status === 'rejected' ? row.entry.reviewNotes : undefined"
+                :show-ai-definition="col.key === 'definition' && !!row.entry.headword?.display && !row.entry.senses?.[0]?.definition"
+                :show-ai-theme="col.key === 'theme' && !!row.entry.headword?.display && !row.entry.theme?.level3Id"
+                :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && String(row.entry.id ?? (row.entry as any)._tempId ?? '') === aiLoadingInlineFor.entryId)"
+                :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && String(row.entry.id ?? (row.entry as any)._tempId ?? '') === aiLoadingInlineFor.entryId)"
                 :show-expand="col.key === 'definition'"
-                :is-expanded="expandedEntryId === String(entry.id ?? (entry as any)._tempId ?? '')"
-                :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(entry) : undefined"
-                :theme-id="col.key === 'theme' ? entry.theme?.level3Id : undefined"
-                :is-theme-expanded="expandedThemeEntryId === String(entry.id ?? (entry as any)._tempId ?? '')"
-                @click="handleCellClick(entry, col.key, $event, rowIndex, colIndex)"
-                @set-ref="(el: any) => setInputRef(el, String(entry.id ?? (entry as any)._tempId ?? ''), col.key)"
-                @keydown="handleKeydown($event, entry, col.key)"
-                @blur="handleBlur(entry, col.key)"
-                @ai-definition="generateAIDefinition(entry)"
-                @ai-theme="generateAICategorization(entry)"
-                @expand-click="toggleSensesExpand(entry)"
-                @theme-expand-click="toggleThemeExpand(entry)"
-                @accept-theme-ai="acceptThemeAI(entry)"
-                @dismiss-theme-ai="dismissThemeAI(entry)"
+                :is-expanded="expandedEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
+                :theme-id="col.key === 'theme' ? row.entry.theme?.level3Id : undefined"
+                :is-theme-expanded="expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                @click="handleCellClick(row.entry, col.key, $event, rowIndex, colIndex)"
+                @set-ref="(el: any) => setInputRef(el, String(row.entry.id ?? (row.entry as any)._tempId ?? ''), col.key)"
+                @keydown="handleKeydown($event, row.entry, col.key)"
+                @blur="handleBlur(row.entry, col.key)"
+                @ai-definition="generateAIDefinition(row.entry)"
+                @ai-theme="generateAICategorization(row.entry)"
+                @expand-click="toggleSensesExpand(row.entry)"
+                @theme-expand-click="toggleThemeExpand(row.entry)"
+                @accept-theme-ai="acceptThemeAI(row.entry)"
+                @dismiss-theme-ai="dismissThemeAI(row.entry)"
               />
               <EntryRowActions
-                :entry="entry"
-                :can-edit="canEditEntry(entry)"
-                @save="entry._isNew ? saveNewEntry(entry) : saveEntryChanges(entry)"
-                @duplicate="duplicateEntry(entry)"
-                @delete="deleteEntry(entry)"
-                @cancel="cancelEdit(entry)"
+                :entry="row.entry"
+                :can-edit="canEditEntry(row.entry)"
+                @save="(row.entry as any)._isNew ? saveNewEntry(row.entry) : saveEntryChanges(row.entry)"
+                @duplicate="duplicateEntry(row.entry)"
+                @delete="deleteEntry(row.entry)"
+                @cancel="cancelEdit(row.entry)"
               />
             </tr>
             <!-- 行內 AI 釋義建議（Tab 落在釋義格且有待處理建議時顯示） -->
             <AISuggestionRow
-              v-if="aiSuggestion && aiSuggestionForField && editingCell && editingCell.field === aiSuggestionForField && String(entry.id ?? (entry as any)._tempId) === String(editingCell.entryId)"
+              v-if="row.type === 'entry' && aiSuggestion && aiSuggestionForField && editingCell && editingCell.field === aiSuggestionForField && String(row.entry.id ?? (row.entry as any)._tempId) === String(editingCell.entryId)"
               :text="aiSuggestion"
               :title="aiSuggestionForField === 'theme' ? 'AI 分類建議' : 'AI 釋義建議'"
               :colspan="editableColumns.length + 2"
               @accept="acceptAISuggestion"
               @dismiss="dismissAISuggestion"
             />
-            <!-- 行內 AI 分類建議（Tab 落在分類格且有待處理建議時顯示，與釋義列行為一致） -->
+            <!-- 行內 AI 分類建議 -->
             <AISuggestionRow
-              v-if="focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === themeColIndex && themeAISuggestions.get(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              :text="formatThemeSuggestion(themeAISuggestions.get(String(entry.id ?? (entry as any)._tempId ?? '')))"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === themeColIndex && themeAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :text="formatThemeSuggestion(themeAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? '')))"
               title="AI 分類建議"
               :colspan="editableColumns.length + 2"
-              @accept="acceptThemeAI(entry)"
-              @dismiss="dismissThemeAI(entry)"
+              @accept="acceptThemeAI(row.entry)"
+              @dismiss="dismissThemeAI(row.entry)"
             />
-            <!-- 泛粵典粵拼建議（Tab 落在粵拼格且有待處理建議時顯示） -->
+            <!-- 泛粵典粵拼建議 -->
             <JyutdictSuggestionRow
-              v-if="focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === phoneticColIndex && getJyutdictVisible(String(entry.id ?? (entry as any)._tempId ?? ''))"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === phoneticColIndex && getJyutdictVisible(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               :colspan="editableColumns.length + 2"
-              :char-data="getJyutdictData(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              :dialect-name="getDialectLabel(entry.dialect?.name || '') || entry.dialect?.name || ''"
-              :suggested-pronunciation="getJyutdictSuggested(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              :is-loading="getJyutdictLoading(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              @accept="(pronunciation: string) => acceptJyutdict(entry, pronunciation)"
-              @dismiss="dismissJyutdict(entry)"
+              :char-data="getJyutdictData(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :dialect-name="getDialectLabel(row.entry.dialect?.name || '') || row.entry.dialect?.name || ''"
+              :suggested-pronunciation="getJyutdictSuggested(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :is-loading="getJyutdictLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              @accept="(pronunciation: string) => acceptJyutdict(row.entry, pronunciation)"
+              @dismiss="dismissJyutdict(row.entry)"
             />
-            <!-- 詞頭重複檢測：同方言已有（或檢測中） -->
+            <!-- 詞頭重複檢測 -->
             <DuplicateCheckRow
-              v-if="focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(String(entry.id ?? (entry as any)._tempId ?? '')) || getDuplicateCheckEntriesFormatted(String(entry.id ?? (entry as any)._tempId ?? '')).length > 0)"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? '')) || getDuplicateCheckEntriesFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length > 0)"
               :colspan="editableColumns.length + 2"
-              :entries="getDuplicateCheckEntriesFormatted(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              :is-loading="getDuplicateCheckLoading(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              @dismiss="dismissDuplicateCheck(entry)"
+              :entries="getDuplicateCheckEntriesFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :is-loading="getDuplicateCheckLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              @dismiss="dismissDuplicateCheck(row.entry)"
             />
-            <!-- 其他方言點已有該詞條，可參考 -->
+            <!-- 其他方言點已有該詞條 -->
             <OtherDialectsRefRow
-              v-if="focusedCell?.rowIndex === rowIndex && getOtherDialectsFormatted(String(entry.id ?? (entry as any)._tempId ?? '')).length > 0"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length > 0"
               :colspan="editableColumns.length + 2"
-              :entries="getOtherDialectsFormatted(String(entry.id ?? (entry as any)._tempId ?? ''))"
-              @dismiss="dismissDuplicateCheck(entry)"
+              :entries="getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              @dismiss="dismissDuplicateCheck(row.entry)"
             />
             <!-- 行內釋義建議錯誤 + 重試 -->
             <tr
-              v-if="aiInlineError && String(entry.id ?? (entry as any)._tempId) === aiInlineError.entryId && aiInlineError.field === 'definition'"
+              v-if="row.type === 'entry' && aiInlineError && String(row.entry.id ?? (row.entry as any)._tempId) === aiInlineError.entryId && aiInlineError.field === 'definition'"
               class="bg-red-50/80 dark:bg-red-900/20 border-b border-gray-200 dark:border-gray-700"
               role="alert"
             >
@@ -327,7 +396,7 @@
                     <UButton size="xs" color="neutral" variant="ghost" @click="aiInlineError = null">
                       關閉
                     </UButton>
-                    <UButton size="xs" color="primary" @click="retryInlineAISuggestion(entry)">
+                    <UButton size="xs" color="primary" @click="retryInlineAISuggestion(row.entry)">
                       重試
                     </UButton>
                   </div>
@@ -336,46 +405,46 @@
             </tr>
             <!-- 釋義詳情展開區 -->
             <tr
-              v-if="expandedEntryId === String(entry.id ?? (entry as any)._tempId ?? '')"
+              v-if="row.type === 'entry' && expandedEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
               class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
             >
               <td :colspan="editableColumns.length + 2" class="p-0 align-top">
                 <EntrySensesExpand
-                  :entry="entry"
-                  :ai-suggestion="definitionAISuggestions.get(String(entry.id ?? (entry as any)._tempId ?? ''))"
-                  :ai-loading="aiLoadingFor?.entryKey === getEntryKey(entry) && aiLoadingFor?.action === 'definition'"
-                  :ai-loading-examples="aiLoadingFor?.entryKey === getEntryKey(entry) && aiLoadingFor?.action === 'examples'"
-                  @close="toggleSensesExpand(entry)"
-                  @ai-definition="generateAIDefinition(entry)"
-                  @accept-definition-ai="acceptDefinitionAI(entry)"
-                  @dismiss-definition-ai="dismissDefinitionAI(entry)"
-                  @ai-examples="generateAIExamples(entry)"
-                  @add-sense="addSense(entry)"
-                  @remove-sense="(senseIdx: number) => removeSense(entry, senseIdx)"
-                  @add-example="(senseIdx: number) => addExample(entry, senseIdx)"
-                  @remove-example="(p: { senseIdx: number; exIdx: number }) => removeExample(entry, p.senseIdx, p.exIdx)"
-                  @add-sub-sense="(senseIdx: number) => addSubSense(entry, senseIdx)"
-                  @remove-sub-sense="(p: { senseIdx: number; subIdx: number }) => removeSubSense(entry, p.senseIdx, p.subIdx)"
-                  @add-sub-sense-example="(p: { senseIdx: number; subIdx: number }) => addSubSenseExample(entry, p.senseIdx, p.subIdx)"
-                  @remove-sub-sense-example="(p: { senseIdx: number; subIdx: number; exIdx: number }) => removeSubSenseExample(entry, p.senseIdx, p.subIdx, p.exIdx)"
+                  :entry="row.entry"
+                  :ai-suggestion="definitionAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+                  :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition'"
+                  :ai-loading-examples="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'examples'"
+                  @close="toggleSensesExpand(row.entry)"
+                  @ai-definition="generateAIDefinition(row.entry)"
+                  @accept-definition-ai="acceptDefinitionAI(row.entry)"
+                  @dismiss-definition-ai="dismissDefinitionAI(row.entry)"
+                  @ai-examples="generateAIExamples(row.entry)"
+                  @add-sense="addSense(row.entry)"
+                  @remove-sense="(senseIdx: number) => removeSense(row.entry, senseIdx)"
+                  @add-example="(senseIdx: number) => addExample(row.entry, senseIdx)"
+                  @remove-example="(p: { senseIdx: number; exIdx: number }) => removeExample(row.entry, p.senseIdx, p.exIdx)"
+                  @add-sub-sense="(senseIdx: number) => addSubSense(row.entry, senseIdx)"
+                  @remove-sub-sense="(p: { senseIdx: number; subIdx: number }) => removeSubSense(row.entry, p.senseIdx, p.subIdx)"
+                  @add-sub-sense-example="(p: { senseIdx: number; subIdx: number }) => addSubSenseExample(row.entry, p.senseIdx, p.subIdx)"
+                  @remove-sub-sense-example="(p: { senseIdx: number; subIdx: number; exIdx: number }) => removeSubSenseExample(row.entry, p.senseIdx, p.subIdx, p.exIdx)"
                 />
               </td>
             </tr>
             <!-- 主題分類展開區 -->
             <tr
-              v-if="expandedThemeEntryId === String(entry.id ?? (entry as any)._tempId ?? '')"
+              v-if="row.type === 'entry' && expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
               class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700"
             >
               <td :colspan="editableColumns.length + 2" class="p-0 align-top">
                 <EntryThemeExpand
-                  :entry="entry"
-                  :ai-suggestion="themeAISuggestions.get(String(entry.id ?? (entry as any)._tempId ?? ''))"
-                  :ai-loading="aiLoadingFor?.entryKey === getEntryKey(entry) && aiLoadingFor?.action === 'theme'"
-                  @close="toggleThemeExpand(entry)"
-                  @update:theme="onThemeUpdate(entry, $event)"
-                  @dismiss-ai="dismissThemeAI(entry)"
-                  @accept-ai="acceptThemeAI(entry)"
-                  @ai-categorize="generateAICategorization(entry)"
+                  :entry="row.entry"
+                  :ai-suggestion="themeAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+                  :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme'"
+                  @close="toggleThemeExpand(row.entry)"
+                  @update:theme="onThemeUpdate(row.entry, $event)"
+                  @dismiss-ai="dismissThemeAI(row.entry)"
+                  @accept-ai="acceptThemeAI(row.entry)"
+                  @ai-categorize="generateAICategorization(row.entry)"
                 />
               </td>
             </tr>
@@ -459,6 +528,12 @@ const themeFilterOptions = [
 
 // State
 const entries = ref<Entry[]>([])
+/** 聚合視圖：按詞形分組的列表（每項含 headwordDisplay, headwordNormalized, entries） */
+const aggregatedGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
+/** 視圖模式：平鋪（一列一條）或聚合（一列一詞形，可展開多方言） */
+const viewMode = ref<'flat' | 'aggregated'>('flat')
+/** 聚合視圖下已展開的詞形（headwordNormalized），用 Set 便於切換 */
+const expandedGroupKeys = ref<Set<string>>(new Set())
 const loading = ref(false)
 const saving = ref(false)
 const searchQuery = ref('')
@@ -656,23 +731,120 @@ function dismissJyutdict(entry: Entry) {
   jyutdictVisible.value.set(entryId, false)
 }
 
+// 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
+const displayGroups = computed(() => {
+  if (viewMode.value !== 'aggregated') return []
+  const newOnes = entries.value
+    .filter(e => (e as any)._isNew)
+    .map(e => ({
+      headwordDisplay: e.headword?.display || e.text || '',
+      headwordNormalized: e.headword?.normalized || e.headword?.display || e.text || '',
+      entries: [e]
+    }))
+  return [...newOnes, ...aggregatedGroups.value]
+})
+
+/** 表格行：平鋪時為 entry 行，聚合時為 group 行 + 展開的 entry 行（entry 帶 entryIndexInGroup 用於組內序號） */
+type TableRow = { type: 'group'; group: { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }; groupIndex: number } | { type: 'entry'; entry: Entry; groupIndex: number; entryIndexInGroup?: number }
+const tableRows = computed((): TableRow[] => {
+  if (viewMode.value === 'flat') {
+    return entries.value.map(entry => ({ type: 'entry' as const, entry, groupIndex: -1 }))
+  }
+  const rows: TableRow[] = []
+  displayGroups.value.forEach((group, groupIndex) => {
+    rows.push({ type: 'group', group, groupIndex })
+    if (expandedGroupKeys.value.has(group.headwordNormalized)) {
+      group.entries.forEach((entry, entryIndexInGroup) => rows.push({ type: 'entry', entry, groupIndex, entryIndexInGroup }))
+    }
+  })
+  return rows
+})
+
+/** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
+const currentPageEntries = computed(() => {
+  if (viewMode.value === 'flat') return entries.value
+  return displayGroups.value.flatMap(g => g.entries)
+})
+
+function toggleGroupExpanded(headwordNormalized: string) {
+  const next = new Set(expandedGroupKeys.value)
+  if (next.has(headwordNormalized)) next.delete(headwordNormalized)
+  else next.add(headwordNormalized)
+  expandedGroupKeys.value = next
+}
+
+function setViewMode(v: string) {
+  const mode = v === 'aggregated' ? 'aggregated' : 'flat'
+  viewMode.value = mode
+  currentPage.value = 1
+  fetchEntries()
+}
+
+const isEmpty = computed(() => {
+  if (viewMode.value === 'flat') return entries.value.length === 0
+  return aggregatedGroups.value.length === 0 && !entries.value.some(e => (e as any)._isNew)
+})
+
+/** 聚合組列顯示：粵拼（首條或「多種」） */
+function getGroupPhonetic(group: { entries: Entry[] }): string {
+  const first = group.entries[0]?.phonetic?.jyutping?.join?.(' ')
+  if (!first) return '—'
+  const allSame = group.entries.every(e => (e.phonetic?.jyutping?.join?.(' ') ?? '') === first)
+  return allSame ? first : '多種'
+}
+
+const ENTRY_TYPE_LABELS: Record<string, string> = { character: '字', word: '詞', phrase: '短語' }
+/** 聚合組列顯示：類型（首條或「混合」） */
+function getGroupEntryType(group: { entries: Entry[] }): string {
+  const first = group.entries[0]?.entryType ?? 'word'
+  const allSame = group.entries.every(e => (e.entryType ?? 'word') === first)
+  return allSame ? (ENTRY_TYPE_LABELS[first] ?? first) : '混合'
+}
+
+/** 聚合組列顯示：分類（首條 L3 名稱或「多種」） */
+function getGroupTheme(group: { entries: Entry[] }): string {
+  const firstId = group.entries[0]?.theme?.level3Id
+  if (firstId == null) return group.entries.some(e => e.theme?.level3Id != null) ? '多種' : '—'
+  const name = getThemeNameById(firstId)
+  const allSame = group.entries.every(e => (e.theme?.level3Id ?? null) === (firstId ?? null))
+  return allSame ? (name || '—') : '多種'
+}
+
+/** 聚合組列顯示：語域（首條或「多種」） */
+function getGroupRegister(group: { entries: Entry[] }): string {
+  const first = (group.entries[0]?.meta?.register as string) ?? '__none__'
+  const allSame = group.entries.every(e => ((e.meta?.register as string) ?? '__none__') === first)
+  if (first === '__none__' || first === '') return allSame ? '—' : '多種'
+  return allSame ? first : '多種'
+}
+
+/** 聚合組列顯示：狀態（一致則一項，否則列出各狀態數量） */
+function getGroupStatus(group: { entries: Entry[] }): string {
+  const statuses = group.entries.map(e => e.status || 'draft')
+  const uniq = [...new Set(statuses)]
+  const first = uniq[0]
+  if (uniq.length === 1 && first) return STATUS_LABELS[first] ?? first
+  const counts = statuses.reduce((acc, s) => { acc[s] = (acc[s] ?? 0) + 1; return acc }, {} as Record<string, number>)
+  return uniq.filter(Boolean).map(s => `${counts[s]} ${STATUS_LABELS[s] ?? s}`).join(' · ')
+}
+
 // 多選：當前選中的詞條 key（id 或 _tempId）集合，用 Set 並整體替換以觸發響應式
 const selectedEntryIds = ref<Set<string>>(new Set())
 const selectAllChecked = computed(() => {
-  if (entries.value.length === 0) return false
-  return entries.value.every((e) => selectedEntryIds.value.has(String(getEntryKey(e))))
+  if (currentPageEntries.value.length === 0) return false
+  return currentPageEntries.value.every((e) => selectedEntryIds.value.has(String(getEntryKey(e))))
 })
 const selectAllIndeterminate = computed(() => {
   const n = selectedOnCurrentPageCount.value
-  return n > 0 && n < entries.value.length
+  return n > 0 && n < currentPageEntries.value.length
 })
 const selectedOnCurrentPageCount = computed(() =>
-  entries.value.filter((e) => selectedEntryIds.value.has(String(getEntryKey(e)))).length
+  currentPageEntries.value.filter((e) => selectedEntryIds.value.has(String(getEntryKey(e)))).length
 )
 const selectedCount = computed(() => selectedEntryIds.value.size)
 /** 當前選中且已保存（有 id）的詞條，可用於批量刪除 */
 const selectedSavedEntries = computed(() =>
-  entries.value.filter((e) => e.id && selectedEntryIds.value.has(String(e.id)))
+  currentPageEntries.value.filter((e) => e.id && selectedEntryIds.value.has(String(e.id)))
 )
 
 function isEntrySelected(entry: Entry) {
@@ -688,11 +860,11 @@ function toggleSelectEntry(entry: Entry, event?: Event) {
 }
 function toggleSelectAll() {
   if (selectAllChecked.value) {
-    const onPage = new Set(entries.value.map((e) => String(getEntryKey(e))))
+    const onPage = new Set(currentPageEntries.value.map((e) => String(getEntryKey(e))))
     selectedEntryIds.value = new Set([...selectedEntryIds.value].filter((id) => !onPage.has(id)))
   } else {
     const next = new Set(selectedEntryIds.value)
-    entries.value.forEach((e) => next.add(String(getEntryKey(e))))
+    currentPageEntries.value.forEach((e) => next.add(String(getEntryKey(e))))
     selectedEntryIds.value = next
   }
 }
@@ -964,7 +1136,7 @@ function getUserDefaultDialect(): string {
 
 // Computed
 const hasUnsavedChanges = computed(() => {
-  return entries.value.some(e => e._isDirty || e._isNew)
+  return currentPageEntries.value.some(e => e._isDirty || (e as any)._isNew)
 })
 
 // Helper functions
@@ -2032,6 +2204,10 @@ async function saveNewEntry(entry: Entry) {
         }
       }
       pagination.total++
+      // 聚合視圖下保存新條目後重新拉取，使新條目歸入對應詞形組
+      if (viewMode.value === 'aggregated') {
+        await fetchEntries()
+      }
     }
   } catch (error: any) {
     console.error('Failed to save entry:', error)
@@ -2173,9 +2349,21 @@ async function fetchEntries() {
     if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
     if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
 
-    const response = await $fetch('/api/entries', { query })
+    if (viewMode.value === 'aggregated') query.groupBy = 'headword'
 
-    entries.value = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
+    const response = await $fetch<{ data: any[]; total: number; page: number; perPage: number; totalPages: number; grouped?: boolean }>('/api/entries', { query })
+
+    if (response.grouped && Array.isArray(response.data)) {
+      aggregatedGroups.value = response.data.map((g: any) => ({
+        headwordDisplay: g.headwordDisplay ?? g.headwordNormalized ?? '',
+        headwordNormalized: g.headwordNormalized ?? g.headwordDisplay ?? '',
+        entries: (g.entries ?? []).map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
+      }))
+      entries.value = []
+    } else {
+      entries.value = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
+      aggregatedGroups.value = []
+    }
     pagination.total = response.total
     pagination.page = response.page
     pagination.totalPages = response.totalPages
