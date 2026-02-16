@@ -75,6 +75,16 @@
             class="w-28"
           />
           <USelectMenu
+            v-model="filterTheme"
+            :items="themeFilterOptions"
+            value-key="value"
+            placeholder="主題分類"
+            size="sm"
+            class="min-w-28 max-w-[14rem]"
+            searchable
+            searchable-placeholder="搜索分類..."
+          />
+          <USelectMenu
             v-model="filterStatus"
             :items="statusOptions"
             value-key="value"
@@ -425,7 +435,7 @@ const themeOptions = getFlatThemeList().map(t => ({
 const ALL_FILTER_VALUE = '__all__'
 
 // Local filters managed by this page (right sidebar filters)
-const filters = reactive({ region: ALL_FILTER_VALUE, status: ALL_FILTER_VALUE })
+const filters = reactive({ region: ALL_FILTER_VALUE, status: ALL_FILTER_VALUE, theme: ALL_FILTER_VALUE })
 
 // Normalize empty string to sentinel so USelectMenu/ComboboxItem never receives value=""
 const filterRegion = computed({
@@ -436,6 +446,16 @@ const filterStatus = computed({
   get: () => filters.status || ALL_FILTER_VALUE,
   set: (v) => { filters.status = (v === '' || v == null) ? ALL_FILTER_VALUE : v }
 })
+const filterTheme = computed({
+  get: () => filters.theme ?? ALL_FILTER_VALUE,
+  set: (v) => { filters.theme = (v === '' || v == null || v === ALL_FILTER_VALUE) ? ALL_FILTER_VALUE : v }
+})
+
+// 頂部篩選用：全部分類 + 扁平化主題列表（與表格分類列同款，單一可搜尋下拉不佔三欄）
+const themeFilterOptions = [
+  { value: ALL_FILTER_VALUE, label: '全部分類' },
+  ...themeOptions
+]
 
 // State
 const entries = ref<Entry[]>([])
@@ -2151,6 +2171,7 @@ async function fetchEntries() {
     if (searchQuery.value) query.query = searchQuery.value
     if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
     if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
+    if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
 
     const response = await $fetch('/api/entries', { query })
 
@@ -2188,7 +2209,7 @@ watch(currentPage, () => {
 })
 
 // Watch for filter changes (sidebar or page dropdowns) - reset to page 1 and fetch
-watch([() => filters.region, () => filters.status], () => {
+watch([() => filters.region, () => filters.status, () => filters.theme], () => {
   currentPage.value = 1
   fetchEntries()
 })
