@@ -1523,8 +1523,9 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
     aiSuggestionForField.value = pending.field
   }
 
-  // 當進入粵拼列編輯時，查詢泛粵典建議（已採納/忽略則不再顯示）
-  if (field === 'phonetic') {
+  // 僅「新建詞條」在編輯粵拼時才啟用泛粵典建議與 AI 建議；
+  // 修改已有詞條時不再自動彈出這兩類建議，避免干擾用戶編輯。
+  if (field === 'phonetic' && (entry as any)._isNew) {
     const headword = entry.headword?.display || entry.text || ''
     const dialectName = entry.dialect?.name || ''
     const entryIdStr = String(entryId)
@@ -1851,6 +1852,11 @@ const aiLoading = ref(false) // 僅用於編輯時 inline 建議等
 const aiSuggestAbortController = ref<AbortController | null>(null)
 
 async function triggerAISuggestion(entry: Entry, field: string, value: string) {
+  // 僅對「新建詞條」啟用行內 AI 建議；編輯已有詞條時不再觸發。
+  if (!(entry as any)._isNew) {
+    return
+  }
+
   if (aiDebounceTimer.value) {
     clearTimeout(aiDebounceTimer.value)
     aiDebounceTimer.value = null
