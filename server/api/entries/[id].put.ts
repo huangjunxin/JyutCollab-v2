@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { canContributeToDialect } from '../../utils/auth'
 
 const UpdateEntrySchema = z.object({
   // 新格式
@@ -126,8 +127,15 @@ export default defineEventHandler(async (event) => {
       changedFields.push('headword')
     }
 
-    // Update dialect
+    // Update dialect（方案 A：貢獻者僅能在其方言權限內修改）
     if (data.dialect) {
+      const auth = event.context.auth
+      if (!canContributeToDialect(auth, data.dialect.name)) {
+        throw createError({
+          statusCode: 403,
+          message: '你沒有權限將詞條改為此方言'
+        })
+      }
       existingEntry.dialect = data.dialect
       changedFields.push('dialect')
     }

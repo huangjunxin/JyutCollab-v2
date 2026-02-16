@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
+import { canContributeToDialect } from '../../utils/auth'
 
 const CreateEntrySchema = z.object({
   // 新格式
@@ -103,6 +104,15 @@ export default defineEventHandler(async (event) => {
     const dialect = {
       name: data.dialect?.name || data.region || 'hongkong',
       regionCode: data.dialect?.regionCode
+    }
+
+    // 方案 A：貢獻者僅能在其方言權限內建立詞條
+    const auth = event.context.auth
+    if (!canContributeToDialect(auth, dialect.name)) {
+      throw createError({
+        statusCode: 403,
+        message: '你沒有權限為此方言建立詞條'
+      })
     }
 
     // 檢查重複

@@ -49,9 +49,13 @@
           </div>
         </div>
 
-        <!-- 方言權限（只讀） -->
-        <div v-if="profile.dialectPermissions?.length" class="mb-8">
+        <!-- 可貢獻的方言（方案 A：只顯示方言範圍，不顯示 per-dialect 角色） -->
+        <div v-if="profile.role === 'reviewer' || profile.role === 'admin'" class="mb-8">
           <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">方言權限</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400">可操作所有方言</p>
+        </div>
+        <div v-else-if="profile.dialectPermissions?.length" class="mb-8">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">可貢獻的方言</h3>
           <div class="flex flex-wrap gap-2">
             <UBadge
               v-for="p in profile.dialectPermissions"
@@ -60,7 +64,7 @@
               variant="subtle"
               size="sm"
             >
-              {{ dialectLabel(p.dialectName) }} · {{ p.role === 'reviewer' ? '審核員' : '貢獻者' }}
+              {{ dialectLabel(p.dialectName) }}
             </UBadge>
           </div>
         </div>

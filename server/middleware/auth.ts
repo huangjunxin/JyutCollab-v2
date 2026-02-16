@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
   event.context.auth = session.user
 })
 
-// Extend event context types
+// Extend event context types（session.user 與 toAuthUser 一致，含 dialectPermissions）
 declare module 'h3' {
   interface H3EventContext {
     auth?: {
@@ -53,6 +53,7 @@ declare module 'h3' {
       username: string
       displayName?: string
       role: 'contributor' | 'reviewer' | 'admin'
+      dialectPermissions?: Array<{ dialectName: string; role: string }>
     }
   }
 }

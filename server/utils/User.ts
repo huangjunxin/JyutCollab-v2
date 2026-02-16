@@ -1,9 +1,8 @@
 import mongoose from 'mongoose'
 
-// Schema-only shape (DB uses dialect_name); shared DialectPermission is in types.ts
 interface IUserDialectPermission {
-  dialect_name: string
-  role: 'contributor' | 'reviewer'
+  dialectName: string
+  role?: 'contributor' | 'reviewer'
 }
 
 export interface IUser {
@@ -70,8 +69,8 @@ const UserSchema = new mongoose.Schema<IUser>({
     maxlength: 500
   },
   dialectPermissions: [{
-    dialect_name: { type: String, required: true },
-    role: { type: String, enum: ['contributor', 'reviewer'], required: true }
+    dialectName: { type: String, required: true },
+    role: { type: String, enum: ['contributor', 'reviewer'] }
   }],
   contributionCount: {
     type: Number,
