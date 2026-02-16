@@ -129,9 +129,10 @@ const PhoneticSchema = new mongoose.Schema<IPhonetic>({
 
 const HeadwordSchema = new mongoose.Schema<IHeadword>({
   display: { type: String, required: true },
-  search: { type: String, required: true },
   normalized: { type: String, required: true },
-  isPlaceholder: { type: Boolean, default: false }
+  isPlaceholder: { type: Boolean, default: false },
+  // 異形／其他詞形列表
+  variants: [{ type: String }]
 }, { _id: false })
 
 const DialectSchema = new mongoose.Schema<IDialect>({
@@ -206,7 +207,7 @@ const EntrySchema = new mongoose.Schema<IEntry>({
 
 // Indexes
 EntrySchema.index({ 'headword.display': 1, 'dialect.name': 1 }, { unique: true })
-EntrySchema.index({ 'headword.search': 1 })
+// 其他索引
 EntrySchema.index({ status: 1 })
 EntrySchema.index({ createdBy: 1 })
 EntrySchema.index({ 'theme.level1Id': 1, 'theme.level2Id': 1, 'theme.level3Id': 1 })
@@ -214,14 +215,9 @@ EntrySchema.index({ 'dialect.name': 1 })
 EntrySchema.index({ entryType: 1 })
 EntrySchema.index({ createdAt: -1 })
 
-// Pre-save hook to auto-populate search field
+// Pre-save hook：僅確保 normalized 存在；search/variants 由 API 層負責
 EntrySchema.pre('save', function() {
   if (this.headword) {
-    // 如果 search 為空，設為 display 的小写版本（僅作為後備，API 層應該已經設置了）
-    if (!this.headword.search || this.headword.search.trim() === '') {
-      this.headword.search = this.headword.display.toLowerCase().trim()
-    }
-    // 如果 normalized 為空，設為 display
     if (!this.headword.normalized || this.headword.normalized.trim() === '') {
       this.headword.normalized = this.headword.display
     }

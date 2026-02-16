@@ -93,96 +93,40 @@ const emit = defineEmits<{
   close: []
 }>()
 
-// 從 entry.headword.search 讀取其他詞形（用空格分隔）
-// search 字段格式：主詞頭 其他詞形1 其他詞形2 ...
-function parseSearchField(search: string | undefined, display: string | undefined): string[] {
-  if (!search || !search.trim()) return []
-  const displayLower = (display || '').toLowerCase().trim()
-  const searchLower = search.toLowerCase().trim()
-  
-  // 如果 search 等於 display（小寫），則沒有其他詞形
-  if (searchLower === displayLower) return []
-  
-  // 分割搜索字段，移除主詞頭，返回其他詞形
-  const parts = search.split(/\s+/).filter(p => p.trim() !== '')
-  const variants: string[] = []
-  
-  for (const part of parts) {
-    const partLower = part.toLowerCase().trim()
-    // 跳過主詞頭（不區分大小寫）
-    if (partLower !== displayLower) {
-      variants.push(part)
-    }
-  }
-  
-  return variants
-}
-
-// 將其他詞形數組轉換為搜索字段字符串
-function buildSearchField(display: string | undefined, variants: string[]): string {
-  const displayStr = (display || '').trim()
-  const variantStrs = variants.filter(v => v && v.trim() !== '').map(v => v.trim())
-  return [displayStr, ...variantStrs].join(' ').trim()
-}
-
-// 初始化：確保 search 和 normalized 字段正確設置
+// 初始化：確保 normalized 存在
 if (props.entry.headword) {
-  // 如果 normalized 為空，設為 display
   if (!props.entry.headword.normalized && props.entry.headword.display) {
     props.entry.headword.normalized = props.entry.headword.display
   }
-  // 確保 search 字段包含 display
-  if (props.entry.headword.display) {
-    const displayLower = props.entry.headword.display.toLowerCase().trim()
-    if (!props.entry.headword.search || props.entry.headword.search.trim() === '') {
-      // 如果 search 為空，設為 display
-      props.entry.headword.search = props.entry.headword.display
-    } else {
-      // 如果 search 已有內容，檢查是否包含 display
-      const searchParts = props.entry.headword.search.split(/\s+/).filter(p => p.trim() !== '')
-      const hasDisplay = searchParts.some(p => p.toLowerCase().trim() === displayLower)
-      if (!hasDisplay) {
-        // 如果 search 中沒有 display，將其添加到開頭
-        props.entry.headword.search = [props.entry.headword.display, ...searchParts].join(' ').trim()
-      } else {
-        // 如果 search 中有 display，確保它在第一個位置
-        const displayIndex = searchParts.findIndex(p => p.toLowerCase().trim() === displayLower)
-        if (displayIndex > 0) {
-          searchParts.splice(displayIndex, 1)
-          searchParts.unshift(props.entry.headword.display)
-          props.entry.headword.search = searchParts.join(' ').trim()
-        }
-      }
+}
+
+// 從 variants 初始化本地編輯狀態
+const variants = ref<string[]>([])
+{
+  const hw = props.entry.headword
+  if (hw) {
+    if (Array.isArray(hw.variants) && hw.variants.length > 0) {
+      variants.value = [...hw.variants]
     }
   }
 }
 
-// 從 search 字段解析其他詞形
-const variants = ref<string[]>(
-  parseSearchField(props.entry.headword?.search, props.entry.headword?.display)
-)
-
-// 監聽 variants 變化，同步到 entry.headword.search
+// 監聽 variants 變化，同步到 entry.headword.variants
 watch(variants, (newVariants) => {
   if (!props.entry.headword) {
-    props.entry.headword = { display: '', search: '', normalized: '', isPlaceholder: false }
+    props.entry.headword = { display: '', normalized: '', isPlaceholder: false, variants: [] }
   }
-  // 將其他詞形合併到搜索字段
-  props.entry.headword.search = buildSearchField(props.entry.headword.display, newVariants)
+  props.entry.headword.variants = newVariants.filter((v) => v.trim() !== '')
   props.entry._isDirty = true
 }, { deep: true })
 
-// 監聽 display 變化，更新 normalized 和 search
+// 監聽 display 變化，更新 normalized
 watch(() => props.entry.headword?.display, (newDisplay, oldDisplay) => {
   if (!props.entry.headword) return
   
   // 標準化詞頭默認等於顯示詞頭
   if (newDisplay !== undefined) {
     props.entry.headword.normalized = newDisplay
-    
-    // 確保顯示詞頭始終包含在搜索詞頭中
-    // 重新構建 search 字段（新的 display 作為第一個詞，然後是其他詞形）
-    props.entry.headword.search = buildSearchField(newDisplay, variants.value)
   }
   props.entry._isDirty = true
 })

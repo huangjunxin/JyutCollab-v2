@@ -943,51 +943,10 @@ const editableColumns = [
     type: 'text',
     get: (entry: Entry) => entry.headword?.display || entry.text || '',
     set: (entry: Entry, value: string) => {
-      if (!entry.headword) entry.headword = { display: '', search: '', normalized: '', isPlaceholder: false }
-      const oldDisplay = entry.headword.display || entry.text || ''
+      if (!entry.headword) entry.headword = { display: '', normalized: '', isPlaceholder: false }
       entry.headword.display = value
       // 標準化詞頭默認等於顯示詞頭
       entry.headword.normalized = value
-      
-      // 更新 search 字段：確保顯示詞頭始終包含在搜索詞頭中
-      if (!entry.headword.search || entry.headword.search.trim() === '') {
-        // 如果 search 為空，設為新的 display
-        entry.headword.search = value
-      } else {
-        // 如果 search 已有內容，需要確保新的 display 包含在其中
-        const searchParts = entry.headword.search.split(/\s+/).filter(p => p.trim() !== '')
-        const oldDisplayLower = oldDisplay.toLowerCase().trim()
-        const newDisplayLower = value.toLowerCase().trim()
-        
-        // 檢查 search 中是否已經包含新的 display（不區分大小寫）
-        const hasNewDisplay = searchParts.some(p => p.toLowerCase().trim() === newDisplayLower)
-        
-        if (!hasNewDisplay) {
-          // 如果 search 中沒有新的 display，替換第一個詞（舊的 display）為新的 display
-          if (searchParts.length > 0) {
-            const firstPart = searchParts[0]
-            if (firstPart && firstPart.toLowerCase().trim() === oldDisplayLower) {
-              searchParts[0] = value
-            } else {
-              // 如果第一個詞不是舊的 display，則在開頭添加新的 display
-              searchParts.unshift(value)
-            }
-          } else {
-            // 如果 searchParts 為空，添加新的 display
-            searchParts.push(value)
-          }
-          entry.headword.search = searchParts.join(' ').trim()
-        } else {
-          // 如果 search 中已經有新的 display，確保它在第一個位置
-          const newDisplayIndex = searchParts.findIndex(p => p.toLowerCase().trim() === newDisplayLower)
-          if (newDisplayIndex > 0) {
-            // 將新的 display 移到第一個位置
-            searchParts.splice(newDisplayIndex, 1)
-            searchParts.unshift(value)
-            entry.headword.search = searchParts.join(' ').trim()
-          }
-        }
-      }
       entry.text = value
     }
   },
@@ -1240,26 +1199,12 @@ function getDefinitionExpandHint(entry: Entry): string {
   return parts.join(' · ')
 }
 
-/** 詞頭列展開區旁的數量提示：有其他詞形時顯示「N個詞形」 */
+/** 詞頭列展開區旁的數量提示：有其他詞形時顯示「N異形」 */
 function getHeadwordExpandHint(entry: Entry): string {
-  const search = entry.headword?.search || ''
-  const display = entry.headword?.display || ''
-  
-  if (!search || !display) return ''
-  
-  // 從 search 字段解析其他詞形
-  const displayLower = display.toLowerCase().trim()
-  const searchLower = search.toLowerCase().trim()
-  
-  // 如果 search 等於 display（小寫），則沒有其他詞形
-  if (searchLower === displayLower) return ''
-  
-  // 分割搜索字段，計算其他詞形數量
-  const parts = search.split(/\s+/).filter(p => p.trim() !== '')
-  const variantCount = parts.filter(p => p.toLowerCase().trim() !== displayLower).length
-  
-  if (variantCount > 0) {
-    return `${variantCount}異形`
+  const variants = entry.headword?.variants || []
+  const count = variants.filter(v => v && v.trim() !== '').length
+  if (count > 0) {
+    return `${count}異形`
   }
   return ''
 }
