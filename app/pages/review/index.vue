@@ -60,10 +60,10 @@
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                   {{ entry.headword?.display || entry.text }}
                 </h3>
-                <UBadge :color="getDialectColor(entry.dialect?.name || entry.region)" variant="subtle">
-                  {{ getDialectLabel(entry.dialect?.name || entry.region) }}
+                <UBadge :color="(getDialectColor(entry.dialect?.name ?? entry.region ?? '') as 'primary' | 'secondary' | 'neutral' | 'success' | 'error' | 'warning' | 'info')" variant="subtle">
+                  {{ getDialectLabel(entry.dialect?.name ?? entry.region ?? '') }}
                 </UBadge>
-                <UBadge :color="getEntryTypeColor(entry.entryType)" variant="subtle" size="xs">
+                <UBadge :color="(getEntryTypeColor(entry.entryType ?? '') as 'primary' | 'secondary' | 'neutral' | 'success' | 'error' | 'warning' | 'info')" variant="subtle" size="xs">
                   {{ getEntryTypeLabel(entry.entryType) }}
                 </UBadge>
               </div>
@@ -236,7 +236,7 @@
               <div>
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400">方言</label>
                 <p class="text-gray-900 dark:text-white">
-                  {{ getDialectLabel(viewingEntry.dialect?.name || viewingEntry.region) }}
+                  {{ getDialectLabel(viewingEntry.dialect?.name ?? viewingEntry.region ?? '') }}
                 </p>
               </div>
               <div>
@@ -383,7 +383,7 @@ async function fetchEntries() {
 
     const response = await $fetch('/api/reviews', { query })
 
-    entries.value = response.data
+    entries.value = response.data as Entry[]
     pagination.total = response.total
     pagination.totalPages = response.totalPages
 
