@@ -390,6 +390,7 @@
               :colspan="editableColumns.length + 2"
               :entries="getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               @dismiss="dismissDuplicateCheck(row.entry)"
+              @apply-template="applyOtherDialectTemplate(row.entry, $event)"
             />
             <!-- 行內釋義建議錯誤 + 重試 -->
             <tr
@@ -713,6 +714,40 @@ function getDuplicateCheckEntriesFormatted(entryId: string) {
 
 function getOtherDialectsFormatted(entryId: string) {
   return formatDuplicateEntries(duplicateCheckResult.value.get(entryId)?.otherDialects || [])
+}
+
+/** 將「其他方言點」中的某條詞條內容作為範本，填入當前正在編輯/新建的詞條。
+ *  僅在同詞頭但不同方言時使用：保留當前詞條的詞頭與方言，只複製釋義、分類等內容。 */
+async function applyOtherDialectTemplate(targetEntry: Entry, sourceId: string) {
+  const sid = String(sourceId)
+
+  try {
+    // 從後端拉取來源詞條的完整數據（同 EntryModal）
+    const response = await $fetch<{ success: boolean; data?: any }>(`/api/entries/${sid}`)
+    if (!response?.success || !response.data) return
+
+    const source = response.data as any
+
+    // 深拷貝需要複製的字段，避免共享引用
+    const clonedSenses = source.senses?.length ? deepCopy(source.senses) : [{ definition: '', examples: [] }]
+    const clonedTheme = source.theme ? deepCopy(source.theme) : {}
+    const clonedMeta = source.meta ? deepCopy(source.meta) : {}
+    const clonedRefs = source.refs?.length ? deepCopy(source.refs) : undefined
+    const clonedEntryType = source.entryType ?? 'word'
+
+    // 僅覆寫內容相關字段，保留當前詞頭與方言
+    targetEntry.entryType = clonedEntryType as any
+    targetEntry.senses = clonedSenses as any
+    if (clonedRefs) {
+      ;(targetEntry as any).refs = clonedRefs
+    }
+    targetEntry.theme = clonedTheme as any
+    targetEntry.meta = clonedMeta as any
+
+    targetEntry._isDirty = true
+  } catch (e) {
+    console.error('Failed to apply other dialect template', e)
+  }
 }
 
 function dismissDuplicateCheck(entry: Entry) {
@@ -1677,7 +1712,8 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   if (field === 'headword' && entry && (entry as any)._isNew && entry.headword?.display?.trim()) {
     runDuplicateCheck(entry)
   }
-  const focusWrapper = options?.focusWrapper !== false
+  // 預設不主動把焦點移回整個表格 wrapper，避免在滑鼠點擊其他區域時觸發瀏覽器自動滾動造成「頁面跳動」感
+  const focusWrapper = options?.focusWrapper === true
   if (focusWrapper) {
     nextTick(() => tableWrapperRef.value?.focus())
   }
