@@ -635,7 +635,7 @@ function isSelected(rowIndex: number, colIndex: number) {
 const pagination = reactive({
   total: 0,
   page: 1,
-  perPage: 30,
+  perPage: 20,
   totalPages: 0
 })
 
