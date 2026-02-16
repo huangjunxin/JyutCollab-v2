@@ -289,12 +289,19 @@
               @accept="(pronunciation: string) => acceptJyutdict(entry, pronunciation)"
               @dismiss="dismissJyutdict(entry)"
             />
-            <!-- 詞頭重複檢測（新建詞條離開詞頭格後，若數據庫已有相同詞頭+方言則顯示） -->
+            <!-- 詞頭重複檢測：同方言已有（或檢測中） -->
             <DuplicateCheckRow
-              v-if="focusedCell?.rowIndex === rowIndex && getDuplicateCheckVisible(String(entry.id ?? (entry as any)._tempId ?? ''))"
+              v-if="focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(String(entry.id ?? (entry as any)._tempId ?? '')) || getDuplicateCheckEntriesFormatted(String(entry.id ?? (entry as any)._tempId ?? '')).length > 0)"
               :colspan="editableColumns.length + 2"
               :entries="getDuplicateCheckEntriesFormatted(String(entry.id ?? (entry as any)._tempId ?? ''))"
               :is-loading="getDuplicateCheckLoading(String(entry.id ?? (entry as any)._tempId ?? ''))"
+              @dismiss="dismissDuplicateCheck(entry)"
+            />
+            <!-- 其他方言點已有該詞條，可參考 -->
+            <OtherDialectsRefRow
+              v-if="focusedCell?.rowIndex === rowIndex && getOtherDialectsFormatted(String(entry.id ?? (entry as any)._tempId ?? '')).length > 0"
+              :colspan="editableColumns.length + 2"
+              :entries="getOtherDialectsFormatted(String(entry.id ?? (entry as any)._tempId ?? ''))"
               @dismiss="dismissDuplicateCheck(entry)"
             />
             <!-- 行內釋義建議錯誤 + 重試 -->
@@ -399,6 +406,7 @@ import EntryThemeExpand from '~/components/entries/EntryThemeExpand.vue'
 import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
+import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
 
 definePageMeta({
   layout: 'default',
@@ -493,8 +501,12 @@ const jyutdictVisible = ref<Map<string, boolean>>(new Map())
 /** 已採納或忽略粵拼建議的 entryId，不再重複顯示 */
 const jyutdictHandled = ref<Set<string>>(new Set())
 
-/** 詞頭重複檢測結果（新建詞條離開詞頭格時觸發）。key: entryId, value: { loading } 或 { loading: false, entries } */
-const duplicateCheckResult = ref<Map<string, { loading: boolean, entries?: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }> }>>(new Map())
+/** 詞頭重複檢測結果（新建詞條離開詞頭格時觸發）。sameDialect=同詞頭+同方言，otherDialects=同詞頭+其他方言可參考 */
+const duplicateCheckResult = ref<Map<string, {
+  loading: boolean
+  entries?: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>
+  otherDialects?: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>
+}>>(new Map())
 
 // 獲取粵拼建議相關數據
 function getJyutdictData(entryId: string): CharPronunciationData[] {
@@ -550,20 +562,23 @@ async function runDuplicateCheck(entry: Entry) {
   duplicateCheckResult.value = new Map(duplicateCheckResult.value)
 
   try {
-    const res = await $fetch<{ data: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }> }>('/api/entries/check-duplicate', {
+    const res = await $fetch<{ sameDialect: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>, otherDialects: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }> }>('/api/entries/check-duplicate', {
       query: { headword, dialect }
     })
-    duplicateCheckResult.value.set(entryId, { loading: false, entries: res.data || [] })
+    duplicateCheckResult.value.set(entryId, {
+      loading: false,
+      entries: res.sameDialect || [],
+      otherDialects: res.otherDialects || []
+    })
   } catch (e) {
-    duplicateCheckResult.value.set(entryId, { loading: false, entries: [] })
+    duplicateCheckResult.value.set(entryId, { loading: false, entries: [], otherDialects: [] })
   }
   duplicateCheckResult.value = new Map(duplicateCheckResult.value)
 }
 
-function getDuplicateCheckEntriesFormatted(entryId: string): Array<{ id: string, headwordDisplay: string, dialectLabel: string, status: string, statusLabel: string, createdAtLabel: string }> {
-  const raw = duplicateCheckResult.value.get(entryId)
-  if (!raw?.entries?.length) return []
-  return raw.entries.map(e => ({
+function formatDuplicateEntries(list: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>): Array<{ id: string, headwordDisplay: string, dialectLabel: string, status: string, statusLabel: string, createdAtLabel: string }> {
+  if (!list?.length) return []
+  return list.map(e => ({
     id: e.id,
     headwordDisplay: e.headword?.display || '-',
     dialectLabel: DIALECT_CODE_TO_NAME[e.dialect?.name || ''] || e.dialect?.name || '-',
@@ -571,6 +586,14 @@ function getDuplicateCheckEntriesFormatted(entryId: string): Array<{ id: string,
     statusLabel: STATUS_LABELS[e.status || 'draft'] || e.status || '-',
     createdAtLabel: e.createdAt ? new Date(e.createdAt).toLocaleString('zh-HK', { dateStyle: 'short', timeStyle: 'short' }) : '-'
   }))
+}
+
+function getDuplicateCheckEntriesFormatted(entryId: string) {
+  return formatDuplicateEntries(duplicateCheckResult.value.get(entryId)?.entries || [])
+}
+
+function getOtherDialectsFormatted(entryId: string) {
+  return formatDuplicateEntries(duplicateCheckResult.value.get(entryId)?.otherDialects || [])
 }
 
 function dismissDuplicateCheck(entry: Entry) {
@@ -581,7 +604,7 @@ function dismissDuplicateCheck(entry: Entry) {
 
 function getDuplicateCheckVisible(entryId: string): boolean {
   const r = duplicateCheckResult.value.get(entryId)
-  return !!(r && (r.loading || (r.entries && r.entries.length > 0)))
+  return !!(r && (r.loading || (r.entries && r.entries.length > 0) || (r.otherDialects && r.otherDialects.length > 0)))
 }
 
 function getDuplicateCheckLoading(entryId: string): boolean {

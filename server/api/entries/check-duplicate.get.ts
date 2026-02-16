@@ -7,9 +7,18 @@ const QuerySchema = z.object({
   dialect: z.string().min(1)
 })
 
+const mapEntry = (e: any) => ({
+  id: e._id?.toString() || e.id,
+  headword: e.headword,
+  dialect: e.dialect,
+  status: e.status,
+  createdAt: e.createdAt?.toISOString?.() || e.createdAt
+})
+
 /**
- * 檢查數據庫中是否已存在相同詞頭+方言的詞條（用於新建時重複性檢測）。
- * 返回匹配的詞條列表（不含當前未保存的新條目）。
+ * 檢查數據庫中是否已有相同詞頭的詞條（用於新建時重複性與參考提示）。
+ * - sameDialect: 相同詞頭+相同方言（真正重複，需提示用戶）
+ * - otherDialects: 相同詞頭、不同方言（可參考其他方言點已有詞條）
  */
 export default defineEventHandler(async (event) => {
   try {
@@ -27,29 +36,31 @@ export default defineEventHandler(async (event) => {
     const { headword, dialect } = validated.data
     const displayTrimmed = headword.trim()
     if (!displayTrimmed) {
-      return { data: [], total: 0 }
+      return { sameDialect: [], otherDialects: [] }
     }
 
-    const matches = await Entry.find({
-      'headword.display': displayTrimmed,
-      'dialect.name': dialect
-    })
-      .select('id headword dialect status createdAt')
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean()
-
-    const data = matches.map((e: any) => ({
-      id: e._id?.toString() || e.id,
-      headword: e.headword,
-      dialect: e.dialect,
-      status: e.status,
-      createdAt: e.createdAt?.toISOString?.() || e.createdAt
-    }))
+    const [sameDialectRaw, otherDialectsRaw] = await Promise.all([
+      Entry.find({
+        'headword.display': displayTrimmed,
+        'dialect.name': dialect
+      })
+        .select('id headword dialect status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean(),
+      Entry.find({
+        'headword.display': displayTrimmed,
+        'dialect.name': { $ne: dialect }
+      })
+        .select('id headword dialect status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean()
+    ])
 
     return {
-      data,
-      total: data.length
+      sameDialect: sameDialectRaw.map(mapEntry),
+      otherDialects: otherDialectsRaw.map(mapEntry)
     }
   } catch (error: any) {
     if (error.statusCode) throw error
