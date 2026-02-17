@@ -392,6 +392,22 @@
               @dismiss="dismissDuplicateCheck(row.entry)"
               @apply-template="applyOtherDialectTemplate(row.entry, $event)"
             />
+            <!-- Jyutjyu 參考（新建詞條：填寫詞頭後自動查詢） -->
+            <JyutjyuRefRow
+              v-if="
+                row.type === 'entry' &&
+                focusedCell?.rowIndex === rowIndex &&
+                (getJyutjyuVisible(String(row.entry.id ?? (row.entry as any)._tempId ?? '')) || getJyutjyuLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? '')))
+              "
+              :colspan="editableColumns.length + 2"
+              :query="getJyutjyuQuery(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :results="formatJyutjyuResults(jyutjyuRefResult.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))?.results || [])"
+              :total="getJyutjyuTotal(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :is-loading="getJyutjyuLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :error-message="getJyutjyuError(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              @dismiss="dismissJyutjyuRef(row.entry)"
+              @apply-template="applyJyutjyuTemplate(row.entry, $event)"
+            />
             <!-- 行內釋義建議錯誤 + 重試 -->
             <tr
               v-if="row.type === 'entry' && aiInlineError && String(row.entry.id ?? (row.entry as any)._tempId) === aiInlineError.entryId && aiInlineError.field === 'definition'"
@@ -509,6 +525,7 @@ import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
 import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
+import JyutjyuRefRow, { type JyutjyuRefItem } from '~/components/entries/JyutjyuRefRow.vue'
 
 definePageMeta({
   layout: 'default',
@@ -641,6 +658,21 @@ const duplicateCheckResult = ref<Map<string, {
   otherDialects?: OtherDialectEntryRaw[]
 }>>(new Map())
 
+/** Jyutjyu 參考結果（新建詞條離開詞頭格時觸發）。 */
+const jyutjyuRefResult = ref<Map<string, {
+  loading: boolean
+  q: string
+  total: number | null
+  results: any[]
+  errorMessage: string
+}>>(new Map())
+
+/** Jyutjyu：是否顯示提示（按 entryId 記） */
+const jyutjyuRefVisible = ref<Map<string, boolean>>(new Map())
+
+/** Jyutjyu：已忽略的查詢（按 entryId + q 記，避免同一詞頭反覆彈出；詞頭變更則會重新顯示） */
+const jyutjyuRefHandled = ref<Set<string>>(new Set())
+
 // 獲取粵拼建議相關數據
 function getJyutdictData(entryId: string): CharPronunciationData[] {
   return jyutdictData.value.get(entryId) || []
@@ -657,6 +689,94 @@ function getJyutdictSuggested(entryId: string): string {
 function getJyutdictVisible(entryId: string): boolean {
   if (jyutdictHandled.value.has(entryId)) return false
   return jyutdictVisible.value.get(entryId) || false
+}
+
+function getJyutjyuHandledKey(entryId: string, q: string): string {
+  return `${entryId}::${q}`
+}
+
+function getJyutjyuVisible(entryId: string): boolean {
+  const state = jyutjyuRefResult.value.get(entryId)
+  const q = state?.q || ''
+  if (!q) return false
+  if (jyutjyuRefHandled.value.has(getJyutjyuHandledKey(entryId, q))) return false
+  return jyutjyuRefVisible.value.get(entryId) || false
+}
+
+function getJyutjyuLoading(entryId: string): boolean {
+  return jyutjyuRefResult.value.get(entryId)?.loading || false
+}
+
+function getJyutjyuError(entryId: string): string {
+  return jyutjyuRefResult.value.get(entryId)?.errorMessage || ''
+}
+
+function getJyutjyuTotal(entryId: string): number | null {
+  return jyutjyuRefResult.value.get(entryId)?.total ?? null
+}
+
+function getJyutjyuQuery(entryId: string): string {
+  return jyutjyuRefResult.value.get(entryId)?.q || ''
+}
+
+function formatJyutjyuResults(list: any[]): JyutjyuRefItem[] {
+  if (!Array.isArray(list) || list.length === 0) return []
+  return list.map((r: any) => ({
+    id: String(r.id || ''),
+    headwordDisplay: r?.headword?.display || '-',
+    jyutping: r?.phonetic?.jyutping?.[0] || '',
+    dialectLabel: r?.dialect?.name || '',
+    sourceBook: r?.source_book || '',
+    definitionSummary: r?.senses?.[0]?.definition || ''
+  }))
+}
+
+async function runJyutjyuRef(entry: Entry) {
+  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
+  const q = entry.headword?.display?.trim() || ''
+  if (!entryId || !q) return
+
+  const handledKey = getJyutjyuHandledKey(entryId, q)
+  if (jyutjyuRefHandled.value.has(handledKey)) return
+
+  // 若同一詞頭已查詢過（且不在 loading），則僅恢復顯示即可，避免重複請求
+  const existing = jyutjyuRefResult.value.get(entryId)
+  if (existing && existing.q === q && existing.loading === false && (existing.total !== null || existing.results.length > 0 || existing.errorMessage)) {
+    jyutjyuRefVisible.value.set(entryId, true)
+    jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
+    return
+  }
+
+  jyutjyuRefResult.value.set(entryId, {
+    loading: true,
+    q,
+    total: null,
+    results: [],
+    errorMessage: ''
+  })
+  jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
+  jyutjyuRefVisible.value.set(entryId, true)
+  jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
+
+  try {
+    const res = await $fetch<any>('/api/jyutjyu/search', { query: { q } })
+    jyutjyuRefResult.value.set(entryId, {
+      loading: false,
+      q,
+      total: typeof res?.total === 'number' ? res.total : (Array.isArray(res?.results) ? res.results.length : 0),
+      results: Array.isArray(res?.results) ? res.results : [],
+      errorMessage: ''
+    })
+  } catch (e) {
+    jyutjyuRefResult.value.set(entryId, {
+      loading: false,
+      q,
+      total: null,
+      results: [],
+      errorMessage: '查詢 Jyutjyu 時出現問題，請稍後再試。'
+    })
+  }
+  jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
 }
 
 // 查詢泛粵典（方言用香港繁體顯示名，如「廣州」，以便推理與 API 匹配）
@@ -804,6 +924,64 @@ async function applyOtherDialectTemplate(targetEntry: Entry, sourceId: string) {
   }
 }
 
+/** 將 Jyutjyu 的某條結果內容作為範本，填入當前正在編輯/新建的詞條。
+ *  保留當前詞條的詞頭與方言，主要複製釋義（及其例句）；若當前尚未填粵拼，會順便補上。 */
+function applyJyutjyuTemplate(targetEntry: Entry, sourceId: string) {
+  const entryId = String(targetEntry.id ?? (targetEntry as any)._tempId ?? '')
+  if (!entryId) return
+
+  const state = jyutjyuRefResult.value.get(entryId)
+  const rawList = state?.results || []
+  const sid = String(sourceId)
+  const source = Array.isArray(rawList) ? rawList.find((r: any) => String(r?.id || '') === sid) : null
+  if (!source) return
+
+  try {
+    const rawSenses = Array.isArray(source?.senses) ? source.senses : []
+    const nextSenses = rawSenses.length
+      ? rawSenses
+        .map((s: any) => {
+          const definition = String(s?.definition || '').trim()
+          if (!definition) return null
+
+          const rawExamples = Array.isArray(s?.examples) ? s.examples : []
+          const examples = rawExamples
+            .map((ex: any) => {
+              const text = String(ex?.text || '').trim()
+              if (!text) return null
+              return {
+                text,
+                jyutping: ex?.jyutping ? String(ex.jyutping) : undefined,
+                translation: ex?.translation ? String(ex.translation) : undefined
+              }
+            })
+            .filter(Boolean) as any
+
+          return {
+            definition,
+            label: s?.label ? String(s.label) : undefined,
+            examples: examples.length ? examples : []
+          }
+        })
+        .filter(Boolean)
+      : [{ definition: '', examples: [] }]
+
+    targetEntry.senses = deepCopy(nextSenses as any)
+
+    // 若當前未填粵拼，嘗試用 Jyutjyu 結果補上
+    const currentJyutping = targetEntry.phonetic?.jyutping || []
+    const sourceJyutping = source?.phonetic?.jyutping
+    if ((!currentJyutping || currentJyutping.length === 0) && Array.isArray(sourceJyutping) && sourceJyutping.length > 0) {
+      targetEntry.phonetic = targetEntry.phonetic || {}
+      targetEntry.phonetic.jyutping = deepCopy(sourceJyutping)
+    }
+
+    targetEntry._isDirty = true
+  } catch (e) {
+    console.error('Failed to apply Jyutjyu template', e)
+  }
+}
+
 function dismissDuplicateCheck(entry: Entry) {
   const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
   duplicateCheckResult.value.delete(entryId)
@@ -842,6 +1020,18 @@ function dismissJyutdict(entry: Entry) {
   jyutdictHandled.value.add(entryId)
   jyutdictHandled.value = new Set(jyutdictHandled.value)
   jyutdictVisible.value.set(entryId, false)
+}
+
+function dismissJyutjyuRef(entry: Entry) {
+  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
+  const q = getJyutjyuQuery(entryId).trim()
+  if (!entryId || !q) return
+
+  const key = getJyutjyuHandledKey(entryId, q)
+  jyutjyuRefHandled.value.add(key)
+  jyutjyuRefHandled.value = new Set(jyutjyuRefHandled.value)
+  jyutjyuRefVisible.value.set(entryId, false)
+  jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
 }
 
 // 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
@@ -1163,6 +1353,7 @@ const editableColumns = [
 /** 分類列在 editableColumns 中的索引，用於 Tab 落在分類列時顯示 AI 建議 */
 const themeColIndex = editableColumns.findIndex(c => c.key === 'theme')
 const phoneticColIndex = editableColumns.findIndex(c => c.key === 'phonetic')
+const headwordColIndex = editableColumns.findIndex(c => c.key === 'headword')
 
 // Options（方言選項由統一常數提供）
 const dialectOptions = dialectOptionsWithAll(ALL_FILTER_VALUE)
@@ -1762,9 +1953,10 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   editingCell.value = null
   aiSuggestion.value = null
   aiSuggestionForField.value = null
-  // 新建詞條：離開詞頭格且已填寫詞頭時，做一次重複性檢測
+  // 新建詞條：離開詞頭格且已填寫詞頭時，做一次重複性檢測 + Jyutjyu 參考查詢
   if (field === 'headword' && entry && (entry as any)._isNew && entry.headword?.display?.trim()) {
     runDuplicateCheck(entry)
+    runJyutjyuRef(entry)
   }
   // 預設不主動把焦點移回整個表格 wrapper，避免在滑鼠點擊其他區域時觸發瀏覽器自動滾動造成「頁面跳動」感
   const focusWrapper = options?.focusWrapper === true
@@ -2347,6 +2539,33 @@ async function saveNewEntry(entry: Entry) {
           jyutdictHandled.value.add(String(saved.id))
           jyutdictHandled.value.delete(String(prev._tempId))
           jyutdictHandled.value = new Set(jyutdictHandled.value)
+        }
+        // Jyutjyu 參考：狀態以 entryId 存 Map；保存後 entryId 從 _tempId 變為真實 id，需遷移避免提示狀態丟失/重複
+        if (prev?._tempId) {
+          const prevId = String(prev._tempId)
+          const nextId = String(saved.id)
+
+          const prevJyutjyuState = jyutjyuRefResult.value.get(prevId)
+          if (prevJyutjyuState) {
+            jyutjyuRefResult.value.set(nextId, prevJyutjyuState)
+            jyutjyuRefResult.value.delete(prevId)
+            jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
+          }
+
+          const prevVisible = jyutjyuRefVisible.value.get(prevId)
+          if (prevVisible !== undefined) {
+            jyutjyuRefVisible.value.set(nextId, prevVisible)
+            jyutjyuRefVisible.value.delete(prevId)
+            jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
+          }
+
+          // 遷移已忽略 key（`${entryId}::${q}`）
+          const nextHandled = new Set<string>()
+          jyutjyuRefHandled.value.forEach((k) => {
+            if (k.startsWith(`${prevId}::`)) nextHandled.add(k.replace(`${prevId}::`, `${nextId}::`))
+            else nextHandled.add(k)
+          })
+          jyutjyuRefHandled.value = nextHandled
         }
         // 从本地存储中移除已保存的条目
         removeEntryFromLocalStorage(prev?._tempId || entry.id || '')
