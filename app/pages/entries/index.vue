@@ -510,7 +510,7 @@
 <script setup lang="ts">
 import { useAuth } from '~/composables/useAuth'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
-import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, DIALECT_CODE_TO_NAME, getDialectLabel } from '~/utils/dialects'
+import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, DIALECT_CODE_TO_NAME, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
 import type { DialectId } from '~shared/dialects'
 import { queryJyutdict, getSuggestedPronunciation } from '~/composables/useJyutdict'
 import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
@@ -729,7 +729,7 @@ function formatJyutjyuResults(list: any[]): JyutjyuRefItem[] {
     id: String(r.id || ''),
     headwordDisplay: r?.headword?.display || '-',
     jyutping: r?.phonetic?.jyutping?.[0] || '',
-    dialectLabel: r?.dialect?.name || '',
+    dialectLabel: getDialectLabelByRegionCode(r?.dialect?.region_code || ''),
     sourceBook: r?.source_book || '',
     definitionSummary: r?.senses?.[0]?.definition || ''
   }))
