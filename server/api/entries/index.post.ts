@@ -222,9 +222,10 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     console.error('Create entry error:', error)
     if (error.statusCode) throw error
+    // 未知錯誤：對用戶顯示更具體但安全的提示
     throw createError({
       statusCode: 500,
-      message: '創建詞條失敗'
+      message: '伺服器出現問題，未能創建詞條，請稍後再試。如多次出現，請聯絡管理員。'
     })
   }
 })
