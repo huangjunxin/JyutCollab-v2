@@ -66,7 +66,21 @@
                 </sup>
               </h3>
               <div class="mt-2 font-mono text-lg text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">
-                {{ (entry.phonetic?.jyutping || (entry.phoneticNotation ? [entry.phoneticNotation] : [])).join(' ') }}
+                {{
+                  (() => {
+                    const arr = entry.phonetic?.jyutping
+                    if (Array.isArray(arr) && arr.length > 0) {
+                      const hasSpaceInside = arr.some(s => (s || '').includes(' '))
+                      if (!hasSpaceInside) {
+                        // 舊數據：視為單一讀音的音節陣列
+                        return arr.join(' ')
+                      }
+                      // 新數據：多讀音列表，使用分號連接
+                      return arr.join('; ')
+                    }
+                    return entry.phoneticNotation || ''
+                  })()
+                }}
               </div>
               <p
                 v-if="entry.meta?.headword_variants?.length"

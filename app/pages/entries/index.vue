@@ -317,8 +317,8 @@
                 :show-expand="col.key === 'definition'"
                 :is-expanded="expandedEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
                 :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
-                :is-headword-expanded="col.key === 'headword' && expandedHeadwordEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
                 :headword-expand-hint="col.key === 'headword' ? getHeadwordExpandHint(row.entry) : undefined"
+                :phonetic-hint="col.key === 'phonetic' ? getPhoneticHint(row.entry) : undefined"
                 :theme-id="col.key === 'theme' ? row.entry.theme?.level3Id : undefined"
                 :is-theme-expanded="expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
                 @click="handleCellClick(row.entry, col.key, $event, rowIndex, colIndex)"
@@ -328,7 +328,6 @@
                 @ai-definition="generateAIDefinition(row.entry)"
                 @ai-theme="generateAICategorization(row.entry)"
                 @expand-click="toggleSensesExpand(row.entry)"
-                @headword-expand-click="toggleHeadwordExpand(row.entry)"
                 @theme-expand-click="toggleThemeExpand(row.entry)"
                 @accept-theme-ai="acceptThemeAI(row.entry)"
                 @dismiss-theme-ai="dismissThemeAI(row.entry)"
@@ -456,17 +455,7 @@
               </td>
             </tr>
             <!-- 詞頭詳情展開區 -->
-            <tr
-              v-if="row.type === 'entry' && expandedHeadwordEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
-              class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
-            >
-              <td :colspan="editableColumns.length + 2" class="p-0 align-top">
-                <EntryHeadwordExpand
-                  :entry="row.entry"
-                  @close="toggleHeadwordExpand(row.entry)"
-                />
-              </td>
-            </tr>
+            <!-- 詞頭詳情展開區（已由詞頭欄位直接展示「主詞形 [異形]」格式取代，暫不再使用） -->
             <!-- 主題分類展開區 -->
             <tr
               v-if="row.type === 'entry' && expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
@@ -520,7 +509,6 @@ import AISuggestionRow from '~/components/entries/AISuggestionRow.vue'
 import JyutdictSuggestionRow from '~/components/entries/JyutdictSuggestionRow.vue'
 import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
 import EntryThemeExpand from '~/components/entries/EntryThemeExpand.vue'
-import EntryHeadwordExpand from '~/components/entries/EntryHeadwordExpand.vue'
 import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
@@ -600,9 +588,6 @@ const tableWrapperRef = ref<HTMLElement | null>(null)
 
 // 方案 B：行展開編輯釋義詳情（多義項、例句、分義項）。值為當前展開的 entry id
 const expandedEntryId = ref<string | null>(null)
-
-// 詞頭展開狀態
-const expandedHeadwordEntryId = ref<string | null>(null)
 
 // 主題展開狀態
 const expandedThemeEntryId = ref<string | null>(null)
@@ -1284,13 +1269,57 @@ const editableColumns = [
     label: '詞頭',
     width: '120px',
     type: 'text',
-    get: (entry: Entry) => entry.headword?.display || entry.text || '',
+    get: (entry: Entry) => {
+      const hw = entry.headword
+      const main = hw?.display || entry.text || ''
+      const variants = (hw?.variants || []).map(v => v.trim()).filter(Boolean)
+      if (!main) return ''
+      if (!variants.length) return main
+      // 顯示格式：主詞形 [異形1; 異形2]
+      return `${main} [${variants.join('; ')}]`
+    },
     set: (entry: Entry, value: string) => {
-      if (!entry.headword) entry.headword = { display: '', normalized: '', isPlaceholder: false }
-      entry.headword.display = value
+      const raw = (value || '').trim()
+
+      // 解析規則：
+      // - 可選中括號：主詞形 [異形1; 異形2]，亦兼容全角【】。
+      // - 多個詞形用半角/全角逗號、分號分隔。
+      let outside = raw
+      let inside = ''
+
+      // 兼容半角 [ ] 及全角 【 】 作為包裹異形詞的括號
+      const bracketMatch = raw.match(/^(.*?)(?:[\[\uFF3B](.*)[\]\uFF3D])\s*$/)
+      if (bracketMatch) {
+        outside = (bracketMatch[1] || '').trim()
+        inside = (bracketMatch[2] || '').trim()
+      }
+
+      const parts: string[] = []
+      const pushFrom = (s: string) => {
+        // 支援半角/全角逗號、分號：, ; ， ；
+        s.split(/[;,，；]/).forEach(token => {
+          const v = token.trim()
+          if (v) parts.push(v)
+        })
+      }
+
+      if (outside) pushFrom(outside)
+      if (inside) pushFrom(inside)
+
+      const uniq = [...new Set(parts)]
+      const main = uniq[0] || ''
+      const variants = uniq.slice(1)
+
+      if (!entry.headword) {
+        entry.headword = { display: '', normalized: '', isPlaceholder: false, variants: [] }
+      }
+
+      entry.headword.display = main
       // 標準化詞頭默認等於顯示詞頭
-      entry.headword.normalized = value
-      entry.text = value
+      entry.headword.normalized = main
+      entry.headword.isPlaceholder = main.includes('□')
+      entry.headword.variants = variants
+      entry.text = main
     }
   },
   {
@@ -1311,11 +1340,33 @@ const editableColumns = [
     label: '粵拼',
     width: '100px',
     type: 'phonetic',
-    get: (entry: Entry) => entry.phonetic?.jyutping?.join(' ') || entry.phoneticNotation || '',
+    get: (entry: Entry) => {
+      const arr = entry.phonetic?.jyutping
+      if (Array.isArray(arr) && arr.length > 0) {
+        // 新格式：每個元素為一套完整讀音（可包含空格）；舊格式：單讀音按音節拆分
+        const hasSpaceInside = arr.some(s => (s || '').includes(' '))
+        if (!hasSpaceInside) {
+          // 舊數據：視為單一讀音的音節陣列
+          return arr.join(' ')
+        }
+        // 新數據：視為多讀音列表，使用分號連接
+        return arr.join('; ')
+      }
+      return entry.phoneticNotation || ''
+    },
     set: (entry: Entry, value: string) => {
+      const raw = (value || '').trim()
       if (!entry.phonetic) entry.phonetic = { jyutping: [] }
-      entry.phonetic.jyutping = value.split(' ').filter(Boolean)
-      entry.phoneticNotation = value
+
+      // 多個讀音用半角/全角逗號或分號分隔；每個元素為一套完整讀音字串
+      const readings = raw
+        .split(/[;,，；]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      entry.phonetic.jyutping = readings
+      // phoneticNotation 作為兼容字段，使用分號連接
+      entry.phoneticNotation = readings.join('; ')
     }
   },
   {
@@ -1543,18 +1594,51 @@ function getDefinitionExpandHint(entry: Entry): string {
   return parts.join(' · ')
 }
 
-/** 詞頭列展開區旁的數量提示：有其他詞形時顯示「N異形」 */
+/** 詞頭列提示：有其他詞形時顯示「N異形」 */
 function getHeadwordExpandHint(entry: Entry): string {
   const variants = entry.headword?.variants || []
   const count = variants.filter(v => v && v.trim() !== '').length
   if (count > 0) {
-    return `${count}異形`
+    return `${count} 異形`
   }
   return ''
 }
 
+/** 粵拼列提示：有多個讀音時顯示「N 其他讀音」 */
+function getPhoneticHint(entry: Entry): string {
+  const arr = entry.phonetic?.jyutping
+  if (!Array.isArray(arr) || arr.length <= 1) return ''
+
+  // 舊數據：視為單一讀音的音節陣列，不顯示「其他讀音」
+  const hasSpaceInside = arr.some(s => (s || '').includes(' '))
+  if (!hasSpaceInside) return ''
+
+  const othersCount = arr.length - 1
+  if (othersCount <= 0) return ''
+  return `${othersCount} 其他讀音`
+}
+
 function getCellDisplay(entry: Entry, col: any) {
   const value = col.get(entry)
+  // 詞頭：顯示主詞形本身，異形數量用第二行提示顯示
+  if (col.key === 'headword') {
+    const main = entry.headword?.display || entry.text || value
+    return main || '-'
+  }
+  // 粵拼：顯示主讀音，若有多個讀音則提示「N 其他讀音」
+  if (col.key === 'phonetic') {
+    const arr = entry.phonetic?.jyutping
+    if (Array.isArray(arr) && arr.length > 0) {
+      const hasSpaceInside = arr.some(s => (s || '').includes(' '))
+      if (!hasSpaceInside) {
+        // 舊數據：視為單一讀音的音節陣列
+        return arr.join(' ')
+      }
+      // 新數據：多讀音列表，主行只顯示第一個讀音，其他讀音數量交給提示函數處理
+      return arr[0] || '-'
+    }
+    return entry.phoneticNotation || value || '-'
+  }
   if (col.type === 'theme') {
     // 主題類型：顯示 L3 名稱
     if (!value) return '選擇分類'
@@ -1589,11 +1673,6 @@ function toggleSensesExpand(entry: Entry) {
   const opening = expandedEntryId.value !== key
   expandedEntryId.value = expandedEntryId.value === key ? null : key
   if (opening && expandedEntryId.value === key) ensureSensesStructure(entry)
-}
-
-function toggleHeadwordExpand(entry: Entry) {
-  const key = String(entry.id ?? (entry as any)._tempId ?? '')
-  expandedHeadwordEntryId.value = expandedHeadwordEntryId.value === key ? null : key
 }
 
 function toggleThemeExpand(entry: Entry) {

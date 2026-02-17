@@ -203,16 +203,6 @@
               class="flex-shrink-0"
               @click="$emit('expand-click')"
             />
-            <UButton
-              v-if="col.key === 'headword' && !headwordExpandHint"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              :icon="isHeadwordExpanded ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
-              :title="isHeadwordExpanded ? '收起詞頭詳情' : '展開詞頭詳情（其他詞形）'"
-              class="flex-shrink-0"
-              @click="$emit('headword-expand-click')"
-            />
           </div>
         </div>
         <!-- 第二行：展開提示 -->
@@ -237,27 +227,29 @@
             @click="$emit('expand-click')"
           />
         </div>
-        <!-- 詞頭展開提示 -->
+        <!-- 詞頭異形數量提示，例如「1 異形」「3 異形」 -->
         <div
           v-if="col.key === 'headword' && headwordExpandHint"
-          class="flex items-center justify-between px-1 py-0.5 min-h-[24px]"
-          @click.stop
+          class="flex items-center px-2 py-0.5 min-h-[20px]"
         >
           <span
             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
-            :title="`${headwordExpandHint}，點擊展開查看`"
+            :title="headwordExpandHint"
           >
             {{ headwordExpandHint }}
           </span>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            :icon="isHeadwordExpanded ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
-            :title="isHeadwordExpanded ? '收起詞頭詳情' : '展開詞頭詳情（其他詞形）'"
-            class="flex-shrink-0"
-            @click="$emit('headword-expand-click')"
-          />
+        </div>
+        <!-- 粵拼多讀音提示，例如「3 其他讀音」 -->
+        <div
+          v-if="col.key === 'phonetic' && phoneticHint"
+          class="flex items-center px-2 py-0.5 min-h-[20px]"
+        >
+          <span
+            class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+            :title="phoneticHint"
+          >
+            {{ phoneticHint }}
+          </span>
         </div>
       </div>
     </template>
@@ -297,6 +289,8 @@ const props = withDefaults(
     isHeadwordExpanded?: boolean
     /** 詞頭展開提示文字 */
     headwordExpandHint?: string
+    /** 粵拼多讀音提示文字（例如「3 其他讀音」） */
+    phoneticHint?: string
     /** 主題 ID，用於顯示 tooltip 路徑 */
     themeId?: number
     /** 主題展開狀態 */
