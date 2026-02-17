@@ -397,7 +397,7 @@
               v-if="
                 row.type === 'entry' &&
                 focusedCell?.rowIndex === rowIndex &&
-                (getJyutjyuVisible(String(row.entry.id ?? (row.entry as any)._tempId ?? '')) || getJyutjyuLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? '')))
+                getJyutjyuRowVisible(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))
               "
               :colspan="editableColumns.length + 2"
               :query="getJyutjyuQuery(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
@@ -693,6 +693,10 @@ function getJyutdictVisible(entryId: string): boolean {
 
 function getJyutjyuHandledKey(entryId: string, q: string): string {
   return `${entryId}::${q}`
+}
+
+function getJyutjyuRowVisible(entryId: string): boolean {
+  return jyutjyuRefVisible.value.get(entryId) || false
 }
 
 function getJyutjyuVisible(entryId: string): boolean {
@@ -995,6 +999,61 @@ function getDuplicateCheckVisible(entryId: string): boolean {
 
 function getDuplicateCheckLoading(entryId: string): boolean {
   return duplicateCheckResult.value.get(entryId)?.loading ?? false
+}
+
+function getDuplicateCheckRowVisible(entryId: string): boolean {
+  return getDuplicateCheckLoading(entryId) || getDuplicateCheckEntriesFormatted(entryId).length > 0
+}
+
+function getOtherDialectsRowVisible(entryId: string): boolean {
+  return getOtherDialectsFormatted(entryId).length > 0 && getDuplicateCheckEntriesFormatted(entryId).length === 0
+}
+
+function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
+  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
+
+  // 1) 行內 AI 釋義建議（最上面）
+  if (
+    aiSuggestion.value &&
+    editingCell.value &&
+    String(editingCell.value.entryId) === entryId &&
+    editingCell.value.field === aiSuggestionForField.value
+  ) {
+    dismissAISuggestion()
+    return true
+  }
+
+  // 2) 行內 AI 分類建議（顯示條件：焦點在分類列）
+  if (colIndex === themeColIndex && themeAISuggestions.value.get(entryId)) {
+    dismissThemeAI(entry)
+    return true
+  }
+
+  // 3) 泛粵典粵拼建議（顯示條件：焦點在粵拼列）
+  if (colIndex === phoneticColIndex && getJyutdictVisible(entryId)) {
+    dismissJyutdict(entry)
+    return true
+  }
+
+  // 4) 詞頭重複檢測（與 v-if 一致：loading 或 sameDialect 有結果）
+  if (getDuplicateCheckRowVisible(entryId)) {
+    dismissDuplicateCheck(entry)
+    return true
+  }
+
+  // 5) 其他方言點參考（與 v-if 一致）
+  if (getOtherDialectsRowVisible(entryId)) {
+    dismissDuplicateCheck(entry)
+    return true
+  }
+
+  // 6) Jyutjyu 參考（最下面）
+  if (getJyutjyuRowVisible(entryId)) {
+    dismissJyutjyuRef(entry)
+    return true
+  }
+
+  return false
 }
 
 // 接受粵拼建議（採納後不再顯示，與分類/釋義一致）
@@ -1889,23 +1948,11 @@ function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
       break
     case 'Escape':
       event.preventDefault()
-      // 如果有 AI 釋義建議，忽略它
-      if (aiSuggestion.value) {
-        dismissAISuggestion()
+      // 有多個提示時：Esc 逐個由上到下忽略（不要一次全關）
+      if (dismissTopHintForEntry(entry, editableColumns.findIndex(c => c.key === field))) {
+        return
       }
-      // 如果有粵拼建議，忽略它
-      else if (getJyutdictVisible(String(entry.id ?? (entry as any)._tempId ?? ''))) {
-        dismissJyutdict(entry)
-      }
-      // 如果有詞頭重複檢測提示，忽略它 (Esc)
-      else if (getDuplicateCheckVisible(String(entry.id ?? (entry as any)._tempId ?? ''))) {
-        dismissDuplicateCheck(entry)
-      }
-      else if (field === 'theme' && themeAISuggestions.value.get(String(entry.id ?? (entry as any)._tempId ?? ''))) {
-        dismissThemeAI(entry)
-      } else {
-        cancelCellEdit()
-      }
+      cancelCellEdit()
       break
     default:
       // 僅在輸入粵拼時觸發生成釋義建議（詞頭已填好）
@@ -2092,16 +2139,10 @@ function handleTableKeydown(event: KeyboardEvent) {
       }
       return
     case 'Escape':
-      // 若當前行有詞頭重複檢測提示，Esc 忽略
-      if (currentEntry && getDuplicateCheckVisible(String(currentEntry.id ?? (currentEntry as any)._tempId ?? ''))) {
+      // 有多個提示時：Esc 逐個由上到下忽略（不要一次全關）
+      if (currentEntry && dismissTopHintForEntry(currentEntry, colIndex)) {
         event.preventDefault()
-        dismissDuplicateCheck(currentEntry)
         return
-      }
-      // 若當前在分類列且有待處理的 AI 分類建議，Esc 忽略
-      if (colIndex === themeColIndex && currentEntry && themeAISuggestions.value.get(entryKeyForTheme)) {
-        event.preventDefault()
-        dismissThemeAI(currentEntry)
       }
       return
     case 'Enter':
