@@ -18,26 +18,37 @@
           </p>
 
           <!-- 短列表：直接顯示前幾條；若條數較多，再提供展開更多 -->
-          <div class="mt-1 space-y-1.5">
+          <div class="mt-1 space-y-2">
             <!-- 直接顯示前 3 條 -->
             <div
               v-for="e in entries.slice(0, 3)"
               :key="e.id"
-              class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-700 dark:text-gray-300 py-1"
+              class="rounded border border-blue-100 dark:border-blue-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
             >
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
-              <span class="text-blue-600 dark:text-blue-400">{{ e.dialectLabel }}</span>
-              <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
-              <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
-              <UButton
-                size="2xs"
-                color="primary"
-                variant="ghost"
-                class="ml-auto"
-                @click="$emit('apply-template', e.id)"
-              >
-                用作範本填寫本行
-              </UButton>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
+                <span class="text-blue-600 dark:text-blue-400">{{ e.dialectLabel }}</span>
+                <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
+                <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
+                <UButton
+                  size="2xs"
+                  color="primary"
+                  variant="ghost"
+                  class="ml-auto"
+                  @click="$emit('apply-template', e.id)"
+                >
+                  用作範本填寫本行
+                </UButton>
+              </div>
+              <p class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
+                {{ e.definitionSummary }}
+              </p>
+              <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
+                <span>分類：{{ e.themeLabel }}</span>
+                <span>·</span>
+                <span>共 {{ e.senseCount }} 個義項</span>
+                <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
+              </div>
             </div>
 
             <!-- 若超過 3 條，提供展開/收起更多 -->
@@ -51,26 +62,37 @@
               </button>
               <div
                 v-if="showDetail"
-                class="mt-1 space-y-1.5 max-h-40 overflow-y-auto"
+                class="mt-1 space-y-2 max-h-64 overflow-y-auto"
               >
                 <div
                   v-for="e in entries.slice(3)"
                   :key="e.id"
-                  class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-700 dark:text-gray-300 py-1"
+                  class="rounded border border-blue-100 dark:border-blue-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
                 >
-                  <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
-                  <span class="text-blue-600 dark:text-blue-400">{{ e.dialectLabel }}</span>
-                  <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
-                  <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
-                  <UButton
-                    size="2xs"
-                    color="primary"
-                    variant="ghost"
-                    class="ml-auto"
-                    @click="$emit('apply-template', e.id)"
-                  >
-                    用作範本填寫本行
-                  </UButton>
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
+                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
+                    <span class="text-blue-600 dark:text-blue-400">{{ e.dialectLabel }}</span>
+                    <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
+                    <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
+                    <UButton
+                      size="2xs"
+                      color="primary"
+                      variant="ghost"
+                      class="ml-auto"
+                      @click="$emit('apply-template', e.id)"
+                    >
+                      用作範本填寫本行
+                    </UButton>
+                  </div>
+                  <p class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
+                    {{ e.definitionSummary }}
+                  </p>
+                  <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
+                    <span>分類：{{ e.themeLabel }}</span>
+                    <span>·</span>
+                    <span>共 {{ e.senseCount }} 個義項</span>
+                    <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
+                  </div>
                 </div>
               </div>
             </template>
@@ -94,6 +116,10 @@ defineProps<{
     status: string
     statusLabel: string
     createdAtLabel: string
+    definitionSummary: string
+    themeLabel: string
+    senseCount: number
+    metaLabel: string
   }>
 }>()
 
