@@ -15,6 +15,18 @@ const mapEntry = (e: any) => ({
   createdAt: e.createdAt?.toISOString?.() || e.createdAt
 })
 
+/** 其他方言詞條需帶上 senses、theme、meta 供前端預覽釋義與分類 */
+const mapOtherDialectEntry = (e: any) => ({
+  id: e._id?.toString() || e.id,
+  headword: e.headword,
+  dialect: e.dialect,
+  status: e.status,
+  createdAt: e.createdAt?.toISOString?.() || e.createdAt,
+  senses: e.senses,
+  theme: e.theme,
+  meta: e.meta
+})
+
 /**
  * 檢查數據庫中是否已有相同詞頭的詞條（用於新建時重複性與參考提示）。
  * - sameDialect: 相同詞頭+相同方言（真正重複，需提示用戶）
@@ -52,7 +64,7 @@ export default defineEventHandler(async (event) => {
         'headword.display': displayTrimmed,
         'dialect.name': { $ne: dialect }
       })
-        .select('id headword dialect status createdAt')
+        .select('id headword dialect status createdAt senses theme meta')
         .sort({ createdAt: -1 })
         .limit(20)
         .lean()
@@ -60,7 +72,7 @@ export default defineEventHandler(async (event) => {
 
     return {
       sameDialect: sameDialectRaw.map(mapEntry),
-      otherDialects: otherDialectsRaw.map(mapEntry)
+      otherDialects: otherDialectsRaw.map(mapOtherDialectEntry)
     }
   } catch (error: any) {
     if (error.statusCode) throw error
