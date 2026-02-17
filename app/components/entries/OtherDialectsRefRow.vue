@@ -31,7 +31,7 @@
                 <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
                 <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
                 <UButton
-                  size="2xs"
+                  size="xs"
                   color="primary"
                   variant="ghost"
                   class="ml-auto"
@@ -75,7 +75,7 @@
                     <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
                     <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
                     <UButton
-                      size="2xs"
+                      size="xs"
                       color="primary"
                       variant="ghost"
                       class="ml-auto"
