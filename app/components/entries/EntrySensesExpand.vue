@@ -208,16 +208,17 @@
                 <img
                   :src="getOptimizedUrl(publicId)"
                   :alt="`配圖 ${imgIdx + 1}`"
-                  class="w-24 h-24 object-cover"
+                  class="w-24 h-24 object-cover cursor-zoom-in"
                   loading="lazy"
+                  @click="openImagePreview(publicId)"
                 />
                 <button
                   type="button"
-                  class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs"
+                  class="absolute top-1 right-1 inline-flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   title="刪除圖片"
-                  @click="removeSenseImage(senseIdx, imgIdx)"
+                  @click.stop="removeSenseImage(senseIdx, imgIdx)"
                 >
-                  <UIcon name="i-heroicons-trash" class="w-5 h-5" />
+                  <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -332,6 +333,22 @@
         </UButton>
       </div>
     </div>
+
+    <!-- 釋義配圖預覽（點擊縮圖放大） -->
+    <UModal v-model:open="imagePreviewVisible">
+      <template #content>
+        <UCard class="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div class="relative">
+            <img
+              v-if="imagePreviewPublicId"
+              :src="getOptimizedUrl(imagePreviewPublicId, { width: 1200 })"
+              alt="釋義配圖預覽"
+              class="max-h-[80vh] w-auto mx-auto object-contain"
+            />
+          </div>
+        </UCard>
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -394,6 +411,14 @@ async function convertHeicToJpeg(file: File): Promise<File> {
 const getOptimizedUrl = useSenseImageUrl()
 const compressImage = useImageCompress()
 const uploadingSenseIdx = ref<number | null>(null)
+
+const imagePreviewVisible = ref(false)
+const imagePreviewPublicId = ref<string | null>(null)
+
+function openImagePreview(publicId: string) {
+  imagePreviewPublicId.value = publicId
+  imagePreviewVisible.value = true
+}
 
 async function onImageSelect(event: Event, senseIdx: number) {
   const input = event.target as HTMLInputElement
