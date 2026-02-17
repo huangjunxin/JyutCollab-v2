@@ -29,6 +29,7 @@ const UpdateEntrySchema = z.object({
       translation: z.string().optional(),
       scenario: z.string().optional()
     })).optional(),
+    images: z.array(z.string()).optional(),
     subSenses: z.array(z.object({
       label: z.string(),
       definition: z.string(),
@@ -181,6 +182,7 @@ export default defineEventHandler(async (event) => {
             scenario: ex.scenario,
             source: 'user_generated' as const
           })),
+          images: Array.isArray(sense.images) ? sense.images : undefined,
           subSenses: sense.subSenses?.map((sub: any) => ({
             label: sub.label || '',
             definition: convertToHongKongTraditional((sub.definition || '').trim()),

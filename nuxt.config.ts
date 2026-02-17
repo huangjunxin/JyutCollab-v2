@@ -33,9 +33,13 @@ export default defineNuxtConfig({
     mongodbUri: process.env.MONGODB_URI || '',
     jwtSecret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
+    cloudinaryCloudName: process.env.NUXT_CLOUDINARY_CLOUD_NAME || '',
+    cloudinaryApiKey: process.env.NUXT_CLOUDINARY_API_KEY || '',
+    cloudinaryApiSecret: process.env.NUXT_CLOUDINARY_API_SECRET || '',
 
-    // Public
+    // Public (e.g. for building image URLs with transforms)
     public: {
+      cloudinaryCloudName: process.env.NUXT_CLOUDINARY_CLOUD_NAME || '',
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://localhost:3100',
       siteName: process.env.NUXT_PUBLIC_SITE_NAME || 'JyutCollab v2'
     }

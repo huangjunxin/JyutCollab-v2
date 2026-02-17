@@ -22,6 +22,8 @@ export interface ISense {
   definition: string
   label?: string
   examples?: IExample[]
+  /** Cloudinary public_id 列表，用於釋義配圖 */
+  images?: string[]
   subSenses?: ISubSense[]
 }
 
@@ -118,6 +120,7 @@ const SenseSchema = new mongoose.Schema<ISense>({
   definition: { type: String, required: true },
   label: { type: String },
   examples: [ExampleSchema],
+  images: [{ type: String }],
   subSenses: [SubSenseSchema]
 }, { _id: false })
 

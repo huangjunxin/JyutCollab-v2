@@ -171,6 +171,52 @@
               </div>
             </div>
           </div>
+          <!-- 釋義配圖（例句下方） -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">釋義配圖</label>
+              <label class="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  class="hidden"
+                  @change="(e: Event) => onImageSelect(e, senseIdx)"
+                />
+                <UButton
+                  as="span"
+                  color="primary"
+                  variant="ghost"
+                  size="xs"
+                  icon="i-heroicons-photo"
+                  :loading="uploadingSenseIdx === senseIdx"
+                >
+                  上傳圖片
+                </UButton>
+              </label>
+            </div>
+            <div v-if="(sense.images?.length ?? 0) > 0" class="flex flex-wrap gap-2 mt-2">
+              <div
+                v-for="(publicId, imgIdx) in (sense.images || [])"
+                :key="publicId"
+                class="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
+              >
+                <img
+                  :src="getOptimizedUrl(publicId)"
+                  :alt="`配圖 ${imgIdx + 1}`"
+                  class="w-24 h-24 object-cover"
+                  loading="lazy"
+                />
+                <button
+                  type="button"
+                  class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs"
+                  title="刪除圖片"
+                  @click="removeSenseImage(senseIdx, imgIdx)"
+                >
+                  <UIcon name="i-heroicons-trash" class="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
           <!-- 分義項 -->
           <div>
             <div class="flex items-center justify-between mb-2">
@@ -287,7 +333,7 @@
 <script setup lang="ts">
 import type { Entry } from '~/types'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     entry: Entry
     /** 展開區內 AI 釋義建議（先展示，用戶採納後才寫入） */
@@ -315,4 +361,46 @@ defineEmits([
   'add-sub-sense-example',
   'remove-sub-sense-example'
 ])
+
+const getOptimizedUrl = useSenseImageUrl()
+const uploadingSenseIdx = ref<number | null>(null)
+
+function onImageSelect(event: Event, senseIdx: number) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploadingSenseIdx.value = senseIdx
+  const form = new FormData()
+  form.append('file', file)
+  $fetch<{ success: boolean; data?: { public_id: string } }>('/api/upload/image', {
+    method: 'POST',
+    body: form
+  })
+    .then((res) => {
+      if (res.success && res.data?.public_id) {
+        const sense = props.entry.senses?.[senseIdx]
+        if (sense) {
+          if (!sense.images) sense.images = []
+          sense.images.push(res.data!.public_id)
+          props.entry._isDirty = true
+        }
+      }
+    })
+    .catch((err) => {
+      const msg = err?.data?.message || err?.message || '上傳失敗'
+      alert(msg)
+    })
+    .finally(() => {
+      uploadingSenseIdx.value = null
+      input.value = ''
+    })
+}
+
+function removeSenseImage(senseIdx: number, imgIdx: number) {
+  const sense = props.entry.senses?.[senseIdx]
+  if (sense?.images) {
+    sense.images.splice(imgIdx, 1)
+    props.entry._isDirty = true
+  }
+}
 </script>

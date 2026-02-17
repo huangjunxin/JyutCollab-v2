@@ -66,6 +66,7 @@ export interface Sense {
   definition: string        // 釋義內容
   label?: string            // 詞性/分類標籤
   examples?: Example[]
+  images?: string[]         // Cloudinary public_id，釋義配圖
   subSenses?: SubSense[]
 }
 

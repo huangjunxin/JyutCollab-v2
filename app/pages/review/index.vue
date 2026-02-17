@@ -303,6 +303,28 @@
               </ul>
             </div>
 
+            <!-- 釋義配圖 -->
+            <div v-if="viewingEntry.senses?.[0]?.images?.length" class="mt-4">
+              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">釋義配圖</label>
+              <div class="flex flex-wrap gap-2 mt-2">
+                <a
+                  v-for="(publicId, i) in viewingEntry.senses[0].images"
+                  :key="publicId"
+                  :href="getOptimizedUrl(publicId, { width: 1200 })"
+                  target="_blank"
+                  rel="noopener"
+                  class="block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600"
+                >
+                  <img
+                    :src="getOptimizedUrl(publicId, { width: 200 })"
+                    :alt="`配圖 ${i + 1}`"
+                    class="w-24 h-24 object-cover"
+                    loading="lazy"
+                  />
+                </a>
+              </div>
+            </div>
+
             <!-- Contributor info -->
             <div class="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
               提交者: {{ viewingEntry.createdBy }} · 提交時間: {{ formatDate(viewingEntry.createdAt) }}
@@ -336,6 +358,8 @@
 <script setup lang="ts">
 import type { Entry } from '~/types'
 import { dialectOptionsWithAll, getDialectLabel, getDialectColor } from '~/utils/dialects'
+
+const getOptimizedUrl = useSenseImageUrl()
 
 definePageMeta({
   layout: 'default',
