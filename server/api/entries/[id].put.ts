@@ -184,7 +184,7 @@ export default defineEventHandler(async (event) => {
             scenario: ex.scenario,
             source: 'user_generated' as const
           })),
-          images: Array.isArray(sense.images) ? sense.images : undefined,
+          images: Array.isArray(sense.images) ? sense.images.slice(0, 3) : undefined,
           subSenses: sense.subSenses?.map((sub: any) => ({
             label: sub.label || '',
             definition: convertToHongKongTraditional((sub.definition || '').trim()),

@@ -171,28 +171,33 @@
               </div>
             </div>
           </div>
-          <!-- 釋義配圖（例句下方） -->
+          <!-- 釋義配圖（例句下方，每義項最多 3 張） -->
           <div>
             <div class="flex items-center justify-between mb-2">
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">釋義配圖</label>
-              <label class="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/gif,image/webp"
-                  class="hidden"
-                  @change="(e: Event) => onImageSelect(e, senseIdx)"
-                />
-                <UButton
-                  as="span"
-                  color="primary"
-                  variant="ghost"
-                  size="xs"
-                  icon="i-heroicons-photo"
-                  :loading="uploadingSenseIdx === senseIdx"
-                >
-                  上傳圖片
-                </UButton>
+              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                釋義配圖（已 {{ (sense.images?.length ?? 0) }}/{{ MAX_IMAGES_PER_SENSE }} 張）
               </label>
+              <template v-if="(sense.images?.length ?? 0) < MAX_IMAGES_PER_SENSE">
+                <label class="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif"
+                    class="hidden"
+                    @change="(e: Event) => onImageSelect(e, senseIdx)"
+                  />
+                  <UButton
+                    as="span"
+                    color="primary"
+                    variant="ghost"
+                    size="xs"
+                    icon="i-heroicons-photo"
+                    :loading="uploadingSenseIdx === senseIdx"
+                  >
+                    上傳圖片
+                  </UButton>
+                </label>
+              </template>
+              <span v-else class="text-xs text-gray-500 dark:text-gray-400">已達 3 張，可刪除後再上傳</span>
             </div>
             <div v-if="(sense.images?.length ?? 0) > 0" class="flex flex-wrap gap-2 mt-2">
               <div
@@ -362,38 +367,73 @@ defineEmits([
   'remove-sub-sense-example'
 ])
 
+const MAX_IMAGES_PER_SENSE = 3
+
+const HEIF_TYPES = ['image/heic', 'image/heif']
+const HEIF_EXT = /\.(heic|heif)$/i
+
+function isHeifFile(file: File): boolean {
+  if (HEIF_TYPES.includes(file.type)) return true
+  return HEIF_EXT.test(file.name)
+}
+
+/** 將 HEIC/HEIF 轉為 JPEG File，供後續壓縮與上傳。僅在客戶端動態載入 heic2any，避免 SSR 時 window 未定義。 */
+async function convertHeicToJpeg(file: File): Promise<File> {
+  const heic2any = (await import('heic2any')).default
+  const result = await heic2any({
+    blob: file,
+    toType: 'image/jpeg',
+    quality: 1
+  })
+  const blob = Array.isArray(result) ? result[0] : result
+  if (!blob) throw new Error('HEIC 轉換失敗')
+  const name = file.name.replace(HEIF_EXT, '.jpg')
+  return new File([blob], name, { type: 'image/jpeg' })
+}
+
 const getOptimizedUrl = useSenseImageUrl()
+const compressImage = useImageCompress()
 const uploadingSenseIdx = ref<number | null>(null)
 
-function onImageSelect(event: Event, senseIdx: number) {
+async function onImageSelect(event: Event, senseIdx: number) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  const sense = props.entry.senses?.[senseIdx]
+  if (!sense) return
+  const currentCount = sense.images?.length ?? 0
+  if (currentCount >= MAX_IMAGES_PER_SENSE) {
+    alert(`每個義項最多上傳 ${MAX_IMAGES_PER_SENSE} 張圖片`)
+    input.value = ''
+    return
+  }
+
   uploadingSenseIdx.value = senseIdx
-  const form = new FormData()
-  form.append('file', file)
-  $fetch<{ success: boolean; data?: { public_id: string } }>('/api/upload/image', {
-    method: 'POST',
-    body: form
-  })
-    .then((res) => {
-      if (res.success && res.data?.public_id) {
-        const sense = props.entry.senses?.[senseIdx]
-        if (sense) {
-          if (!sense.images) sense.images = []
-          sense.images.push(res.data!.public_id)
-          props.entry._isDirty = true
-        }
-      }
+  try {
+    let fileToCompress: File = file
+    if (isHeifFile(file)) {
+      const converted = await convertHeicToJpeg(file)
+      fileToCompress = converted
+    }
+    const blob = await compressImage(fileToCompress, { maxSize: 1200, quality: 0.82 })
+    const form = new FormData()
+    form.append('file', blob, fileToCompress.name.replace(/\.[^.]+$/, '.jpg') || 'image.jpg')
+    const res = await $fetch<{ success: boolean; data?: { public_id: string } }>('/api/upload/image', {
+      method: 'POST',
+      body: form
     })
-    .catch((err) => {
-      const msg = err?.data?.message || err?.message || '上傳失敗'
-      alert(msg)
-    })
-    .finally(() => {
-      uploadingSenseIdx.value = null
-      input.value = ''
-    })
+    if (res.success && res.data?.public_id) {
+      if (!sense.images) sense.images = []
+      sense.images.push(res.data.public_id)
+      props.entry._isDirty = true
+    }
+  } catch (err: any) {
+    const msg = err?.data?.message || err?.message || '上傳失敗'
+    alert(msg)
+  } finally {
+    uploadingSenseIdx.value = null
+    input.value = ''
+  }
 }
 
 function removeSenseImage(senseIdx: number, imgIdx: number) {

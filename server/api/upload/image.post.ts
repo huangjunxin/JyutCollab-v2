@@ -1,7 +1,7 @@
 import { uploadImageBuffer, getOptimizedImageUrl } from '../../utils/cloudinary'
 
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif']
 
 export default defineEventHandler(async (event) => {
   if (!event.context.auth) {
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   if (!ALLOWED_TYPES.includes(type)) {
     throw createError({
       statusCode: 400,
-      message: '僅支持 JPG、PNG、GIF、WebP 格式'
+      message: '僅支持 JPG、PNG、GIF、WebP、HEIC/HEIF 格式'
     })
   }
 
