@@ -1,13 +1,22 @@
 import { z } from 'zod'
 import { User } from '../../utils/User'
+import { formatZodErrorToMessage } from '../../utils/validation'
 
 const UpdateProfileSchema = z.object({
-  displayName: z.string().trim().max(100).optional(),
-  location: z.string().trim().max(100).optional(),
-  nativeDialect: z.string().trim().optional(),
-  bio: z.string().trim().max(500).optional(),
-  avatarUrl: z.string().url().optional().or(z.literal(''))
+  displayName: z.string().trim().max(100, '顯示名稱最多100個字符').optional(),
+  location: z.string().trim().max(100, '所在地最多100個字符').optional(),
+  nativeDialect: z.string().trim().max(50).optional(),
+  bio: z.string().trim().max(500, '簡介最多500個字符').optional(),
+  avatarUrl: z.union([z.string().url('請輸入有效的頭像網址'), z.literal('')]).optional()
 })
+
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  displayName: '顯示名稱',
+  location: '所在地',
+  nativeDialect: '母語方言',
+  bio: '簡介',
+  avatarUrl: '頭像網址'
+}
 
 export default defineEventHandler(async (event) => {
   const session = await getUserSession(event)
@@ -21,11 +30,11 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => ({}))
   const parsed = UpdateProfileSchema.safeParse(body)
   if (!parsed.success) {
-    const msg = parsed.error.errors[0]?.message ?? '輸入數據無效'
-    throw createError({
-      statusCode: 400,
-      message: msg
-    })
+    const errorText = formatZodErrorToMessage(parsed.error, PROFILE_FIELD_LABELS)
+    return {
+      success: false,
+      error: errorText
+    }
   }
 
   const updates = parsed.data as Record<string, unknown>

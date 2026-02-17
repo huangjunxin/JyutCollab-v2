@@ -30,7 +30,7 @@
               {{ profile.email }}
             </p>
             <p class="mt-2">
-              <UBadge :color="roleBadgeColor" variant="subtle" size="sm">
+              <UBadge :color="roleBadgeColor[profile.role] ?? 'neutral'" variant="subtle" size="sm">
                 {{ roleLabel }}
               </UBadge>
             </p>
@@ -60,7 +60,7 @@
             <UBadge
               v-for="p in profile.dialectPermissions"
               :key="p.dialectName"
-              color="gray"
+              color="neutral"
               variant="subtle"
               size="sm"
             >
@@ -77,7 +77,8 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">顯示名稱</label>
             <UInput
               v-model="form.displayName"
-              placeholder="可選，用於顯示"
+              placeholder="可選，最多 100 個字符"
+              maxlength="100"
               size="lg"
               icon="i-heroicons-identification"
               class="w-full"
@@ -88,7 +89,8 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">所在地</label>
             <UInput
               v-model="form.location"
-              placeholder="例如：香港、廣州"
+              placeholder="例如：香港、廣州（最多 100 個字符）"
+              maxlength="100"
               size="lg"
               icon="i-heroicons-map-pin"
               class="w-full"
@@ -126,28 +128,28 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">簡介</label>
             <UTextarea
               v-model="form.bio"
-              placeholder="簡短介紹（可選）"
+              placeholder="簡短介紹（可選，最多 500 個字符）"
               :rows="3"
+              maxlength="500"
               class="w-full"
             />
           </div>
 
           <UAlert
             v-if="error"
-            color="red"
+            color="error"
             variant="subtle"
             icon="i-heroicons-exclamation-triangle"
-          >
-            {{ error }}
-          </UAlert>
+            title="保存失敗"
+            :description="error"
+          />
           <UAlert
             v-if="success"
-            color="green"
+            color="success"
             variant="subtle"
             icon="i-heroicons-check-circle"
-          >
-            已保存
-          </UAlert>
+            title="已保存"
+          />
 
           <UButton
             type="submit"
@@ -164,7 +166,7 @@
     <!-- Error state -->
     <UAlert
       v-else-if="loadError"
-      color="red"
+      color="error"
       variant="subtle"
       icon="i-heroicons-exclamation-triangle"
       title="無法載入個人資料"
@@ -224,10 +226,10 @@ const roleLabels: Record<string, string> = {
   admin: '管理員'
 }
 
-const roleBadgeColor: Record<string, string> = {
-  contributor: 'gray',
+const roleBadgeColor: Record<string, 'primary' | 'neutral' | 'error'> = {
+  contributor: 'neutral',
   reviewer: 'primary',
-  admin: 'red'
+  admin: 'error'
 }
 
 const roleLabel = computed(() =>
@@ -263,7 +265,7 @@ async function handleSubmit() {
   error.value = ''
   success.value = false
   try {
-    const res = await $fetch<{ success: boolean; data: Profile }>('/api/auth/me', {
+    const res = await $fetch<{ success: boolean; data?: Profile; error?: string }>('/api/auth/me', {
       method: 'PATCH',
       body: {
         displayName: form.displayName || undefined,
@@ -278,9 +280,11 @@ async function handleSubmit() {
       success.value = true
       const { fetch: fetchSession } = useUserSession()
       await fetchSession()
+    } else if (res.success === false && (res as any).error) {
+      error.value = (res as any).error
     }
   } catch (e: any) {
-    error.value = e.data?.message ?? e.message ?? '保存失敗'
+    error.value = e.data?.error ?? e.data?.message ?? e.message ?? '保存失敗'
   } finally {
     saving.value = false
   }

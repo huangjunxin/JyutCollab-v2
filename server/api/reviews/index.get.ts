@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { formatZodErrorToMessage } from '../../utils/validation'
 
 const QuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -33,9 +34,10 @@ export default defineEventHandler(async (event) => {
     const validated = QuerySchema.safeParse(query)
 
     if (!validated.success) {
+      const message = formatZodErrorToMessage(validated.error)
       throw createError({
         statusCode: 400,
-        message: validated.error.errors[0]?.message || '查詢參數無效'
+        message: message || '查詢參數無效'
       })
     }
 

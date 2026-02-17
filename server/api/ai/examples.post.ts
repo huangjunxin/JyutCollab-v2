@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { formatZodErrorToMessage } from '../../utils/validation'
 
 const RequestSchema = z.object({
-  expression: z.string().min(1, '請輸入表達'),
-  definition: z.string().min(1, '請輸入釋義'),
+  expression: z.string().trim().min(1, '請輸入表達').max(200, '表達過長'),
+  definition: z.string().trim().min(1, '請輸入釋義').max(1000, '釋義過長'),
   region: z.enum(['guangzhou', 'hongkong', 'taishan', 'overseas']).default('hongkong')
 })
 
@@ -27,9 +28,10 @@ export default defineEventHandler(async (event) => {
     const validated = RequestSchema.safeParse(body)
 
     if (!validated.success) {
+      const message = formatZodErrorToMessage(validated.error)
       throw createError({
         statusCode: 400,
-        message: validated.error.errors[0]?.message || '輸入數據無效'
+        message
       })
     }
 

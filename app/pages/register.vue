@@ -65,10 +65,11 @@
           <form @submit.prevent="handleSubmit" class="space-y-5">
             <!-- Username -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">用户名 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">用戶名 <span class="text-red-500">*</span></label>
               <UInput
                 v-model="form.username"
-                placeholder="請輸入用户名"
+                placeholder="請輸入用戶名（2–50 個字符）"
+                maxlength="50"
                 size="lg"
                 icon="i-heroicons-at-symbol"
                 class="w-full"
@@ -82,6 +83,7 @@
                 v-model="form.email"
                 type="email"
                 placeholder="請輸入郵箱"
+                maxlength="254"
                 size="lg"
                 icon="i-heroicons-envelope"
                 class="w-full"
@@ -94,7 +96,8 @@
               <UInput
                 v-model="form.password"
                 type="password"
-                placeholder="請輸入密碼（至少6位）"
+                placeholder="請輸入密碼（6–128 位）"
+                maxlength="128"
                 size="lg"
                 icon="i-heroicons-lock-closed"
                 class="w-full"
@@ -109,7 +112,8 @@
               </label>
               <UInput
                 v-model="form.displayName"
-                placeholder="可選，用於顯示"
+                placeholder="可選，最多 100 個字符"
+                maxlength="100"
                 size="lg"
                 icon="i-heroicons-identification"
                 class="w-full"
@@ -142,8 +146,8 @@
                 <span class="text-gray-400 font-normal">(可選)</span>
               </label>
               <USelectMenu
-                v-model="form.nativeDialect"
-                :items="DIALECT_OPTIONS_OPTIONAL"
+                v-model="formNativeDialectModel"
+                :items="DIALECT_OPTIONS_OPTIONAL_FOR_COMBO"
                 value-key="value"
                 placeholder="可選"
                 size="lg"
@@ -157,10 +161,10 @@
               color="error"
               variant="subtle"
               icon="i-heroicons-exclamation-triangle"
+              title="註冊失敗"
+              :description="error"
               class="mt-4"
-            >
-              {{ error }}
-            </UAlert>
+            />
 
             <!-- Submit button -->
             <UButton
@@ -198,7 +202,7 @@ definePageMeta({
 
 import type { DialectId } from '~shared/dialects'
 import { useAuth } from '~/composables/useAuth'
-import { DIALECT_OPTIONS_FOR_SELECT, DIALECT_OPTIONS_OPTIONAL } from '~/utils/dialects'
+import { DIALECT_OPTIONS_FOR_SELECT, DIALECT_OPTIONS_OPTIONAL_FOR_COMBO, NATIVE_DIALECT_NONE } from '~/utils/dialects'
 
 const { register, isAuthenticated } = useAuth()
 const router = useRouter()
@@ -209,7 +213,7 @@ const form = reactive({
   password: '',
   displayName: '',
   dialect: '' as string,
-  nativeDialect: '' as string
+  nativeDialect: NATIVE_DIALECT_NONE as string
 })
 
 const dialectOptions = DIALECT_OPTIONS_FOR_SELECT
@@ -219,6 +223,15 @@ const formDialectModel = computed({
   get: () => (form.dialect || undefined) as DialectId | undefined,
   set: (v: DialectId | { value: string; label: string } | undefined) => {
     form.dialect = (typeof v === 'object' && v && 'value' in v) ? (v as { value: string }).value : (v ?? '')
+  }
+})
+
+/** 母語方言：Combobox 不允許 value 為空，用 NATIVE_DIALECT_NONE；提交時轉回 undefined */
+const formNativeDialectModel = computed({
+  get: () => (form.nativeDialect === '' ? NATIVE_DIALECT_NONE : form.nativeDialect) as string,
+  set: (v: string | { value: string; label: string } | undefined) => {
+    const val = (typeof v === 'object' && v && 'value' in v) ? (v as { value: string }).value : (v ?? NATIVE_DIALECT_NONE)
+    form.nativeDialect = val === NATIVE_DIALECT_NONE ? '' : val
   }
 })
 
@@ -257,7 +270,7 @@ async function handleSubmit() {
     password: form.password,
     displayName: form.displayName || undefined,
     dialect: form.dialect,
-    nativeDialect: form.nativeDialect || undefined
+    nativeDialect: (form.nativeDialect && form.nativeDialect !== NATIVE_DIALECT_NONE) ? form.nativeDialect : undefined
   })
 
   if (!result.success) {
