@@ -51,6 +51,8 @@ export interface Sense {
   definition: string
   label?: string
   examples?: Example[]
+  /** Cloudinary public_id 列表，釋義配圖 */
+  images?: string[]
   subSenses?: SubSense[]
 }
 
