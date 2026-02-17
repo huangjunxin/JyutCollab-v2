@@ -45,106 +45,162 @@
       <p class="text-gray-500 dark:text-gray-400">所有詞條都已審核完畢</p>
     </div>
 
-    <!-- Entry list -->
+    <!-- Entry list (DictCard-style) -->
     <div v-else class="space-y-4">
       <div
         v-for="entry in entries"
         :key="entry.id"
-        class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow"
+        class="review-dict-card bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden"
       >
-        <div class="p-5">
-          <div class="flex justify-between gap-4">
+        <!-- 頭部：詞頭 + 粵拼 + 標籤 + 操作 -->
+        <div class="card-header px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
             <div class="flex-1 min-w-0">
-              <!-- Header -->
-              <div class="flex items-center gap-3 mb-3">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ entry.headword?.display || entry.text }}
-                </h3>
-                <UBadge :color="(getDialectColor(entry.dialect?.name ?? entry.region ?? '') as 'primary' | 'secondary' | 'neutral' | 'success' | 'error' | 'warning' | 'info')" variant="subtle">
-                  {{ getDialectLabel(entry.dialect?.name ?? entry.region ?? '') }}
-                </UBadge>
-                <UBadge :color="(getEntryTypeColor(entry.entryType ?? '') as 'primary' | 'secondary' | 'neutral' | 'success' | 'error' | 'warning' | 'info')" variant="subtle" size="xs">
-                  {{ getEntryTypeLabel(entry.entryType) }}
-                </UBadge>
+              <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 break-words">
+                {{ entry.headword?.display || entry.text }}
+                <sup
+                  v-if="entry.meta?.variant_number"
+                  class="ml-1 text-sm text-gray-500 dark:text-gray-400"
+                >
+                  {{ entry.meta.variant_number }}
+                </sup>
+              </h3>
+              <div class="mt-2 font-mono text-lg text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">
+                {{ (entry.phonetic?.jyutping || (entry.phoneticNotation ? [entry.phoneticNotation] : [])).join(' ') }}
               </div>
+              <p
+                v-if="entry.meta?.headword_variants?.length"
+                class="text-sm text-gray-600 dark:text-gray-400 break-words mt-2"
+              >
+                異形詞：{{ entry.meta.headword_variants.join('、') }}
+              </p>
+              <p
+                v-if="entry.headword?.display && entry.headword?.normalized && entry.headword.display !== entry.headword.normalized"
+                class="text-sm text-gray-500 dark:text-gray-400 break-words mt-1"
+              >
+                標準寫法：{{ entry.headword.normalized }}
+              </p>
+            </div>
 
-              <!-- Phonetic -->
-              <div v-if="entry.phonetic?.jyutping?.length || entry.phoneticNotation" class="mb-3">
-                <span class="text-sm font-mono text-gray-600 dark:text-gray-400">
-                  {{ entry.phonetic?.jyutping?.join(' ') || entry.phoneticNotation }}
+            <!-- 右側：標籤 + 通過/拒絕 -->
+            <div class="flex flex-wrap gap-2 md:justify-end md:mt-0 md:ml-4 md:max-w-[40%] items-start">
+              <span class="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-sm whitespace-nowrap">
+                {{ getDialectLabel(entry.dialect?.name ?? entry.region ?? '') }}
+              </span>
+              <span class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm whitespace-nowrap">
+                {{ getEntryTypeLabel(entry.entryType) }}
+              </span>
+              <span
+                v-if="entry.meta?.register"
+                class="px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm whitespace-nowrap"
+              >
+                {{ entry.meta.register }}
+              </span>
+              <!-- 分類（與 DictCard 一致：紫色 pill） -->
+              <span
+                v-if="entry.meta?.category || entry.theme?.level3"
+                class="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-sm break-words max-w-full"
+              >
+                {{ entry.meta?.category || [entry.theme?.level1, entry.theme?.level2, entry.theme?.level3].filter(Boolean).join(' → ') }}
+              </span>
+              <div class="flex gap-2 flex-shrink-0">
+                <UButton
+                  color="success"
+                  size="sm"
+                  icon="i-heroicons-check"
+                  :loading="processing === entry.id && action === 'approve'"
+                  @click="handleApprove(entry.id)"
+                >
+                  通過
+                </UButton>
+                <UButton
+                  color="error"
+                  variant="soft"
+                  size="sm"
+                  icon="i-heroicons-x-mark"
+                  :loading="processing === entry.id && action === 'reject'"
+                  @click="showRejectModal(entry)"
+                >
+                  拒絕
+                </UButton>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 內容：釋義、例句、分類、提交信息 -->
+        <div class="card-body px-6 py-4">
+          <div
+            v-for="(sense, senseIdx) in (entry.senses?.length ? entry.senses : [{ definition: entry.definition || '暫無釋義', examples: entry.examples || [] }])"
+            :key="senseIdx"
+            class="mb-4 last:mb-0"
+          >
+            <div class="flex items-start gap-3">
+              <span
+                v-if="(entry.senses?.length || 1) > 1"
+                class="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm flex items-center justify-center font-semibold"
+              >
+                {{ senseIdx + 1 }}
+              </span>
+              <div class="flex-1">
+                <span
+                  v-if="sense.label"
+                  class="inline-block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                >
+                  {{ sense.label }}
                 </span>
-              </div>
-
-              <!-- Definition -->
-              <div class="mb-3">
-                <p class="text-gray-700 dark:text-gray-300">
-                  {{ entry.senses?.[0]?.definition || entry.definition || '暫無釋義' }}
+                <p class="text-gray-800 dark:text-gray-200 text-base leading-relaxed mb-2">
+                  {{ sense.definition }}
                 </p>
-              </div>
-
-              <!-- Theme -->
-              <div v-if="entry.theme?.level3" class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                <span class="font-medium">分類:</span>
-                {{ entry.theme.level1 }} → {{ entry.theme.level2 }} → {{ entry.theme.level3 }}
-              </div>
-
-              <!-- Usage notes -->
-              <div v-if="entry.meta?.usage || entry.usageNotes" class="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                <span class="font-medium">使用説明:</span> {{ entry.meta?.usage || entry.usageNotes }}
-              </div>
-
-              <!-- Examples -->
-              <div v-if="(entry.senses?.[0]?.examples?.length || entry.examples?.length)" class="mt-4">
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">例句:</p>
-                <ul class="space-y-2">
-                  <li
-                    v-for="(example, idx) in (entry.senses?.[0]?.examples || entry.examples || []).slice(0, 2)"
-                    :key="idx"
-                    class="text-sm text-gray-600 dark:text-gray-400 pl-4 border-l-2 border-primary/50"
+                <div
+                  v-if="(sense.examples?.length || sense.subSenses?.some((s) => s.examples?.length))"
+                  class="space-y-2"
+                >
+                  <div
+                    v-for="(example, exIdx) in (sense.examples || []).slice(0, 3)"
+                    :key="exIdx"
+                    class="pl-4 border-l-2 border-gray-200 dark:border-gray-600"
                   >
-                    {{ example.text || example.sentence }}
-                    <span v-if="example.translation || example.explanation" class="text-gray-400">
-                      — {{ example.translation || example.explanation }}
-                    </span>
-                  </li>
-                </ul>
-              </div>
-
-              <!-- Meta info -->
-              <div class="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                <span>提交者: {{ entry.createdBy }}</span>
-                <span>提交時間: {{ formatDate(entry.createdAt) }}</span>
+                    <p class="text-gray-700 dark:text-gray-300 text-base">
+                      {{ example.text || example.sentence }}
+                    </p>
+                    <p
+                      v-if="example.jyutping"
+                      class="text-sm text-blue-600 dark:text-blue-400 font-mono mt-1"
+                    >
+                      {{ example.jyutping }}
+                    </p>
+                    <p
+                      v-if="example.translation || example.explanation"
+                      class="text-base text-gray-500 dark:text-gray-400 mt-1"
+                    >
+                      → {{ example.translation || example.explanation }}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <!-- Actions -->
-            <div class="flex flex-col gap-2 flex-shrink-0">
-              <UButton
-                color="success"
-                icon="i-heroicons-check"
-                :loading="processing === entry.id && action === 'approve'"
-                @click="handleApprove(entry.id)"
-              >
-                通過
-              </UButton>
-              <UButton
-                color="error"
-                variant="soft"
-                icon="i-heroicons-x-mark"
-                :loading="processing === entry.id && action === 'reject'"
-                @click="showRejectModal(entry)"
-              >
-                拒絕
-              </UButton>
-              <UButton
-                color="neutral"
-                variant="ghost"
-                icon="i-heroicons-eye"
-                @click="handleView(entry)"
-              >
-                詳情
-              </UButton>
-            </div>
+          <div
+            v-if="entry.meta?.usage || entry.usageNotes"
+            class="mt-3 p-3 border-l-4 bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600 text-sm text-gray-700 dark:text-gray-300"
+          >
+            <span class="font-semibold text-blue-700 dark:text-blue-300">使用説明：</span>
+            {{ entry.meta?.usage || entry.usageNotes }}
+          </div>
+
+          <div
+            v-if="entry.meta?.notes"
+            class="mt-3 p-3 border-l-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 dark:border-yellow-600 text-sm text-gray-700 dark:text-gray-300"
+          >
+            <span class="font-semibold text-yellow-700 dark:text-yellow-300">備註：</span>
+            {{ entry.meta.notes }}
+          </div>
+
+          <div class="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+            <span>提交者：{{ entry.createdBy }}</span>
+            <span>提交時間：{{ formatDate(entry.createdAt) }}</span>
           </div>
         </div>
       </div>
@@ -207,159 +263,12 @@
       </template>
     </UModal>
 
-    <!-- View Modal -->
-    <UModal v-model:open="viewModalOpen">
-      <template #content>
-        <UCard class="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <template #header>
-            <div class="flex justify-between items-center">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">詞條詳情</h3>
-              <UButton color="neutral" variant="ghost" icon="i-heroicons-x-mark" @click="viewModalOpen = false" />
-            </div>
-          </template>
-
-          <div v-if="viewingEntry" class="space-y-4">
-            <!-- Basic info: 詞頭、粵拼、方言、類型 -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">詞頭</label>
-                <p class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ viewingEntry.headword?.display || viewingEntry.text || '-' }}
-                </p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">粵拼</label>
-                <p class="text-gray-900 dark:text-white font-mono">
-                  {{ viewingEntry.phonetic?.jyutping?.join(' ') || viewingEntry.phoneticNotation || '-' }}
-                </p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">方言</label>
-                <p class="text-gray-900 dark:text-white">
-                  {{ getDialectLabel(viewingEntry.dialect?.name ?? viewingEntry.region ?? '') }}
-                </p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">類型</label>
-                <p class="text-gray-900 dark:text-white">
-                  {{ getEntryTypeLabel(viewingEntry.entryType) }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Definition -->
-            <div>
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">釋義</label>
-              <p class="text-gray-900 dark:text-white">
-                {{ viewingEntry.senses?.[0]?.definition || viewingEntry.definition || '-' }}
-              </p>
-            </div>
-
-            <!-- Theme -->
-            <div v-if="viewingEntry.theme?.level1 || viewingEntry.theme?.level2 || viewingEntry.theme?.level3">
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">分類</label>
-              <p class="text-gray-900 dark:text-white">
-                {{ [viewingEntry.theme.level1, viewingEntry.theme.level2, viewingEntry.theme.level3].filter(Boolean).join(' → ') }}
-              </p>
-            </div>
-
-            <!-- Meta info: 語域、詞性、用法、備註 -->
-            <div class="grid grid-cols-2 gap-4">
-              <div v-if="viewingEntry.meta?.register">
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">語域</label>
-                <p class="text-gray-900 dark:text-white">{{ viewingEntry.meta.register }}</p>
-              </div>
-              <div v-if="viewingEntry.meta?.pos">
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">詞性</label>
-                <p class="text-gray-900 dark:text-white">{{ viewingEntry.meta.pos }}</p>
-              </div>
-            </div>
-
-            <div v-if="viewingEntry.meta?.usage">
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">用法説明</label>
-              <p class="text-gray-900 dark:text-white">{{ viewingEntry.meta.usage }}</p>
-            </div>
-
-            <div v-if="viewingEntry.meta?.notes">
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">備註</label>
-              <p class="text-gray-900 dark:text-white">{{ viewingEntry.meta.notes }}</p>
-            </div>
-
-            <!-- Examples -->
-            <div v-if="viewingEntry.senses?.[0]?.examples?.length || viewingEntry.examples?.length">
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">例句</label>
-              <ul class="mt-2 space-y-2">
-                <li
-                  v-for="(ex, i) in (viewingEntry.senses?.[0]?.examples || viewingEntry.examples || [])"
-                  :key="i"
-                  class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                >
-                  <p class="text-gray-900 dark:text-white">{{ ex.text || ex.sentence }}</p>
-                  <p v-if="ex.jyutping" class="text-sm text-gray-500 font-mono mt-1">{{ ex.jyutping }}</p>
-                  <p v-if="ex.translation || ex.explanation" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {{ ex.translation || ex.explanation }}
-                  </p>
-                </li>
-              </ul>
-            </div>
-
-            <!-- 釋義配圖 -->
-            <div v-if="viewingEntry.senses?.[0]?.images?.length" class="mt-4">
-              <label class="text-xs font-medium text-gray-500 dark:text-gray-400">釋義配圖</label>
-              <div class="flex flex-wrap gap-2 mt-2">
-                <a
-                  v-for="(publicId, i) in viewingEntry.senses[0].images"
-                  :key="publicId"
-                  :href="getOptimizedUrl(publicId, { width: 1200 })"
-                  target="_blank"
-                  rel="noopener"
-                  class="block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600"
-                >
-                  <img
-                    :src="getOptimizedUrl(publicId, { width: 200 })"
-                    :alt="`配圖 ${i + 1}`"
-                    class="w-24 h-24 object-cover"
-                    loading="lazy"
-                  />
-                </a>
-              </div>
-            </div>
-
-            <!-- Contributor info -->
-            <div class="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
-              提交者: {{ viewingEntry.createdBy }} · 提交時間: {{ formatDate(viewingEntry.createdAt) }}
-            </div>
-
-            <!-- Actions -->
-            <div class="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-              <UButton
-                color="success"
-                icon="i-heroicons-check"
-                @click="handleApproveFromView"
-              >
-                通過
-              </UButton>
-              <UButton
-                color="error"
-                variant="soft"
-                icon="i-heroicons-x-mark"
-                @click="handleRejectFromView"
-              >
-                拒絕
-              </UButton>
-            </div>
-          </div>
-        </UCard>
-      </template>
-    </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Entry } from '~/types'
 import { dialectOptionsWithAll, getDialectLabel, getDialectColor } from '~/utils/dialects'
-
-const getOptimizedUrl = useSenseImageUrl()
 
 definePageMeta({
   layout: 'default',
@@ -386,9 +295,6 @@ const rejectModalOpen = ref(false)
 const rejectReason = ref('')
 const rejecting = ref(false)
 const rejectingEntry = ref<Entry | null>(null)
-
-const viewModalOpen = ref(false)
-const viewingEntry = ref<Entry | null>(null)
 
 const dialectOptions = dialectOptionsWithAll(ALL_DIALECT_VALUE)
 
@@ -497,41 +403,11 @@ async function handleReject() {
   }
 }
 
-function handleView(entry: Entry) {
-  viewingEntry.value = entry
-  viewModalOpen.value = true
-}
-
-async function handleApproveFromView() {
-  if (!viewingEntry.value) return
-  const entryId = viewingEntry.value.id
-  viewModalOpen.value = false
-  await handleApprove(entryId)
-}
-
-async function handleRejectFromView() {
-  if (!viewingEntry.value) return
-  const entry = viewingEntry.value
-  viewModalOpen.value = false
-  // 等待彈窗關閉動畫完成
-  await nextTick()
-  showRejectModal(entry)
-}
-
 watch(currentPage, fetchEntries)
 
 onMounted(fetchEntries)
 
 // Helpers（方言標籤與顏色由 ~/utils/dialects 提供）
-
-function getEntryTypeColor(type: string) {
-  const colors: Record<string, string> = {
-    character: 'purple',
-    word: 'blue',
-    phrase: 'cyan'
-  }
-  return colors[type] || 'gray'
-}
 
 function getEntryTypeLabel(type: string) {
   const labels: Record<string, string> = {
@@ -550,3 +426,20 @@ function formatDate(dateString: string) {
   })
 }
 </script>
+
+<style scoped>
+.review-dict-card {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
