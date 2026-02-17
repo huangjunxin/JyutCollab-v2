@@ -72,7 +72,7 @@
               />
             </div>
             <div>
-              <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2 mb-1">
                 <label class="text-xs text-gray-500 dark:text-gray-400">釋義</label>
                 <UButton
                   v-if="senseIdx === 0 && entry.headword?.display"
@@ -98,9 +98,18 @@
           </div>
           <!-- 例句 -->
           <div>
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2 mb-2">
               <label class="text-xs font-medium text-gray-500 dark:text-gray-400">例句</label>
               <div class="flex items-center gap-1">
+                <UButton
+                  color="primary"
+                  variant="ghost"
+                  size="xs"
+                  icon="i-heroicons-plus"
+                  @click="$emit('add-example', senseIdx)"
+                >
+                  添加例句
+                </UButton>
                 <UButton
                   v-if="senseIdx === 0 && entry.headword?.display && sense.definition"
                   color="primary"
@@ -112,15 +121,6 @@
                   @click="$emit('ai-examples')"
                 >
                   AI 例句
-                </UButton>
-                <UButton
-                  color="primary"
-                  variant="ghost"
-                  size="xs"
-                  icon="i-heroicons-plus"
-                  @click="$emit('add-example', senseIdx)"
-                >
-                  添加例句
                 </UButton>
               </div>
             </div>
@@ -173,7 +173,7 @@
           </div>
           <!-- 釋義配圖（例句下方，每義項最多 3 張） -->
           <div>
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2 mb-2">
               <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 釋義配圖（已 {{ (sense.images?.length ?? 0) }}/{{ MAX_IMAGES_PER_SENSE }} 張）
               </label>
@@ -225,7 +225,7 @@
           </div>
           <!-- 分義項 -->
           <div>
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2 mb-2">
               <label class="text-xs font-medium text-gray-500 dark:text-gray-400">分義項（A、B、C…）</label>
               <UButton
                 color="primary"
