@@ -65,7 +65,7 @@
           <form @submit.prevent="handleSubmit" class="space-y-5">
             <!-- Username -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">用户名</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">用户名 <span class="text-red-500">*</span></label>
               <UInput
                 v-model="form.username"
                 placeholder="請輸入用户名"
@@ -77,7 +77,7 @@
 
             <!-- Email -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">郵箱</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">郵箱 <span class="text-red-500">*</span></label>
               <UInput
                 v-model="form.email"
                 type="email"
@@ -90,7 +90,7 @@
 
             <!-- Password -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">密碼</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">密碼 <span class="text-red-500">*</span></label>
               <UInput
                 v-model="form.password"
                 type="password"
@@ -123,7 +123,7 @@
                 <span class="text-red-500">*</span>
               </label>
               <USelectMenu
-                v-model="form.dialect"
+                v-model="formDialectModel"
                 :items="dialectOptions"
                 placeholder="請選擇方言點"
                 size="lg"
@@ -154,7 +154,7 @@
             <!-- Error message -->
             <UAlert
               v-if="error"
-              color="red"
+              color="error"
               variant="subtle"
               icon="i-heroicons-exclamation-triangle"
               class="mt-4"
@@ -196,6 +196,7 @@ definePageMeta({
   layout: false
 })
 
+import type { DialectId } from '~shared/dialects'
 import { useAuth } from '~/composables/useAuth'
 import { DIALECT_OPTIONS_FOR_SELECT, DIALECT_OPTIONS_OPTIONAL } from '~/utils/dialects'
 
@@ -207,11 +208,19 @@ const form = reactive({
   email: '',
   password: '',
   displayName: '',
-  dialect: '',
+  dialect: '' as string,
   nativeDialect: '' as string
 })
 
 const dialectOptions = DIALECT_OPTIONS_FOR_SELECT
+
+/** USelectMenu 綁定用：組件可能回傳 value 或整個 item，統一寫回字串 */
+const formDialectModel = computed({
+  get: () => (form.dialect || undefined) as DialectId | undefined,
+  set: (v: DialectId | { value: string; label: string } | undefined) => {
+    form.dialect = (typeof v === 'object' && v && 'value' in v) ? (v as { value: string }).value : (v ?? '')
+  }
+})
 
 const loading = ref(false)
 const error = ref('')
