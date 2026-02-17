@@ -6,7 +6,8 @@ import {
   DIALECT_IDS,
   DIALECT_LABELS,
   getDialectLabel as _getDialectLabel,
-  getDialectColor as _getDialectColor
+  getDialectColor as _getDialectColor,
+  getDialectLabelByRegionCode as _getDialectLabelByRegionCode
 } from '~shared/dialects'
 
 export const DIALECT_OPTIONS_FOR_SELECT = DIALECT_OPTIONS
@@ -26,6 +27,11 @@ export function getDialectLabel(id: string): string {
 
 export function getDialectColor(id: string): string {
   return _getDialectColor(id)
+}
+
+/** Jyutjyu 的 dialect.region_code → 顯示名稱（香港繁體） */
+export function getDialectLabelByRegionCode(regionCode: string): string {
+  return _getDialectLabelByRegionCode(regionCode)
 }
 
 /** 篩選用：帶「全部方言」的選項列表，allValue 為「全部」的 value */

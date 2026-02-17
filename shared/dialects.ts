@@ -79,6 +79,60 @@ export const DIALECT_LABELS: Record<DialectId, string> = {
   overseas: '海外'
 }
 
+/**
+ * 方言代碼 → Jyutjyu 地區代碼（dialect.region_code）
+ * 規則通常為地名拼音首字母大寫（如 廣州 GuangZhou → GZ），香港為 HK。
+ */
+export const DIALECT_REGION_CODES: Record<DialectId, string> = {
+  // 廣東
+  guangzhou: 'GZ',
+  hongkong: 'HK',
+  macau: 'MO',
+  foshan: 'FS',
+  shunde: 'SD',
+  zhongshan: 'ZS',
+  jiangmen: 'JM',
+  taishan: 'TS',
+  kaiping: 'KP',
+  enping: 'EP',
+  heshan: 'HS',
+  xinhui: 'XH',
+  zhuhai: 'ZH',
+  dongguan: 'DG',
+  shenzhen: 'SZ',
+  zhaoqing: 'ZQ',
+  yunfu: 'YF',
+  yangjiang: 'YJ',
+  maoming: 'MM',
+  zhanjiang: 'ZJ',
+  qingyuan: 'QY',
+  shaoguan: 'SG',
+  // 廣西
+  nanning: 'NN',
+  wuzhou: 'WZ',
+  hezhou: 'HZ',
+  yulin: 'YL',
+  guigang: 'GG',
+  beihai: 'BH',
+  qinzhou: 'QZ',
+  fangchenggang: 'FCG',
+  // 其他
+  overseas: 'OS'
+}
+
+/** Jyutjyu 地區代碼（region_code） → 方言代碼 */
+export const REGION_CODE_TO_DIALECT_ID: Record<string, DialectId> = Object.fromEntries(
+  Object.entries(DIALECT_REGION_CODES).map(([id, code]) => [code, id as DialectId])
+) as Record<string, DialectId>
+
+/** 根據 Jyutjyu 的 region_code 取顯示名稱（香港繁體）；未知則回傳原值 */
+export function getDialectLabelByRegionCode(regionCode: string): string {
+  const code = String(regionCode || '').trim().toUpperCase()
+  if (!code) return ''
+  const id = REGION_CODE_TO_DIALECT_ID[code]
+  return id ? DIALECT_LABELS[id] : code
+}
+
 /** 用於下拉的選項：{ value, label } */
 export const DIALECT_OPTIONS = DIALECT_IDS.map((id) => ({
   value: id,
