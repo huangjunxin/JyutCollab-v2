@@ -45,9 +45,11 @@ export const useAuth = () => {
         await router.push('/entries')
         return { success: true }
       }
-      return { success: false, error: res.error }
+      return { success: false, error: res.error || '註冊失敗' }
     } catch (e: any) {
-      return { success: false, error: e.data?.error || '註冊失敗' }
+      const msg = e.data?.error ?? e.message ?? '註冊失敗'
+      if (process.dev) console.warn('[註冊] 請求異常:', e.data ?? e.message)
+      return { success: false, error: msg }
     }
   }
 
