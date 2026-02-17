@@ -37,7 +37,7 @@
                   class="ml-auto"
                   @click="$emit('apply-template', e.id)"
                 >
-                  用作範本填寫本行
+                  用作範本填寫此行
                 </UButton>
               </div>
               <p class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
@@ -81,7 +81,7 @@
                       class="ml-auto"
                       @click="$emit('apply-template', e.id)"
                     >
-                      用作範本填寫本行
+                      用作範本填寫此行
                     </UButton>
                   </div>
                   <p class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
