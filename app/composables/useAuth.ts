@@ -20,9 +20,10 @@ export const useAuth = () => {
         await router.push((route.query.redirect as string) || '/entries')
         return { success: true }
       }
-      return { success: false, error: res.error }
+      const errMsg = (res as any).error ?? (res as any).data?.error ?? '登錄失敗'
+      return { success: false, error: errMsg }
     } catch (e: any) {
-      return { success: false, error: e.data?.error || '登錄失敗' }
+      return { success: false, error: e.data?.error ?? e.data?.message ?? e.message ?? '登錄失敗' }
     }
   }
 
@@ -45,9 +46,10 @@ export const useAuth = () => {
         await router.push('/entries')
         return { success: true }
       }
-      return { success: false, error: res.error || '註冊失敗' }
+      const errMsg = (res as any).error ?? (res as any).data?.error ?? '註冊失敗'
+      return { success: false, error: errMsg }
     } catch (e: any) {
-      const msg = e.data?.error ?? e.message ?? '註冊失敗'
+      const msg = e.data?.error ?? e.data?.message ?? e.message ?? '註冊失敗'
       if (process.dev) console.warn('[註冊] 請求異常:', e.data ?? e.message)
       return { success: false, error: msg }
     }

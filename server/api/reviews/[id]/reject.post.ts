@@ -1,7 +1,8 @@
 import { z } from 'zod'
+import { formatZodErrorToMessage } from '../../../utils/validation'
 
 const RejectSchema = z.object({
-  reason: z.string().min(1, '請提供拒絕原因')
+  reason: z.string().trim().min(1, '請提供拒絕原因').max(500, '拒絕原因最多500個字符')
 })
 
 export default defineEventHandler(async (event) => {
@@ -36,9 +37,10 @@ export default defineEventHandler(async (event) => {
     const validated = RejectSchema.safeParse(body)
 
     if (!validated.success) {
+      const message = formatZodErrorToMessage(validated.error)
       throw createError({
         statusCode: 400,
-        message: validated.error.errors[0]?.message || '輸入數據無效'
+        message
       })
     }
 

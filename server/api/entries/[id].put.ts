@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { canContributeToDialect } from '../../utils/auth'
+import { formatZodErrorToMessage } from '../../utils/validation'
 
 const UpdateEntrySchema = z.object({
   // 新格式
@@ -95,9 +96,10 @@ export default defineEventHandler(async (event) => {
     const validated = UpdateEntrySchema.safeParse(body)
 
     if (!validated.success) {
+      const message = formatZodErrorToMessage(validated.error)
       throw createError({
         statusCode: 400,
-        message: validated.error.errors[0]?.message || '輸入數據無效'
+        message
       })
     }
 

@@ -12,6 +12,11 @@ export default defineEventHandler(async (event) => {
     return
   }
 
+  // Nuxt 內部資源（如 @nuxt/icon 的圖標清單）不需登錄
+  if (path.startsWith('/api/_nuxt')) {
+    return
+  }
+
   // Our auth routes (login, register, logout) - handle inside handlers
   if (path.startsWith('/api/auth/')) {
     return

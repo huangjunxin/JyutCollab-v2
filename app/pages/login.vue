@@ -70,6 +70,7 @@
                 v-model="form.email"
                 type="email"
                 placeholder="請輸入郵箱"
+                maxlength="254"
                 size="lg"
                 icon="i-heroicons-envelope"
                 class="w-full"
@@ -83,6 +84,7 @@
                 v-model="form.password"
                 type="password"
                 placeholder="請輸入密碼"
+                maxlength="128"
                 size="lg"
                 icon="i-heroicons-lock-closed"
                 class="w-full"
@@ -92,13 +94,13 @@
             <!-- Error message -->
             <UAlert
               v-if="error"
-              color="red"
+              color="error"
               variant="subtle"
               icon="i-heroicons-exclamation-triangle"
+              title="登錄失敗"
+              :description="error"
               class="mt-4"
-            >
-              {{ error }}
-            </UAlert>
+            />
 
             <!-- Submit button -->
             <UButton

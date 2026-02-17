@@ -36,8 +36,17 @@ export function dialectOptionsWithAll(allValue: string): { value: string; label:
   ]
 }
 
-/** 可選填的方言選項（如母語方言）：首項為「不填」，其餘與 DIALECT_OPTIONS 相同 */
+/** Combobox/USelectMenu 不允許 option value 為空字串，用此常數表示「不填」 */
+export const NATIVE_DIALECT_NONE = '__none__'
+
+/** 可選填的方言選項（如母語方言）：首項為「不填」，其餘與 DIALECT_OPTIONS 相同。原生 <select> 用。 */
 export const DIALECT_OPTIONS_OPTIONAL: { value: string; label: string }[] = [
   { value: '', label: '不填' },
+  ...DIALECT_OPTIONS
+]
+
+/** 供 USelectMenu/Combobox 使用，首項用 NATIVE_DIALECT_NONE 代替空字串，避免 ComboboxItem 報錯 */
+export const DIALECT_OPTIONS_OPTIONAL_FOR_COMBO: { value: string; label: string }[] = [
+  { value: NATIVE_DIALECT_NONE, label: '不填' },
   ...DIALECT_OPTIONS
 ]
