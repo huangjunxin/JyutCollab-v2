@@ -7,16 +7,8 @@ const QuerySchema = z.object({
   dialect: z.string().min(1)
 })
 
-const mapEntry = (e: any) => ({
-  id: e._id?.toString() || e.id,
-  headword: e.headword,
-  dialect: e.dialect,
-  status: e.status,
-  createdAt: e.createdAt?.toISOString?.() || e.createdAt
-})
-
-/** 其他方言詞條需帶上 senses、theme、meta 供前端預覽釋義與分類 */
-const mapOtherDialectEntry = (e: any) => ({
+/** 同方言 / 其他方言詞條均帶 senses、theme、meta 供前端預覽釋義與分類 */
+const mapEntryWithPreview = (e: any) => ({
   id: e._id?.toString() || e.id,
   headword: e.headword,
   dialect: e.dialect,
@@ -56,7 +48,7 @@ export default defineEventHandler(async (event) => {
         'headword.display': displayTrimmed,
         'dialect.name': dialect
       })
-        .select('id headword dialect status createdAt')
+        .select('id headword dialect status createdAt senses theme meta')
         .sort({ createdAt: -1 })
         .limit(20)
         .lean(),
@@ -71,8 +63,8 @@ export default defineEventHandler(async (event) => {
     ])
 
     return {
-      sameDialect: sameDialectRaw.map(mapEntry),
-      otherDialects: otherDialectsRaw.map(mapOtherDialectEntry)
+      sameDialect: sameDialectRaw.map(mapEntryWithPreview),
+      otherDialects: otherDialectsRaw.map(mapEntryWithPreview)
     }
   } catch (error: any) {
     if (error.statusCode) throw error

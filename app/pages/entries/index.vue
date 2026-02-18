@@ -637,10 +637,10 @@ type OtherDialectEntryRaw = {
   meta?: { pos?: string; register?: string }
 }
 
-/** 詞頭重複檢測結果（新建詞條離開詞頭格時觸發）。sameDialect=同詞頭+同方言，otherDialects=同詞頭+其他方言可參考 */
+/** 詞頭重複檢測結果（新建詞條離開詞頭格時觸發）。sameDialect=同詞頭+同方言，otherDialects=同詞頭+其他方言可參考。API 兩者均帶 senses/theme/meta 供預覽。 */
 const duplicateCheckResult = ref<Map<string, {
   loading: boolean
-  entries?: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>
+  entries?: OtherDialectEntryRaw[]
   otherDialects?: OtherDialectEntryRaw[]
 }>>(new Map())
 
@@ -805,7 +805,7 @@ async function runDuplicateCheck(entry: Entry) {
   duplicateCheckResult.value = new Map(duplicateCheckResult.value)
 
   try {
-    const res = await $fetch<{ sameDialect: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>, otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
+    const res = await $fetch<{ sameDialect: OtherDialectEntryRaw[], otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
       query: { headword, dialect }
     })
     duplicateCheckResult.value.set(entryId, {
@@ -821,16 +821,43 @@ async function runDuplicateCheck(entry: Entry) {
 
 const DEFINITION_SUMMARY_MAX_LEN = 50
 
-function formatDuplicateEntries(list: Array<{ id: string, headword?: { display?: string }, dialect?: { name?: string }, status?: string, createdAt?: string }>): Array<{ id: string, headwordDisplay: string, dialectLabel: string, status: string, statusLabel: string, createdAtLabel: string }> {
+/** 格式化同方言重複詞條，帶釋義摘要、主題分類、義項數、meta 簡要（與「其他方言點」預覽一致） */
+function formatDuplicateEntries(list: OtherDialectEntryRaw[]): Array<{
+  id: string
+  headwordDisplay: string
+  dialectLabel: string
+  status: string
+  statusLabel: string
+  createdAtLabel: string
+  definitionSummary: string
+  themeLabel: string
+  senseCount: number
+  metaLabel: string
+}> {
   if (!list?.length) return []
-  return list.map(e => ({
-    id: e.id,
-    headwordDisplay: e.headword?.display || '-',
-    dialectLabel: DIALECT_CODE_TO_NAME[e.dialect?.name || ''] || e.dialect?.name || '-',
-    status: e.status || 'draft',
-    statusLabel: STATUS_LABELS[e.status || 'draft'] || e.status || '-',
-    createdAtLabel: e.createdAt ? new Date(e.createdAt).toLocaleString('zh-HK', { dateStyle: 'short', timeStyle: 'short' }) : '-'
-  }))
+  return list.map(e => {
+    const firstDef = e.senses?.[0]?.definition?.trim() || ''
+    const definitionSummary = firstDef
+      ? (firstDef.length <= DEFINITION_SUMMARY_MAX_LEN ? firstDef : firstDef.slice(0, DEFINITION_SUMMARY_MAX_LEN) + '…')
+      : '（無釋義）'
+    const themeParts = [e.theme?.level1, e.theme?.level2, e.theme?.level3].filter(Boolean) as string[]
+    const themeLabel = themeParts.length ? themeParts.join(' → ') : '（未分類）'
+    const senseCount = e.senses?.length ?? 0
+    const metaParts = [e.meta?.pos, e.meta?.register].filter(Boolean) as string[]
+    const metaLabel = metaParts.length ? metaParts.join(' · ') : ''
+    return {
+      id: e.id,
+      headwordDisplay: e.headword?.display || '-',
+      dialectLabel: DIALECT_CODE_TO_NAME[e.dialect?.name || ''] || e.dialect?.name || '-',
+      status: e.status || 'draft',
+      statusLabel: STATUS_LABELS[e.status || 'draft'] || e.status || '-',
+      createdAtLabel: e.createdAt ? new Date(e.createdAt).toLocaleString('zh-HK', { dateStyle: 'short', timeStyle: 'short' }) : '-',
+      definitionSummary,
+      themeLabel,
+      senseCount,
+      metaLabel
+    }
+  })
 }
 
 /** 格式化「其他方言」詞條，帶釋義摘要、主題分類、義項數、meta 簡要 */
@@ -1590,8 +1617,8 @@ function getDefinitionExpandHint(entry: Entry): string {
     })
   })
   const parts: string[] = []
-  if (senseCount > 1) parts.push(`${senseCount}義項`)
-  if (exampleCount > 0) parts.push(`${exampleCount}例`)
+  if (senseCount > 1) parts.push(`${senseCount} 義項`)
+  if (exampleCount > 0) parts.push(`${exampleCount} 例`)
   return parts.join(' · ')
 }
 
