@@ -29,7 +29,8 @@ const CreateEntrySchema = z.object({
       jyutping: z.string().optional(),
       translation: z.string().optional(),
       scenario: z.string().optional()
-    })).optional()
+    })).optional(),
+    images: z.array(z.string()).optional()
   })).optional(),
   theme: z.object({
     level1: z.string().optional(),
