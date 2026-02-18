@@ -45,178 +45,38 @@
       <p class="text-gray-500 dark:text-gray-400">所有詞條都已審核完畢</p>
     </div>
 
-    <!-- Entry list (DictCard-style) -->
+    <!-- Entry list (DictCard-style)，復用 EntryDetailCard -->
     <div v-else class="space-y-4">
       <div
         v-for="entry in entries"
         :key="entry.id"
         class="review-dict-card bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden"
       >
-        <!-- 頭部：詞頭 + 粵拼 + 標籤 + 操作 -->
-        <div class="card-header px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
-            <div class="flex-1 min-w-0">
-              <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 break-words">
-                {{ entry.headword?.display || entry.text }}
-                <sup
-                  v-if="entry.meta?.variant_number"
-                  class="ml-1 text-sm text-gray-500 dark:text-gray-400"
-                >
-                  {{ entry.meta.variant_number }}
-                </sup>
-              </h3>
-              <div class="mt-2 font-mono text-lg text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">
-                {{
-                  (() => {
-                    const arr = entry.phonetic?.jyutping
-                    if (Array.isArray(arr) && arr.length > 0) {
-                      const hasSpaceInside = arr.some(s => (s || '').includes(' '))
-                      if (!hasSpaceInside) {
-                        // 舊數據：視為單一讀音的音節陣列
-                        return arr.join(' ')
-                      }
-                      // 新數據：多讀音列表，使用分號連接
-                      return arr.join('; ')
-                    }
-                    return entry.phoneticNotation || ''
-                  })()
-                }}
-              </div>
-              <p
-                v-if="entry.meta?.headword_variants?.length"
-                class="text-sm text-gray-600 dark:text-gray-400 break-words mt-2"
+        <EntriesEntryDetailCard :display-entry="entryToDisplay(entry)">
+          <template #actions>
+            <div class="flex gap-2 flex-shrink-0">
+              <UButton
+                color="success"
+                size="sm"
+                icon="i-heroicons-check"
+                :loading="processing === entry.id && action === 'approve'"
+                @click="handleApprove(entry.id)"
               >
-                異形詞：{{ entry.meta.headword_variants.join('、') }}
-              </p>
-              <p
-                v-if="entry.headword?.display && entry.headword?.normalized && entry.headword.display !== entry.headword.normalized"
-                class="text-sm text-gray-500 dark:text-gray-400 break-words mt-1"
+                通過
+              </UButton>
+              <UButton
+                color="error"
+                variant="soft"
+                size="sm"
+                icon="i-heroicons-x-mark"
+                :loading="processing === entry.id && action === 'reject'"
+                @click="showRejectModal(entry)"
               >
-                標準寫法：{{ entry.headword.normalized }}
-              </p>
+                拒絕
+              </UButton>
             </div>
-
-            <!-- 右側：標籤 + 通過/拒絕 -->
-            <div class="flex flex-wrap gap-2 md:justify-end md:mt-0 md:ml-4 md:max-w-[40%] items-start">
-              <span class="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-sm whitespace-nowrap">
-                {{ getDialectLabel(entry.dialect?.name ?? entry.region ?? '') }}
-              </span>
-              <span class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm whitespace-nowrap">
-                {{ getEntryTypeLabel(entry.entryType) }}
-              </span>
-              <span
-                v-if="entry.meta?.register"
-                class="px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm whitespace-nowrap"
-              >
-                {{ entry.meta.register }}
-              </span>
-              <!-- 分類（與 DictCard 一致：紫色 pill） -->
-              <span
-                v-if="entry.meta?.category || entry.theme?.level3"
-                class="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-sm break-words max-w-full"
-              >
-                {{ entry.meta?.category || [entry.theme?.level1, entry.theme?.level2, entry.theme?.level3].filter(Boolean).join(' → ') }}
-              </span>
-              <div class="flex gap-2 flex-shrink-0">
-                <UButton
-                  color="success"
-                  size="sm"
-                  icon="i-heroicons-check"
-                  :loading="processing === entry.id && action === 'approve'"
-                  @click="handleApprove(entry.id)"
-                >
-                  通過
-                </UButton>
-                <UButton
-                  color="error"
-                  variant="soft"
-                  size="sm"
-                  icon="i-heroicons-x-mark"
-                  :loading="processing === entry.id && action === 'reject'"
-                  @click="showRejectModal(entry)"
-                >
-                  拒絕
-                </UButton>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 內容：釋義、例句、分類、提交信息 -->
-        <div class="card-body px-6 py-4">
-          <div
-            v-for="(sense, senseIdx) in (entry.senses?.length ? entry.senses : [{ definition: entry.definition || '暫無釋義', examples: entry.examples || [] }])"
-            :key="senseIdx"
-            class="mb-4 last:mb-0"
-          >
-            <div class="flex items-start gap-3">
-              <span
-                v-if="(entry.senses?.length || 1) > 1"
-                class="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm flex items-center justify-center font-semibold"
-              >
-                {{ senseIdx + 1 }}
-              </span>
-              <div class="flex-1">
-                <span
-                  v-if="sense.label"
-                  class="inline-block text-xs text-gray-500 dark:text-gray-400 mb-1"
-                >
-                  {{ sense.label }}
-                </span>
-                <p class="text-gray-800 dark:text-gray-200 text-base leading-relaxed mb-2">
-                  {{ sense.definition }}
-                </p>
-                <div
-                  v-if="(sense.examples?.length || sense.subSenses?.some((s) => s.examples?.length))"
-                  class="space-y-2"
-                >
-                  <div
-                    v-for="(example, exIdx) in (sense.examples || []).slice(0, 3)"
-                    :key="exIdx"
-                    class="pl-4 border-l-2 border-gray-200 dark:border-gray-600"
-                  >
-                    <p class="text-gray-700 dark:text-gray-300 text-base">
-                      {{ example.text || example.sentence }}
-                    </p>
-                    <p
-                      v-if="example.jyutping"
-                      class="text-sm text-blue-600 dark:text-blue-400 font-mono mt-1"
-                    >
-                      {{ example.jyutping }}
-                    </p>
-                    <p
-                      v-if="example.translation || example.explanation"
-                      class="text-base text-gray-500 dark:text-gray-400 mt-1"
-                    >
-                      → {{ example.translation || example.explanation }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="entry.meta?.usage || entry.usageNotes"
-            class="mt-3 p-3 border-l-4 bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600 text-sm text-gray-700 dark:text-gray-300"
-          >
-            <span class="font-semibold text-blue-700 dark:text-blue-300">使用説明：</span>
-            {{ entry.meta?.usage || entry.usageNotes }}
-          </div>
-
-          <div
-            v-if="entry.meta?.notes"
-            class="mt-3 p-3 border-l-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 dark:border-yellow-600 text-sm text-gray-700 dark:text-gray-300"
-          >
-            <span class="font-semibold text-yellow-700 dark:text-yellow-300">備註：</span>
-            {{ entry.meta.notes }}
-          </div>
-
-          <div class="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-            <span>提交者：{{ entry.createdBy }}</span>
-            <span>提交時間：{{ formatDate(entry.createdAt) }}</span>
-          </div>
-        </div>
+          </template>
+        </EntriesEntryDetailCard>
       </div>
 
       <!-- Pagination -->
@@ -282,7 +142,8 @@
 
 <script setup lang="ts">
 import type { Entry } from '~/types'
-import { dialectOptionsWithAll, getDialectLabel, getDialectColor } from '~/utils/dialects'
+import { dialectOptionsWithAll } from '~/utils/dialects'
+import { entryToDisplay } from '~/composables/useEntryDisplay'
 
 definePageMeta({
   layout: 'default',
@@ -421,24 +282,6 @@ watch(currentPage, fetchEntries)
 
 onMounted(fetchEntries)
 
-// Helpers（方言標籤與顏色由 ~/utils/dialects 提供）
-
-function getEntryTypeLabel(type: string) {
-  const labels: Record<string, string> = {
-    character: '字',
-    word: '詞',
-    phrase: '短語'
-  }
-  return labels[type] || type || '詞'
-}
-
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
 </script>
 
 <style scoped>

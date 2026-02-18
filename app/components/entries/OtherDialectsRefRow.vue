@@ -40,14 +40,28 @@
                   用作範本填寫此行
                 </UButton>
               </div>
-              <p class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
-                {{ e.definitionSummary }}
-              </p>
-              <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
-                <span>分類：{{ e.themeLabel }}</span>
-                <span>·</span>
-                <span>共 {{ e.senseCount }} 個義項</span>
-                <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
+              <div class="mt-0.5 flex items-start gap-2">
+                <div class="flex-1 min-w-0">
+                  <p class="text-gray-600 dark:text-gray-400 line-clamp-2">
+                    {{ e.definitionSummary }}
+                  </p>
+                  <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
+                    <span>分類：{{ e.themeLabel }}</span>
+                    <span>·</span>
+                    <span>共 {{ e.senseCount }} 個義項</span>
+                    <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
+                  </div>
+                </div>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  class="text-blue-600 dark:text-blue-400 flex-shrink-0"
+                  type="button"
+                  @click.stop="openDetailFor(e.id)"
+                >
+                  查看完整詞條
+                </UButton>
               </div>
             </div>
 
@@ -84,20 +98,38 @@
                       用作範本填寫此行
                     </UButton>
                   </div>
-                  <p class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {{ e.definitionSummary }}
-                  </p>
-                  <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
-                    <span>分類：{{ e.themeLabel }}</span>
-                    <span>·</span>
-                    <span>共 {{ e.senseCount }} 個義項</span>
-                    <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
+                  <div class="mt-0.5 flex items-start gap-2">
+                    <div class="flex-1 min-w-0">
+                      <p class="text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {{ e.definitionSummary }}
+                      </p>
+                      <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
+                        <span>分類：{{ e.themeLabel }}</span>
+                        <span>·</span>
+                        <span>共 {{ e.senseCount }} 個義項</span>
+                        <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
+                      </div>
+                    </div>
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      class="text-blue-600 dark:text-blue-400 flex-shrink-0"
+                      type="button"
+                      @click.stop="openDetailFor(e.id)"
+                    >
+                      查看完整詞條
+                    </UButton>
                   </div>
                 </div>
               </div>
             </template>
           </div>
         </div>
+        <EntriesEntryDetailModal
+          v-model:open="detailModalOpen"
+          :entry-id="detailEntryId"
+        />
         <UButton size="xs" color="neutral" variant="ghost" class="flex-shrink-0" @mousedown.prevent="$emit('dismiss')">
           忽略 (Esc)
         </UButton>
@@ -129,4 +161,11 @@ defineEmits<{
 }>()
 
 const showDetail = ref(false)
+const detailModalOpen = ref(false)
+const detailEntryId = ref<string | null>(null)
+
+function openDetailFor(id: string) {
+  detailEntryId.value = id
+  detailModalOpen.value = true
+}
 </script>

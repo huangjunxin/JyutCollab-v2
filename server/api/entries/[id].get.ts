@@ -32,6 +32,20 @@ export default defineEventHandler(async (event) => {
       { $inc: { viewCount: 1 } }
     )
 
+    // 解析提交者顯示名稱（優先顯示名稱，其次用戶名）
+    let createdByDisplay = entry.createdBy
+    if (entry.createdBy) {
+      const isObjectId = /^[a-f\d]{24}$/i.test(entry.createdBy)
+      const creator = await User.findOne(
+        isObjectId ? { _id: entry.createdBy } : { username: entry.createdBy }
+      )
+        .select('username displayName')
+        .lean()
+      if (creator) {
+        createdByDisplay = (creator as any).displayName || (creator as any).username
+      }
+    }
+
     // 轉換響應格式
     const response = {
       success: true,
@@ -69,7 +83,7 @@ export default defineEventHandler(async (event) => {
         notationSystem: 'jyutping' as const,
         // 通用字段
         status: entry.status,
-        createdBy: entry.createdBy,
+        createdBy: createdByDisplay,
         contributorId: entry.createdBy,
         updatedBy: entry.updatedBy,
         reviewedBy: entry.reviewedBy,
