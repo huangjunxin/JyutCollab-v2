@@ -20,7 +20,7 @@ const QuerySchema = z.object({
   formalityLevel: z.enum(['formal', 'neutral', 'informal', 'slang', 'vulgar']).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'viewCount', 'likeCount', 'headword']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
-  groupBy: z.enum(['headword']).optional() // 聚合視圖：按詞形分組
+  groupBy: z.enum(['headword', 'lexeme']).optional() // 聚合視圖：按詞形/按詞語(lexeme)分組
 })
 
 export default defineEventHandler(async (event) => {
@@ -111,6 +111,7 @@ export default defineEventHandler(async (event) => {
     const transformEntry = (entry: any) => ({
       id: entry.id || entry._id?.toString?.(),
       sourceBook: entry.sourceBook,
+      lexemeId: entry.lexemeId,
       dialect: entry.dialect,
       headword: entry.headword,
       phonetic: entry.phonetic,
@@ -170,6 +171,56 @@ export default defineEventHandler(async (event) => {
       const groups = (facetResult[0]?.groups ?? []).map((g: any) => ({
         headwordNormalized: g._id,
         headwordDisplay: g.headwordDisplay ?? g._id,
+        entries: (g.entries ?? []).map((e: any) => transformEntry(e))
+      }))
+      return {
+        data: groups,
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        grouped: true
+      }
+    }
+
+    if (groupBy === 'lexeme') {
+      const sortStage = Object.keys(sort).length ? { $sort: sort } : { $sort: { createdAt: -1 } }
+      // 注意：lexemeId 可能為空；為避免把所有未關聯詞條誤聚合為一組，缺省時以 _id 做唯一鍵
+      const groupKey = {
+        $ifNull: [
+          '$lexemeId',
+          { $concat: ['__unassigned__:', { $toString: '$_id' }] }
+        ]
+      }
+      const facetResult = await Entry.aggregate([
+        { $match: filter },
+        sortStage,
+        {
+          $facet: {
+            totalGroups: [
+              { $group: { _id: groupKey } },
+              { $count: 'count' }
+            ],
+            groups: [
+              {
+                $group: {
+                  _id: groupKey,
+                  headwordDisplay: { $first: '$headword.display' },
+                  entries: { $push: '$$ROOT' }
+                }
+              },
+              { $sort: { _id: sortOrder === 'asc' ? 1 : -1 } },
+              { $skip: skip },
+              { $limit: perPage }
+            ]
+          }
+        }
+      ])
+      const total = facetResult[0]?.totalGroups?.[0]?.count ?? 0
+      const groups = (facetResult[0]?.groups ?? []).map((g: any) => ({
+        // 前端聚合行已使用 headwordDisplay/headwordNormalized，這裏復用字段名以減少改動
+        headwordNormalized: g._id,
+        headwordDisplay: g.headwordDisplay ?? '—',
         entries: (g.entries ?? []).map((e: any) => transformEntry(e))
       }))
       return {

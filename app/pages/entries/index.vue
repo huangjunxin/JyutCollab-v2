@@ -11,7 +11,8 @@
             詞條表格
           </h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ pagination.total }}</span> {{ viewMode === 'aggregated' ? '個詞形' : '個詞條' }}
+            共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ pagination.total }}</span>
+            {{ viewMode === 'aggregated' ? '個詞形' : (viewMode === 'lexeme' ? '個詞語' : '個詞條') }}
             <span v-if="hasUnsavedChanges" class="ml-2 text-amber-600">· 有未保存的更改</span>
           </p>
         </div>
@@ -105,7 +106,8 @@
               :model-value="viewMode"
               :items="[
                 { value: 'flat', label: '平鋪' },
-                { value: 'aggregated', label: '按詞形聚合' }
+                { value: 'aggregated', label: '按詞形聚合（參考）' },
+                { value: 'lexeme', label: '按詞語聚合' }
               ]"
               value-key="value"
               size="sm"
@@ -131,9 +133,19 @@
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
         <UIcon name="i-heroicons-table-cells" class="w-10 h-10 text-gray-400" />
       </div>
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ viewMode === 'aggregated' ? '暫無詞形' : '暫無詞條' }}</h3>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        {{ viewMode === 'aggregated' ? '暫無詞形' : (viewMode === 'lexeme' ? '暫無詞語' : '暫無詞條') }}
+      </h3>
       <p class="text-gray-500 dark:text-gray-400 mb-4 max-w-md mx-auto">
-        {{ searchQuery ? (viewMode === 'aggregated' ? '沒有找到匹配的詞形' : '沒有找到匹配的詞條，請嘗試其他關鍵詞') : (viewMode === 'aggregated' ? '可切換為平鋪視圖或點擊上方按鈕新建詞條' : '點擊上方按鈕開始創建第一個詞條') }}
+        {{
+          searchQuery
+            ? (viewMode === 'aggregated'
+              ? '沒有找到匹配的詞形'
+              : (viewMode === 'lexeme' ? '沒有找到匹配的詞語' : '沒有找到匹配的詞條，請嘗試其他關鍵詞'))
+            : (viewMode === 'aggregated'
+              ? '可切換為平鋪視圖或點擊上方按鈕新建詞條'
+              : (viewMode === 'lexeme' ? '可切換為平鋪/按詞形聚合視圖或點擊上方按鈕新建詞條' : '點擊上方按鈕開始創建第一個詞條'))
+        }}
       </p>
       <UButton
         v-if="isAuthenticated && !searchQuery"
@@ -142,7 +154,7 @@
         icon="i-heroicons-plus"
         @click="addNewRow"
       >
-        {{ viewMode === 'aggregated' ? '新建詞條' : '創建第一個詞條' }}
+        {{ viewMode === 'aggregated' || viewMode === 'lexeme' ? '新建詞條' : '創建第一個詞條' }}
       </UButton>
     </div>
 
@@ -266,14 +278,35 @@
                 {{ getGroupStatus(row.group) }}
               </td>
               <td class="min-w-[6rem] w-24 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
-                <UButton
-                  :icon="expandedGroupKeys.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  :aria-label="expandedGroupKeys.has(row.group.headwordNormalized) ? '收合' : '展開'"
-                  @click="toggleGroupExpanded(row.group.headwordNormalized)"
-                />
+                <div class="flex items-center justify-center gap-1">
+                  <UButton
+                    v-if="viewMode === 'lexeme'"
+                    icon="i-heroicons-globe-asia-australia"
+                    color="primary"
+                    variant="ghost"
+                    size="xs"
+                    :disabled="!canEditExternalEtymons"
+                    :title="!canEditExternalEtymons ? '只有審核員及以上可編輯' : (String(row.group.headwordNormalized || '').startsWith('__unassigned__:') ? '編輯域外方音（將自動創建詞語組）' : '編輯域外方音')"
+                    @click="openExternalEtymonsForGroup(String(row.group.headwordNormalized || ''), String(row.group.headwordDisplay || ''), row.group.entries)"
+                  />
+                  <UButton
+                    v-if="viewMode === 'lexeme' && canEditExternalEtymons && !String(row.group.headwordNormalized || '').startsWith('__unassigned__:')"
+                    icon="i-heroicons-arrow-path"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    title="合併到其他詞語組"
+                    @click="openMergeModalForGroup(String(row.group.headwordNormalized || ''), String(row.group.headwordDisplay || ''), row.group.entries.map(e => String(e.id || (e as any)._tempId || '')).filter(Boolean))"
+                  />
+                  <UButton
+                    :icon="expandedGroupKeys.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    :aria-label="expandedGroupKeys.has(row.group.headwordNormalized) ? '收合' : '展開'"
+                    @click="toggleGroupExpanded(row.group.headwordNormalized)"
+                  />
+                </div>
               </td>
             </tr>
             <!-- 平鋪詞條行 或 聚合視圖下展開的詞條行 -->
@@ -335,10 +368,13 @@
               <EntryRowActions
                 :entry="row.entry"
                 :can-edit="canEditEntry(row.entry)"
+                :show-lexeme-actions="viewMode === 'lexeme' && canEditExternalEtymons"
                 @save="(row.entry as any)._isNew ? saveNewEntry(row.entry) : saveEntryChanges(row.entry)"
                 @duplicate="duplicateEntry(row.entry)"
                 @delete="deleteEntry(row.entry)"
                 @cancel="cancelEdit(row.entry)"
+                @make-new-lexeme="makeEntryNewLexeme(row.entry)"
+                @join-lexeme="openMergeModalForEntry(row.entry)"
               />
             </tr>
             <!-- 行內 AI 釋義建議（Tab 落在釋義格且有待處理建議時顯示） -->
@@ -495,6 +531,23 @@
     </div>
     </div>
   </div>
+
+  <LexemeExternalEtymonsModal
+    :open="externalEtymonModalOpen"
+    :lexeme-id="activeExternalEtymonLexemeId"
+    :lexeme-label="activeExternalEtymonLexemeLabel"
+    :can-edit="canEditExternalEtymons"
+    @update:open="(v: boolean) => { externalEtymonModalOpen = v }"
+  />
+
+  <LexemeMergeModal
+    :open="lexemeMergeModalOpen"
+    :source-lexeme-id="mergeSourceLexemeId"
+    :source-label="mergeSourceLabel"
+    :is-group-merge="mergeIsGroupMerge"
+    @update:open="(v: boolean) => { lexemeMergeModalOpen = v }"
+    @merged="handleLexemeMerge"
+  />
 </template>
 
 <script setup lang="ts">
@@ -515,6 +568,8 @@ import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
 import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
 import JyutjyuRefRow, { type JyutjyuRefItem } from '~/components/entries/JyutjyuRefRow.vue'
+import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymonsModal.vue'
+import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
 
 definePageMeta({
   layout: 'default',
@@ -522,6 +577,142 @@ definePageMeta({
 })
 
 const { isAuthenticated, user } = useAuth()
+
+const canEditExternalEtymons = computed(() => {
+  const r = user.value?.role
+  return r === 'reviewer' || r === 'admin'
+})
+
+const externalEtymonModalOpen = ref(false)
+const activeExternalEtymonLexemeId = ref<string | null>(null)
+const activeExternalEtymonLexemeLabel = ref<string>('')
+
+async function openExternalEtymonsForGroup(groupKey: string, groupLabel: string, groupEntries?: Entry[]) {
+  if (!groupKey) return
+  
+  // 如果是未綁定組（__unassigned__:*），先為該組的所有 entry 創建 lexemeId
+  if (groupKey.startsWith('__unassigned__:')) {
+    if (!groupEntries || groupEntries.length === 0) {
+      alert('無法為空組創建詞語')
+      return
+    }
+    if (!confirm(`此組尚未綁定詞語。是否為 ${groupEntries.length} 條詞條創建新詞語組？`)) {
+      return
+    }
+    try {
+      // 為該組的第一個 entry 創建新的 lexemeId（已確保 groupEntries.length > 0）
+      const firstEntry = groupEntries[0]!
+      const entryId = String(firstEntry.id ?? (firstEntry as any)._tempId ?? '')
+      if (!entryId) {
+        alert('無法獲取詞條 ID')
+        return
+      }
+      const response = await $fetch<{ success: boolean; data?: { lexemeId?: string } }>(`/api/entries/${entryId}/lexeme`, {
+        method: 'PATCH',
+        body: { action: 'new' }
+      })
+      const newLexemeId = response.data?.lexemeId
+      if (!newLexemeId) {
+        alert('創建詞語組失敗')
+        return
+      }
+      
+      // 將該組的其他 entry 也加入同一個 lexemeId
+      if (groupEntries.length > 1) {
+        await Promise.all(
+          groupEntries.slice(1).map((entry) => {
+            const id = String(entry.id ?? (entry as any)._tempId ?? '')
+            if (!id) return Promise.resolve()
+            return $fetch(`/api/entries/${id}/lexeme`, {
+              method: 'PATCH',
+              body: { action: 'set', lexemeId: newLexemeId }
+            })
+          })
+        )
+      }
+      
+      // 重新拉取列表以更新 lexemeId
+      await fetchEntries()
+      
+      // 使用新創建的 lexemeId 打開 modal
+      activeExternalEtymonLexemeId.value = newLexemeId
+      activeExternalEtymonLexemeLabel.value = groupLabel || ''
+      externalEtymonModalOpen.value = true
+    } catch (e: any) {
+      console.error('Failed to create lexeme for unassigned group:', e)
+      alert(e?.data?.message || e?.message || '創建詞語組失敗')
+    }
+    return
+  }
+  
+  // 正常情況：直接打開 modal
+  activeExternalEtymonLexemeId.value = groupKey
+  activeExternalEtymonLexemeLabel.value = groupLabel || ''
+  externalEtymonModalOpen.value = true
+}
+
+const lexemeMergeModalOpen = ref(false)
+const mergeSourceLexemeId = ref<string | null>(null)
+const mergeSourceLabel = ref<string>('')
+const mergeIsGroupMerge = ref(false)
+const mergeTargetEntryIds = ref<string[]>([])
+
+function openMergeModalForGroup(groupKey: string, groupLabel: string, entryIds: string[]) {
+  if (!groupKey || groupKey.startsWith('__unassigned__:')) return
+  mergeSourceLexemeId.value = groupKey
+  mergeSourceLabel.value = groupLabel || ''
+  mergeIsGroupMerge.value = true
+  mergeTargetEntryIds.value = entryIds
+  lexemeMergeModalOpen.value = true
+}
+
+function openMergeModalForEntry(entry: Entry) {
+  const currentLexemeId = (entry as any).lexemeId
+  // 即使沒有 lexemeId 或係 __unassigned__，都允許加入其他組（會用 action: 'set' 直接設定目標 lexemeId）
+  mergeSourceLexemeId.value = currentLexemeId && !String(currentLexemeId).startsWith('__unassigned__:') ? currentLexemeId : null
+  mergeSourceLabel.value = entry.headword?.display || entry.text || ''
+  mergeIsGroupMerge.value = false
+  mergeTargetEntryIds.value = [String(entry.id || (entry as any)._tempId || '')]
+  lexemeMergeModalOpen.value = true
+}
+
+async function handleLexemeMerge(targetLexemeId: string) {
+  if (!mergeTargetEntryIds.value.length || !targetLexemeId) return
+  try {
+    await Promise.all(
+      mergeTargetEntryIds.value.map((entryId) =>
+        $fetch(`/api/entries/${entryId}/lexeme`, {
+          method: 'PATCH',
+          body: { action: 'set', lexemeId: targetLexemeId }
+        })
+      )
+    )
+    lexemeMergeModalOpen.value = false
+    fetchEntries()
+  } catch (e: any) {
+    console.error('Failed to merge lexeme:', e)
+    alert(e?.data?.message || e?.message || '合併失敗')
+  }
+}
+
+async function makeEntryNewLexeme(entry: Entry) {
+  const id = String(entry.id ?? (entry as any)._tempId ?? '')
+  if (!id) return
+  if (!confirm(`確定要將「${entry.headword?.display || entry.text || id}」拆出成獨立詞語？`)) {
+    return
+  }
+  try {
+    await $fetch<{ success: boolean; data?: { lexemeId?: string } }>(`/api/entries/${id}/lexeme`, {
+      method: 'PATCH',
+      body: { action: 'new' }
+    })
+    // 操作後重新拉取列表，以反映最新詞語聚合狀態
+    fetchEntries()
+  } catch (e: any) {
+    console.error('Failed to make new lexeme:', e)
+    alert(e?.data?.message || e?.message || '操作失敗')
+  }
+}
 
 // 主題選項列表（用於搜尋下拉）
 const themeOptions = getFlatThemeList().map(t => ({
@@ -559,10 +750,12 @@ const themeFilterOptions = [
 const entries = ref<Entry[]>([])
 /** 聚合視圖：按詞形分組的列表（每項含 headwordDisplay, headwordNormalized, entries） */
 const aggregatedGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
+/** 詞語聚合視圖：按 lexemeId 分組的列表（字段名沿用聚合視圖以減少模板改動） */
+const lexemeGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
 /** 詞條 baseline（用於「取消編輯」回滾，避免刷新整個頁面誤傷其他未保存內容）。key: entry.id */
 const entryBaselineById = ref<Map<string, any>>(new Map())
 /** 視圖模式：平鋪（一列一條）或聚合（一列一詞形，可展開多方言） */
-const viewMode = ref<'flat' | 'aggregated'>('flat')
+const viewMode = ref<'flat' | 'aggregated' | 'lexeme'>('flat')
 /** 聚合視圖下已展開的詞形（headwordNormalized），用 Set 便於切換 */
 const expandedGroupKeys = ref<Set<string>>(new Set())
 const loading = ref(false)
@@ -937,6 +1130,11 @@ async function applyOtherDialectTemplate(targetEntry: Entry, sourceId: string) {
     targetEntry.theme = clonedTheme as any
     targetEntry.meta = clonedMeta as any
 
+    // 來源詞條若已隸屬某個詞語（lexeme），沿用其 lexemeId，方便跨方言詞語聚合
+    if (source.lexemeId) {
+      ;(targetEntry as any).lexemeId = source.lexemeId
+    }
+
     targetEntry._isDirty = true
   } catch (e) {
     console.error('Failed to apply other dialect template', e)
@@ -1110,15 +1308,19 @@ function dismissJyutjyuRef(entry: Entry) {
 
 // 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
 const displayGroups = computed(() => {
-  if (viewMode.value !== 'aggregated') return []
+  if (viewMode.value !== 'aggregated' && viewMode.value !== 'lexeme') return []
+  const base = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
   const newOnes = entries.value
     .filter(e => (e as any)._isNew)
     .map(e => ({
       headwordDisplay: e.headword?.display || e.text || '',
-      headwordNormalized: e.headword?.normalized || e.headword?.display || e.text || '',
+      headwordNormalized:
+        viewMode.value === 'lexeme'
+          ? ((e as any).lexemeId || `__unassigned__:${String(getEntryKey(e))}`)
+          : (e.headword?.normalized || e.headword?.display || e.text || ''),
       entries: [e]
     }))
-  return [...newOnes, ...aggregatedGroups.value]
+  return [...newOnes, ...base]
 })
 
 /** 表格行：平鋪時為 entry 行，聚合時為 group 行 + 展開的 entry 行（entry 帶 entryIndexInGroup 用於組內序號） */
@@ -1151,7 +1353,7 @@ function toggleGroupExpanded(headwordNormalized: string) {
 }
 
 function setViewMode(v: string) {
-  const mode = v === 'aggregated' ? 'aggregated' : 'flat'
+  const mode = v === 'aggregated' ? 'aggregated' : (v === 'lexeme' ? 'lexeme' : 'flat')
   viewMode.value = mode
   currentPage.value = 1
   fetchEntries()
@@ -1159,7 +1361,8 @@ function setViewMode(v: string) {
 
 const isEmpty = computed(() => {
   if (viewMode.value === 'flat') return entries.value.length === 0
-  return aggregatedGroups.value.length === 0 && !entries.value.some(e => (e as any)._isNew)
+  const base = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
+  return base.length === 0 && !entries.value.some(e => (e as any)._isNew)
 })
 
 /** 聚合組列顯示：粵拼（首條或「多種」） */
@@ -2727,6 +2930,8 @@ function duplicateEntry(entry: Entry) {
     refs: clonedRefs,
     theme: clonedTheme,
     meta: clonedMeta,
+    // 若原詞條已經屬於某個詞語（lexeme），沿用該 lexemeId，方便跨方言聚合
+    lexemeId: (entry as any).lexemeId,
     status: 'draft',
     _isNew: true,
     _isDirty: false
@@ -2750,19 +2955,25 @@ async function saveNewEntry(entry: Entry) {
     const role = user.value?.role
     const statusForNew = (role === 'reviewer' || role === 'admin') ? 'approved' : 'pending_review'
 
+    const body: Record<string, unknown> = {
+      headword: entry.headword,
+      text: entry.text,
+      dialect: entry.dialect,
+      phonetic: entry.phonetic,
+      entryType: entry.entryType,
+      senses: entry.senses,
+      theme: entry.theme,
+      meta: entry.meta,
+      status: statusForNew
+    }
+    // 複製／用作範本時沿用原詞條的 lexemeId，方便按詞語聚合視圖自動歸類
+    const lexemeId = (entry as any).lexemeId
+    if (lexemeId && !String(lexemeId).startsWith('__unassigned__:')) {
+      body.lexemeId = lexemeId
+    }
     const response = await $fetch('/api/entries', {
       method: 'POST',
-      body: {
-        headword: entry.headword,
-        text: entry.text,
-        dialect: entry.dialect,
-        phonetic: entry.phonetic,
-        entryType: entry.entryType,
-        senses: entry.senses,
-        theme: entry.theme,
-        meta: entry.meta,
-        status: statusForNew
-      }
+      body
     })
 
     if (response.success) {
@@ -2812,8 +3023,8 @@ async function saveNewEntry(entry: Entry) {
         setBaselineForEntry(saved)
       }
       pagination.total++
-      // 聚合視圖下保存新條目後重新拉取，使新條目歸入對應詞形組
-      if (viewMode.value === 'aggregated') {
+      // 聚合／按詞語視圖下保存新條目後重新拉取，使新條目歸入對應詞形組或詞語組
+      if (viewMode.value === 'aggregated' || viewMode.value === 'lexeme') {
         await fetchEntries()
       }
     }
@@ -2883,18 +3094,24 @@ async function saveEntryChanges(entry: Entry) {
   // 先更新本地狀態（如審核員保存→已發佈），再發送請求，避免保存後比對仍顯示「有修改」
   entry.status = statusToSave
   try {
+    const putBody: Record<string, unknown> = {
+      headword: entry.headword,
+      dialect: entry.dialect,
+      phonetic: entry.phonetic,
+      entryType: entry.entryType,
+      senses: entry.senses,
+      theme: entry.theme,
+      meta: entry.meta,
+      status: statusToSave
+    }
+    // 用作範本時可能已寫入 lexemeId，一併提交以便按詞語聚合視圖歸類
+    const lexemeId = (entry as any).lexemeId
+    if (lexemeId !== undefined && lexemeId !== null && !String(lexemeId).startsWith('__unassigned__:')) {
+      putBody.lexemeId = lexemeId
+    }
     const response = await $fetch<{ success: boolean; data?: { status?: string } }>(`/api/entries/${entry.id}`, {
       method: 'PUT',
-      body: {
-        headword: entry.headword,
-        dialect: entry.dialect,
-        phonetic: entry.phonetic,
-        entryType: entry.entryType,
-        senses: entry.senses,
-        theme: entry.theme,
-        meta: entry.meta,
-        status: statusToSave
-      }
+      body: putBody
     })
 
     if (response.success) {
@@ -2955,14 +3172,18 @@ async function deleteEntry(entry: Entry) {
 
   try {
     await $fetch<unknown>(`/api/entries/${entry.id}`, { method: 'DELETE' })
+    // 從本地儲存中移除已刪除嘅詞條
+    removeEntryFromLocalStorage(entry.id || '')
 
-    // Remove from list
-    const index = entries.value.findIndex(e => e.id === entry.id)
-    if (index !== -1) {
-      entries.value.splice(index, 1)
-      pagination.total--
-      // 從本地儲存中移除已刪除嘅詞條
-      removeEntryFromLocalStorage(entry.id || '')
+    // 聚合／詞語視圖的表格數據來自 aggregatedGroups/lexemeGroups，須重新拉取才能更新；平鋪視圖直接從 entries 移除即可
+    if (viewMode.value === 'aggregated' || viewMode.value === 'lexeme') {
+      await fetchEntries()
+    } else {
+      const index = entries.value.findIndex(e => e.id === entry.id)
+      if (index !== -1) {
+        entries.value.splice(index, 1)
+        pagination.total--
+      }
     }
   } catch (error: any) {
     console.error('Failed to delete entry:', error)
@@ -2987,6 +3208,7 @@ async function fetchEntries() {
     if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
 
     if (viewMode.value === 'aggregated') query.groupBy = 'headword'
+    if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
 
     const response = await $fetch<{ data: any[]; total: number; page: number; perPage: number; totalPages: number; grouped?: boolean }>('/api/entries', { query })
 
@@ -3001,7 +3223,8 @@ async function fetchEntries() {
       nextGroups.forEach((g: any) => g.entries.forEach((e: any) => nextBaseline.set(String(e.id ?? ''), makeBaselineSnapshot(e))))
       entryBaselineById.value = nextBaseline
 
-      aggregatedGroups.value = nextGroups
+      if (viewMode.value === 'lexeme') lexemeGroups.value = nextGroups
+      else aggregatedGroups.value = nextGroups
       entries.value = []
     } else {
       const nextEntries = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
@@ -3011,6 +3234,7 @@ async function fetchEntries() {
 
       entries.value = nextEntries
       aggregatedGroups.value = []
+      lexemeGroups.value = []
     }
     
     // 恢復本地儲存嘅草稿：
@@ -3025,12 +3249,13 @@ async function fetchEntries() {
       filters.theme === ALL_FILTER_VALUE
 
     if (restoredEntries.length > 0) {
-      if (viewMode.value === 'aggregated') {
+      if (viewMode.value === 'aggregated' || viewMode.value === 'lexeme') {
         restoredEntries.forEach((restoredEntry) => {
           const restoredId = String((restoredEntry as any).id ?? '')
           let applied = false
           if (restoredId) {
-            for (const g of aggregatedGroups.value) {
+            const base = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
+            for (const g of base) {
               const hit = g.entries.find(e => String((e as any).id ?? '') === restoredId)
               if (hit) {
                 applyDraftOntoEntry(hit, restoredEntry)
@@ -3089,9 +3314,9 @@ watch([() => filters.region, () => filters.status, () => filters.theme], () => {
   fetchEntries()
 })
 
-// 監聽 entries 同 aggregatedGroups 變化，即時保存到本地儲存
+// 監聽 entries / 聚合 groups 變化，即時保存到本地儲存
 watch(
-  [() => entries.value, () => aggregatedGroups.value],
+  [() => entries.value, () => aggregatedGroups.value, () => lexemeGroups.value],
   () => {
     // 收集所有需要保存嘅詞條（新建或已修改）
     const allEntries: Entry[] = []
@@ -3105,6 +3330,15 @@ watch(
     
     // 從 aggregatedGroups 中收集
     aggregatedGroups.value.forEach(g => {
+      g.entries.forEach(e => {
+        if ((e as any)._isNew || e._isDirty) {
+          allEntries.push(e)
+        }
+      })
+    })
+
+    // 從 lexemeGroups 中收集
+    lexemeGroups.value.forEach(g => {
       g.entries.forEach(e => {
         if ((e as any)._isNew || e._isDirty) {
           allEntries.push(e)
