@@ -4,7 +4,7 @@
       <div class="flex justify-between items-center h-16">
         <!-- Logo -->
         <NuxtLink to="/entries" class="flex items-center gap-3 group">
-          <div class="p-2 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:shadow-green-500/40 transition-shadow">
+          <div class="w-10 h-10 aspect-square flex items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:shadow-green-500/40 transition-shadow">
             <UIcon name="i-heroicons-book-open" class="w-6 h-6 text-white" />
           </div>
           <div class="flex flex-col">
