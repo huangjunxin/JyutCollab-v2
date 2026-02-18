@@ -112,6 +112,7 @@ export default defineEventHandler(async (event) => {
       id: entry.id || entry._id?.toString?.(),
       sourceBook: entry.sourceBook,
       lexemeId: entry.lexemeId,
+      morphemeRefs: entry.morphemeRefs,
       dialect: entry.dialect,
       headword: entry.headword,
       phonetic: entry.phonetic,

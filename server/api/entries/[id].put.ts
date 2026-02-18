@@ -59,7 +59,15 @@ const UpdateEntrySchema = z.object({
   }).optional(),
   status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
   // 詞級關聯（可選）：用作範本時沿用來源詞條的 lexemeId，方便按詞語聚合
-  lexemeId: z.string().optional()
+  lexemeId: z.string().optional(),
+  // 詞素／單音節來源（僅屬於本方言點詞條，不跨方言共享）
+  morphemeRefs: z.array(z.object({
+    targetEntryId: z.string().optional(),
+    position: z.number().optional(),
+    char: z.string().optional(),
+    jyutping: z.string().optional(),
+    note: z.string().optional()
+  })).optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -229,6 +237,12 @@ export default defineEventHandler(async (event) => {
     if (data.lexemeId !== undefined && data.lexemeId !== '' && !String(data.lexemeId).startsWith('__unassigned__:')) {
       existingEntry.lexemeId = data.lexemeId
       changedFields.push('lexemeId')
+    }
+
+    // Update morphemeRefs（詞素／單音節來源）
+    if (data.morphemeRefs !== undefined) {
+      existingEntry.morphemeRefs = Array.isArray(data.morphemeRefs) ? data.morphemeRefs : []
+      changedFields.push('morphemeRefs')
     }
 
     // Update status (only reviewers/admins can approve/reject)

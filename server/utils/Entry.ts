@@ -181,7 +181,7 @@ const EntrySchema = new mongoose.Schema<IEntry>({
     type: String
   },
   morphemeRefs: [{
-    targetEntryId: { type: String, required: true },
+    targetEntryId: { type: String },
     position: { type: Number },
     char: { type: String },
     jyutping: { type: String },

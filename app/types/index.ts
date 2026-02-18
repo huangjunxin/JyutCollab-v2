@@ -89,9 +89,9 @@ export interface Entry {
   _isDirty?: boolean // Flag for unsaved changes
   /** 詞級關聯：用於跨方言「同一個詞」嘅聚合（舊數據可能暫時沒有） */
   lexemeId?: string
-  /** 詞素／單音節來源：只屬於本方言點詞條 */
+  /** 詞素／單音節來源：只屬於本方言點詞條。targetEntryId 可選，無則為未連結詞素（僅記錄字/粵拼/備註） */
   morphemeRefs?: {
-    targetEntryId: string
+    targetEntryId?: string
     position?: number
     char?: string
     jyutping?: string

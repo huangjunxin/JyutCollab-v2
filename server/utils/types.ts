@@ -70,9 +70,10 @@ export interface Sense {
   subSenses?: SubSense[]
 }
 
-/** 詞素／單音節來源（僅屬於單個方言點詞條，不跨方言共享） */
+/** 詞素／單音節來源（僅屬於單個方言點詞條，不跨方言共享）。
+ * targetEntryId 可選：有則連結到庫內詞條；無則僅記錄該位置的字／粵拼／備註（數據庫暫無對應詞條時用）。 */
 export interface MorphemeRef {
-  targetEntryId: string
+  targetEntryId?: string
   position?: number
   char?: string
   jyutping?: string
