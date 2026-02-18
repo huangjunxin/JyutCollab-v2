@@ -2139,7 +2139,13 @@ function cancelCellEdit() {
   editingCell.value = null
   aiSuggestion.value = null
   aiSuggestionForField.value = null
-  nextTick(() => tableWrapperRef.value?.focus())
+  // 取消編輯時同樣不強制把焦點移回表格 wrapper，避免聚合視圖下出現滾動跳動
+  nextTick(() => {
+    // 僅當前沒有任何焦點格時才主動聚焦 wrapper，盡量減少瀏覽器自動滾動
+    if (!focusedCell.value) {
+      tableWrapperRef.value?.focus()
+    }
+  })
 }
 
 /** 保存當前格並跳到下一格（Tab 方向）。返回是否成功打開下一格。 */
