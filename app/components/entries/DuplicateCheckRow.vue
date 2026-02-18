@@ -19,50 +19,13 @@
               數據庫中已存在相同「詞頭 + 方言」的詞條，共 {{ entries.length }} 條。請確認是否改寫詞頭或方言，或直接編輯已有詞條。
             </p>
             <div class="mt-1 space-y-2 max-h-64 overflow-y-auto">
-              <div
+              <EntriesEntryPreviewCard
                 v-for="e in entries"
                 :key="e.id"
-                class="rounded border border-amber-100 dark:border-amber-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
-              >
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
-                  <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
-                  <span class="text-amber-600 dark:text-amber-400">{{ e.dialectLabel }}</span>
-                  <span
-                    :class="[
-                      e.status === 'draft' && 'text-gray-500 dark:text-gray-400',
-                      e.status === 'pending_review' && 'text-amber-600 dark:text-amber-400',
-                      e.status === 'approved' && 'text-green-600 dark:text-green-400',
-                      e.status === 'rejected' && 'text-red-600 dark:text-red-400'
-                    ]"
-                  >
-                    {{ e.statusLabel }}
-                  </span>
-                  <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
-                </div>
-                <div class="mt-0.5 flex items-start gap-2">
-                  <div class="flex-1 min-w-0">
-                    <p class="text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {{ e.definitionSummary }}
-                    </p>
-                    <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
-                      <span>分類：{{ e.themeLabel }}</span>
-                      <span>·</span>
-                      <span>共 {{ e.senseCount }} 個義項</span>
-                      <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
-                    </div>
-                  </div>
-                  <UButton
-                    size="xs"
-                    color="neutral"
-                    variant="ghost"
-                    class="text-amber-600 dark:text-amber-400 flex-shrink-0"
-                    type="button"
-                    @click.stop="openDetailFor(e.id)"
-                  >
-                    查看完整詞條
-                  </UButton>
-                </div>
-              </div>
+                :item="e"
+                variant="amber"
+                @open-detail="openDetailFor"
+              />
             </div>
           </template>
         </div>
@@ -81,20 +44,11 @@
 </template>
 
 <script setup lang="ts">
+import type { EntryPreviewItemDb } from '~/components/entries/EntryPreviewCard.vue'
+
 defineProps<{
   colspan: number
-  entries: Array<{
-    id: string
-    headwordDisplay: string
-    dialectLabel: string
-    status: string
-    statusLabel: string
-    createdAtLabel: string
-    definitionSummary: string
-    themeLabel: string
-    senseCount: number
-    metaLabel: string
-  }>
+  entries: EntryPreviewItemDb[]
   isLoading: boolean
 }>()
 

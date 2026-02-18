@@ -32,45 +32,16 @@
               共 {{ total ?? results.length }} 條結果，下列顯示頭 3 條。
             </p>
 
-            <!-- 直接顯示前 3 條 -->
-            <div
+            <EntriesEntryPreviewCard
               v-for="r in visibleResults.slice(0, 3)"
               :key="r.id"
-              class="rounded border border-emerald-100 dark:border-emerald-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
-            >
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ r.headwordDisplay }}</span>
-                <span v-if="r.jyutping" class="font-mono text-gray-600 dark:text-gray-400">{{ r.jyutping }}</span>
-                <span v-if="r.dialectLabel" class="text-emerald-700 dark:text-emerald-300">{{ r.dialectLabel }}</span>
-                <span v-if="r.sourceBook" class="text-gray-400 dark:text-gray-500">{{ r.sourceBook }}</span>
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="ghost"
-                  class="ml-auto"
-                  @click="$emit('apply-template', r.id)"
-                >
-                  用作範本填寫此行
-                </UButton>
-              </div>
-              <div class="mt-0.5 flex items-start gap-2">
-                <p v-if="r.definitionSummary" class="flex-1 min-w-0 text-gray-600 dark:text-gray-400 line-clamp-2">
-                  {{ r.definitionSummary }}
-                </p>
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  class="text-emerald-700 dark:text-emerald-300 flex-shrink-0"
-                  type="button"
-                  @click.stop="openDetailFor(r.id)"
-                >
-                  查看完整詞條
-                </UButton>
-              </div>
-            </div>
+              :item="r"
+              variant="emerald"
+              :show-apply-template="true"
+              @open-detail="openDetailFor"
+              @apply-template="(id) => $emit('apply-template', id)"
+            />
 
-            <!-- 若超過 3 條，提供展開/收起更多 -->
             <template v-if="results.length > 3">
               <button
                 type="button"
@@ -80,42 +51,15 @@
                 {{ showDetail ? '收起更多結果' : `另外還有 ${results.length - 3} 條，點此展開` }}
               </button>
               <div v-if="showDetail" class="mt-1 space-y-2 max-h-64 overflow-y-auto">
-                <div
+                <EntriesEntryPreviewCard
                   v-for="r in visibleResults.slice(3)"
                   :key="r.id"
-                  class="rounded border border-emerald-100 dark:border-emerald-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
-                >
-                  <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
-                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ r.headwordDisplay }}</span>
-                    <span v-if="r.jyutping" class="font-mono text-gray-600 dark:text-gray-400">{{ r.jyutping }}</span>
-                    <span v-if="r.dialectLabel" class="text-emerald-700 dark:text-emerald-300">{{ r.dialectLabel }}</span>
-                    <span v-if="r.sourceBook" class="text-gray-400 dark:text-gray-500">{{ r.sourceBook }}</span>
-                    <UButton
-                      size="xs"
-                      color="primary"
-                      variant="ghost"
-                      class="ml-auto"
-                      @click="$emit('apply-template', r.id)"
-                    >
-                      用作範本填寫此行
-                    </UButton>
-                  </div>
-                  <div class="mt-0.5 flex items-start gap-2">
-                    <p v-if="r.definitionSummary" class="flex-1 min-w-0 text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {{ r.definitionSummary }}
-                    </p>
-                    <UButton
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      class="text-emerald-700 dark:text-emerald-300 flex-shrink-0"
-                      type="button"
-                      @click.stop="openDetailFor(r.id)"
-                    >
-                      查看完整詞條
-                    </UButton>
-                  </div>
-                </div>
+                  :item="r"
+                  variant="emerald"
+                  :show-apply-template="true"
+                  @open-detail="openDetailFor"
+                  @apply-template="(id) => $emit('apply-template', id)"
+                />
               </div>
             </template>
           </div>
@@ -135,19 +79,15 @@
 </template>
 
 <script setup lang="ts">
-export interface JyutjyuRefItem {
-  id: string
-  headwordDisplay: string
-  jyutping: string
-  dialectLabel: string
-  sourceBook: string
-  definitionSummary: string
-}
+import type { EntryPreviewItemJyutjyu } from '~/components/entries/EntryPreviewCard.vue'
+
+/** @deprecated 請使用 EntryPreviewItemJyutjyu */
+export type JyutjyuRefItem = EntryPreviewItemJyutjyu
 
 const props = defineProps<{
   colspan: number
   query: string
-  results: JyutjyuRefItem[]
+  results: EntryPreviewItemJyutjyu[]
   /** 原始搜尋結果（用於彈窗展示完整詞條） */
   rawResults?: any[]
   total: number | null
