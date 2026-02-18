@@ -17,111 +17,35 @@
             共 {{ entries.length }} 條（不同方言），可參考釋義與分類後填寫本條。
           </p>
 
-          <!-- 短列表：直接顯示前幾條；若條數較多，再提供展開更多 -->
           <div class="mt-1 space-y-2">
-            <!-- 直接顯示前 3 條 -->
-            <div
+            <EntriesEntryPreviewCard
               v-for="e in entries.slice(0, 3)"
               :key="e.id"
-              class="rounded border border-blue-100 dark:border-blue-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
-            >
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
-                <span class="text-blue-600 dark:text-blue-400">{{ e.dialectLabel }}</span>
-                <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
-                <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="ghost"
-                  class="ml-auto"
-                  @click="$emit('apply-template', e.id)"
-                >
-                  用作範本填寫此行
-                </UButton>
-              </div>
-              <div class="mt-0.5 flex items-start gap-2">
-                <div class="flex-1 min-w-0">
-                  <p class="text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {{ e.definitionSummary }}
-                  </p>
-                  <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
-                    <span>分類：{{ e.themeLabel }}</span>
-                    <span>·</span>
-                    <span>共 {{ e.senseCount }} 個義項</span>
-                    <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
-                  </div>
-                </div>
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  class="text-blue-600 dark:text-blue-400 flex-shrink-0"
-                  type="button"
-                  @click.stop="openDetailFor(e.id)"
-                >
-                  查看完整詞條
-                </UButton>
-              </div>
-            </div>
+              :item="e"
+              variant="blue"
+              :show-apply-template="true"
+              @open-detail="openDetailFor"
+              @apply-template="(id) => $emit('apply-template', id)"
+            />
 
-            <!-- 若超過 3 條，提供展開/收起更多 -->
             <template v-if="entries.length > 3">
               <button
                 type="button"
                 class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 @click="showDetail = !showDetail"
               >
-                {{ showDetail ? '收起其他方言詞條' : `另外還有 ${ entries.length - 3 } 條，點此展開` }}
+                {{ showDetail ? '收起其他方言詞條' : `另外還有 ${entries.length - 3} 條，點此展開` }}
               </button>
-              <div
-                v-if="showDetail"
-                class="mt-1 space-y-2 max-h-64 overflow-y-auto"
-              >
-                <div
+              <div v-if="showDetail" class="mt-1 space-y-2 max-h-64 overflow-y-auto">
+                <EntriesEntryPreviewCard
                   v-for="e in entries.slice(3)"
                   :key="e.id"
-                  class="rounded border border-blue-100 dark:border-blue-800/50 bg-white/60 dark:bg-gray-800/40 px-2 py-1.5 text-xs"
-                >
-                  <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-700 dark:text-gray-300">
-                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ e.headwordDisplay }}</span>
-                    <span class="text-blue-600 dark:text-blue-400">{{ e.dialectLabel }}</span>
-                    <span class="text-gray-500 dark:text-gray-500">{{ e.statusLabel }}</span>
-                    <span class="text-gray-400 dark:text-gray-500">{{ e.createdAtLabel }}</span>
-                    <UButton
-                      size="xs"
-                      color="primary"
-                      variant="ghost"
-                      class="ml-auto"
-                      @click="$emit('apply-template', e.id)"
-                    >
-                      用作範本填寫此行
-                    </UButton>
-                  </div>
-                  <div class="mt-0.5 flex items-start gap-2">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {{ e.definitionSummary }}
-                      </p>
-                      <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-gray-500 dark:text-gray-500">
-                        <span>分類：{{ e.themeLabel }}</span>
-                        <span>·</span>
-                        <span>共 {{ e.senseCount }} 個義項</span>
-                        <span v-if="e.metaLabel">· {{ e.metaLabel }}</span>
-                      </div>
-                    </div>
-                    <UButton
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      class="text-blue-600 dark:text-blue-400 flex-shrink-0"
-                      type="button"
-                      @click.stop="openDetailFor(e.id)"
-                    >
-                      查看完整詞條
-                    </UButton>
-                  </div>
-                </div>
+                  :item="e"
+                  variant="blue"
+                  :show-apply-template="true"
+                  @open-detail="openDetailFor"
+                  @apply-template="(id) => $emit('apply-template', id)"
+                />
               </div>
             </template>
           </div>
@@ -139,20 +63,11 @@
 </template>
 
 <script setup lang="ts">
+import type { EntryPreviewItemDb } from '~/components/entries/EntryPreviewCard.vue'
+
 defineProps<{
   colspan: number
-  entries: Array<{
-    id: string
-    headwordDisplay: string
-    dialectLabel: string
-    status: string
-    statusLabel: string
-    createdAtLabel: string
-    definitionSummary: string
-    themeLabel: string
-    senseCount: number
-    metaLabel: string
-  }>
+  entries: EntryPreviewItemDb[]
 }>()
 
 defineEmits<{
