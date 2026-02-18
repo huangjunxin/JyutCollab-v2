@@ -5,7 +5,7 @@
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+            <div class="w-10 h-10 aspect-square flex items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
               <UIcon name="i-heroicons-table-cells" class="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
             詞條表格
