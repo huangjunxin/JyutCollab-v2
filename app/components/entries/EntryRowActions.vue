@@ -37,6 +37,24 @@
         title="取消"
         @click.stop="$emit('cancel')"
       />
+      <UButton
+        v-if="canEdit && showLexemeActions && !entry._isNew"
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        icon="i-heroicons-link-slash"
+        title="將此詞條拆出成新詞語"
+        @click.stop="$emit('make-new-lexeme')"
+      />
+      <UButton
+        v-if="canEdit && showLexemeActions && !entry._isNew"
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        icon="i-heroicons-arrow-path"
+        title="加入其他詞語組"
+        @click.stop="$emit('join-lexeme')"
+      />
     </div>
   </td>
 </template>
@@ -48,6 +66,8 @@ defineProps<{
   entry: Entry
   /** 是否可編輯此詞條（貢獻者僅自己創建的可編輯；審核員/管理員任意） */
   canEdit: boolean
+  /** 是否顯示詞語層相關操作（僅在「按詞語聚合」視圖顯示） */
+  showLexemeActions?: boolean
 }>()
 
 defineEmits<{
@@ -55,5 +75,7 @@ defineEmits<{
   duplicate: []
   delete: []
   cancel: []
+  'make-new-lexeme': []
+  'join-lexeme': []
 }>()
 </script>

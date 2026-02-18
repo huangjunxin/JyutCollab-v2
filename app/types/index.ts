@@ -87,6 +87,16 @@ export interface Entry {
   _tempId?: string // For new entries before save
   _isNew?: boolean // Flag for new entries
   _isDirty?: boolean // Flag for unsaved changes
+  /** 詞級關聯：用於跨方言「同一個詞」嘅聚合（舊數據可能暫時沒有） */
+  lexemeId?: string
+  /** 詞素／單音節來源：只屬於本方言點詞條 */
+  morphemeRefs?: {
+    targetEntryId: string
+    position?: number
+    char?: string
+    jyutping?: string
+    note?: string
+  }[]
   dialect: Dialect
   headword: Headword
   phonetic: Phonetic

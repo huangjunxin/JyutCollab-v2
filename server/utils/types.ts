@@ -70,6 +70,15 @@ export interface Sense {
   subSenses?: SubSense[]
 }
 
+/** 詞素／單音節來源（僅屬於單個方言點詞條，不跨方言共享） */
+export interface MorphemeRef {
+  targetEntryId: string
+  position?: number
+  char?: string
+  jyutping?: string
+  note?: string
+}
+
 export interface EntryRef {
   type: 'word' | 'section'
   target: string
@@ -98,6 +107,12 @@ export interface EntryMeta {
 
 export interface Entry {
   id: string
+
+  // 詞級關聯：用於跨方言「同一個詞」的聚合（可選，舊數據可能暫時沒有）
+  lexemeId?: string
+
+  /** 詞素／單音節來源：只屬於本方言點詞條 */
+  morphemeRefs?: MorphemeRef[]
 
   // 方言維度
   dialect: Dialect

@@ -58,13 +58,16 @@ const CreateEntrySchema = z.object({
   formalityLevel: z.enum(['formal', 'neutral', 'informal', 'slang', 'vulgar']).optional(),
   examples: z.array(z.object({
     sentence: z.string(),
+    jyutping: z.string().optional(),
     text: z.string().optional(),
     explanation: z.string().optional(),
     translation: z.string().optional(),
     scenario: z.string().optional()
   })).optional(),
   phoneticNotation: z.string().optional(),
-  status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional()
+  status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
+  // 詞級關聯（可選）：若未提供，後端會自動生成新的 lexemeId
+  lexemeId: z.string().optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -131,7 +134,7 @@ export default defineEventHandler(async (event) => {
     const existing = await Entry.findOne({
       'headword.display': headword.display,
       'dialect.name': dialect.name
-    })
+    } as any)
 
     if (existing) {
       throw createError({
@@ -177,9 +180,13 @@ export default defineEventHandler(async (event) => {
       jyutping: data.phoneticNotation ? [data.phoneticNotation] : []
     }
 
+    // 決定本詞條所屬的 lexemeId（若前端已有，沿用；否則新建一個）
+    const lexemeId = data.lexemeId || nanoid(10)
+
     // 創建詞條
     const entryData = {
       id: nanoid(12),
+      lexemeId,
       headword,
       dialect,
       phonetic,
@@ -209,6 +216,7 @@ export default defineEventHandler(async (event) => {
       success: true,
       data: {
         id: entry.id,
+        lexemeId: entry.lexemeId,
         headword: entry.headword,
         dialect: entry.dialect,
         phonetic: entry.phonetic,

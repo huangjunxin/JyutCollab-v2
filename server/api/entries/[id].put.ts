@@ -57,7 +57,9 @@ const UpdateEntrySchema = z.object({
     etymology: z.string().optional(),
     pos: z.string().optional()
   }).optional(),
-  status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional()
+  status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
+  // 詞級關聯（可選）：用作範本時沿用來源詞條的 lexemeId，方便按詞語聚合
+  lexemeId: z.string().optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -221,6 +223,12 @@ export default defineEventHandler(async (event) => {
         notes: data.meta.notes ? convertToHongKongTraditional(data.meta.notes) : existingEntry.meta?.notes
       }
       changedFields.push('meta')
+    }
+
+    // Update lexemeId（用作範本時沿用來源詞條的詞語組；僅在傳入有效值時更新）
+    if (data.lexemeId !== undefined && data.lexemeId !== '' && !String(data.lexemeId).startsWith('__unassigned__:')) {
+      existingEntry.lexemeId = data.lexemeId
+      changedFields.push('lexemeId')
     }
 
     // Update status (only reviewers/admins can approve/reject)

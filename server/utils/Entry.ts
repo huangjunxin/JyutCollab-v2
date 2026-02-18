@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import type { Region, EntryStatus, EntryType, Register } from './types'
+import type { Region, EntryStatus, EntryType, Register, MorphemeRef } from './types'
 
 // Interfaces
 export interface IExample {
@@ -74,6 +74,8 @@ export interface IEntryMeta {
 export interface IEntry {
   _id: string
   id: string
+  lexemeId?: string
+  morphemeRefs?: MorphemeRef[]
   sourceBook?: string
   dialect: IDialect
   headword: IHeadword
@@ -175,6 +177,16 @@ const EntrySchema = new mongoose.Schema<IEntry>({
     required: true,
     unique: true
   },
+  lexemeId: {
+    type: String
+  },
+  morphemeRefs: [{
+    targetEntryId: { type: String, required: true },
+    position: { type: Number },
+    char: { type: String },
+    jyutping: { type: String },
+    note: { type: String }
+  }],
   sourceBook: { type: String },
   dialect: { type: DialectSchema, required: true },
   headword: { type: HeadwordSchema, required: true },

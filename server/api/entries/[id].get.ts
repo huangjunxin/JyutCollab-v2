@@ -53,6 +53,7 @@ export default defineEventHandler(async (event) => {
         id: entry.id || entry._id.toString(),
         // 新格式字段
         sourceBook: entry.sourceBook,
+        lexemeId: entry.lexemeId,
         dialect: entry.dialect,
         headword: entry.headword,
         phonetic: entry.phonetic,
