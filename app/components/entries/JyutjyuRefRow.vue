@@ -53,9 +53,21 @@
                   用作範本填寫此行
                 </UButton>
               </div>
-              <p v-if="r.definitionSummary" class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
-                {{ r.definitionSummary }}
-              </p>
+              <div class="mt-0.5 flex items-start gap-2">
+                <p v-if="r.definitionSummary" class="flex-1 min-w-0 text-gray-600 dark:text-gray-400 line-clamp-2">
+                  {{ r.definitionSummary }}
+                </p>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  class="text-emerald-700 dark:text-emerald-300 flex-shrink-0"
+                  type="button"
+                  @click.stop="openDetailFor(r.id)"
+                >
+                  查看完整詞條
+                </UButton>
+              </div>
             </div>
 
             <!-- 若超過 3 條，提供展開/收起更多 -->
@@ -88,14 +100,31 @@
                       用作範本填寫此行
                     </UButton>
                   </div>
-                  <p v-if="r.definitionSummary" class="mt-0.5 text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {{ r.definitionSummary }}
-                  </p>
+                  <div class="mt-0.5 flex items-start gap-2">
+                    <p v-if="r.definitionSummary" class="flex-1 min-w-0 text-gray-600 dark:text-gray-400 line-clamp-2">
+                      {{ r.definitionSummary }}
+                    </p>
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      class="text-emerald-700 dark:text-emerald-300 flex-shrink-0"
+                      type="button"
+                      @click.stop="openDetailFor(r.id)"
+                    >
+                      查看完整詞條
+                    </UButton>
+                  </div>
                 </div>
               </div>
             </template>
           </div>
         </div>
+
+        <EntriesEntryDetailModal
+          v-model:open="detailModalOpen"
+          :jyutjyu-raw="detailJyutjyuRaw"
+        />
 
         <UButton size="xs" color="neutral" variant="ghost" class="flex-shrink-0" @mousedown.prevent="$emit('dismiss')">
           忽略 (Esc)
@@ -119,6 +148,8 @@ const props = defineProps<{
   colspan: number
   query: string
   results: JyutjyuRefItem[]
+  /** 原始搜尋結果（用於彈窗展示完整詞條） */
+  rawResults?: any[]
   total: number | null
   isLoading: boolean
   errorMessage: string
@@ -130,8 +161,16 @@ defineEmits<{
 }>()
 
 const showDetail = ref(false)
+const detailModalOpen = ref(false)
+const detailJyutjyuRaw = ref<Record<string, any> | null>(null)
 
 const visibleResults = computed(() => props.results || [])
+
+function openDetailFor(id: string) {
+  const raw = (props.rawResults || []).find((r: any) => String(r?.id) === String(id))
+  detailJyutjyuRaw.value = raw ?? null
+  detailModalOpen.value = true
+}
 
 watch(
   () => props.query,

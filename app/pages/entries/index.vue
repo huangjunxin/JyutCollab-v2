@@ -401,6 +401,7 @@
               :colspan="editableColumns.length + 2"
               :query="getJyutjyuQuery(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               :results="formatJyutjyuResults(jyutjyuRefResult.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))?.results || [])"
+              :raw-results="jyutjyuRefResult.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))?.results || []"
               :total="getJyutjyuTotal(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               :is-loading="getJyutjyuLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
               :error-message="getJyutjyuError(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
