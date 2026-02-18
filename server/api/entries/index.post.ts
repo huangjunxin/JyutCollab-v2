@@ -67,7 +67,15 @@ const CreateEntrySchema = z.object({
   phoneticNotation: z.string().optional(),
   status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
   // 詞級關聯（可選）：若未提供，後端會自動生成新的 lexemeId
-  lexemeId: z.string().optional()
+  lexemeId: z.string().optional(),
+  // 詞素／單音節來源（僅屬於本方言點詞條，不跨方言共享）
+  morphemeRefs: z.array(z.object({
+    targetEntryId: z.string().optional(),
+    position: z.number().optional(),
+    char: z.string().optional(),
+    jyutping: z.string().optional(),
+    note: z.string().optional()
+  })).optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -184,7 +192,7 @@ export default defineEventHandler(async (event) => {
     const lexemeId = data.lexemeId || nanoid(10)
 
     // 創建詞條
-    const entryData = {
+    const entryData: any = {
       id: nanoid(12),
       lexemeId,
       headword,
@@ -198,6 +206,11 @@ export default defineEventHandler(async (event) => {
       createdBy: userId,
       viewCount: 0,
       likeCount: 0
+    }
+    
+    // 詞素／單音節來源（僅屬於本方言點詞條）
+    if (data.morphemeRefs && Array.isArray(data.morphemeRefs)) {
+      entryData.morphemeRefs = data.morphemeRefs
     }
 
     const entry = await Entry.create(entryData)
@@ -217,6 +230,7 @@ export default defineEventHandler(async (event) => {
       data: {
         id: entry.id,
         lexemeId: entry.lexemeId,
+        morphemeRefs: entry.morphemeRefs,
         headword: entry.headword,
         dialect: entry.dialect,
         phonetic: entry.phonetic,

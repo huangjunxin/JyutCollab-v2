@@ -369,12 +369,14 @@
                 :entry="row.entry"
                 :can-edit="canEditEntry(row.entry)"
                 :show-lexeme-actions="viewMode === 'lexeme' && canEditExternalEtymons"
+                :is-morpheme-refs-expanded="expandedMorphemeRefsEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
                 @save="(row.entry as any)._isNew ? saveNewEntry(row.entry) : saveEntryChanges(row.entry)"
                 @duplicate="duplicateEntry(row.entry)"
                 @delete="deleteEntry(row.entry)"
                 @cancel="cancelEdit(row.entry)"
                 @make-new-lexeme="makeEntryNewLexeme(row.entry)"
                 @join-lexeme="openMergeModalForEntry(row.entry)"
+                @toggle-morpheme-refs="toggleMorphemeRefsExpand(row.entry)"
               />
             </tr>
             <!-- 行內 AI 釋義建議（Tab 落在釋義格且有待處理建議時顯示） -->
@@ -491,6 +493,112 @@
                 />
               </td>
             </tr>
+            <!-- 詞素引用展開區 -->
+            <tr
+              v-if="row.type === 'entry' && expandedMorphemeRefsEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+              class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
+            >
+              <td :colspan="editableColumns.length + 2" class="p-0 align-top">
+                <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">詞素／單音節來源</h4>
+                    <UButton
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      icon="i-heroicons-chevron-up"
+                      @click="toggleMorphemeRefsExpand(row.entry)"
+                    >
+                      收起
+                    </UButton>
+                  </div>
+                  <div class="space-y-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <template v-for="(ref, refIdx) in (row.entry.morphemeRefs || [])" :key="refIdx">
+                        <div
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
+                          :title="ref.note ? `備註：${ref.note}` : (ref.targetEntryId ? `ID: ${ref.targetEntryId}` : undefined)"
+                        >
+                          <span v-if="ref.char" class="font-medium text-gray-900 dark:text-white">{{ ref.char }}</span>
+                          <span v-if="ref.jyutping" class="text-gray-500 dark:text-gray-400">{{ ref.jyutping }}</span>
+                          <span v-if="ref.position !== undefined" class="text-xs text-gray-400 dark:text-gray-500">第{{ (ref.position ?? 0) + 1 }}字</span>
+                          <span v-if="!ref.targetEntryId" class="text-xs text-amber-600 dark:text-amber-400" title="數據庫暫無對應詞條">(未連結)</span>
+                          <UButton
+                            color="error"
+                            variant="ghost"
+                            size="xs"
+                            icon="i-heroicons-trash"
+                            title="刪除此引用"
+                            class="p-0.5 min-w-0"
+                            @click="removeMorphemeRef(row.entry, refIdx)"
+                          />
+                        </div>
+                      </template>
+                      <span v-if="!row.entry.morphemeRefs || row.entry.morphemeRefs.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                        暫無詞素引用
+                      </span>
+                    </div>
+                    <div class="pt-1 border-t border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
+                      <UButton
+                        color="primary"
+                        variant="soft"
+                        size="sm"
+                        icon="i-heroicons-plus"
+                        @click="openMorphemeSearch(row.entry)"
+                      >
+                        從數據庫選擇詞素
+                      </UButton>
+                      <UButton
+                        color="neutral"
+                        variant="soft"
+                        size="sm"
+                        icon="i-heroicons-pencil-square"
+                        @click="openUnlinkedMorphemeForm(row.entry)"
+                      >
+                        添加未連結詞素
+                      </UButton>
+                    </div>
+                    <!-- 未連結詞素：自動依詞頭與粵拼帶入，確認或改備註後添加 -->
+                    <div
+                      v-if="unlinkedMorphemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                      class="mt-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 space-y-2"
+                    >
+                      <p class="text-xs text-amber-800 dark:text-amber-200">以下為詞頭各字自動帶入的未連結詞素，可補備註後確認添加。</p>
+                      <div v-if="unlinkedMorphemeCandidates.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                        詞頭各字均已有關聯或未連結詞素。
+                      </div>
+                      <template v-else>
+                        <div class="flex flex-wrap gap-2">
+                          <div
+                            v-for="(cand, idx) in unlinkedMorphemeCandidates"
+                            :key="idx"
+                            class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900"
+                          >
+                            <span class="text-sm text-gray-500 dark:text-gray-400">第{{ cand.position + 1 }}字</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{{ cand.char }}</span>
+                            <span v-if="cand.jyutping" class="text-sm text-gray-500 dark:text-gray-400">{{ cand.jyutping }}</span>
+                            <input
+                              v-model="cand.note"
+                              type="text"
+                              placeholder="備註（可選）"
+                              class="w-20 px-1.5 py-0.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                            />
+                          </div>
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                          <UButton size="sm" color="primary" @click="confirmUnlinkedMorphemeRefs(row.entry)">
+                            確認添加
+                          </UButton>
+                          <UButton size="sm" color="neutral" variant="ghost" @click="closeUnlinkedMorphemeForm">
+                            取消
+                          </UButton>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
             <!-- 詞頭詳情展開區 -->
             <!-- 詞頭詳情展開區（已由詞頭欄位直接展示「主詞形 [異形]」格式取代，暫不再使用） -->
             <!-- 主題分類展開區 -->
@@ -548,6 +656,76 @@
     @update:open="(v: boolean) => { lexemeMergeModalOpen = v }"
     @merged="handleLexemeMerge"
   />
+
+  <!-- 詞素引用搜索 Modal -->
+  <UModal :open="morphemeSearchModalOpen" @update:open="(v: boolean) => { morphemeSearchModalOpen = v }">
+    <template #content>
+      <UCard class="w-full max-w-2xl">
+        <template #header>
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">搜索詞素／單音節詞</h3>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              icon="i-heroicons-x-mark"
+              @click="morphemeSearchModalOpen = false"
+            />
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <div v-if="morphemeSearchTargetEntry" class="text-sm text-gray-600 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+            <p class="font-medium">當前詞條：{{ morphemeSearchTargetEntry.headword?.display || morphemeSearchTargetEntry.text || '—' }}</p>
+            <p v-if="morphemeSearchTargetEntry.dialect?.name" class="text-xs mt-1">方言：{{ getDialectLabel(morphemeSearchTargetEntry.dialect.name) || morphemeSearchTargetEntry.dialect.name }}</p>
+          </div>
+
+          <div v-if="morphemeSearchLoading" class="flex items-center justify-center py-8">
+            <div class="w-8 h-8 border-2 border-gray-200 dark:border-gray-700 border-t-primary rounded-full animate-spin" />
+            <span class="ml-3 text-sm text-gray-500 dark:text-gray-400">搜索中...</span>
+          </div>
+
+          <div v-else-if="morphemeSearchResults.length === 0" class="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+            暫無匹配的詞素
+          </div>
+
+          <div v-else class="space-y-2 max-h-[400px] overflow-y-auto">
+            <div
+              v-for="item in morphemeSearchResults"
+              :key="item.id"
+              class="flex items-start justify-between gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer transition-colors"
+              @click="addMorphemeRef(item.id, { headword: item.headword, jyutping: item.jyutping })"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm font-medium text-gray-900 dark:text-white">{{ item.headword || '—' }}</span>
+                  <span v-if="item.jyutping" class="text-xs text-gray-500 dark:text-gray-400">{{ item.jyutping }}</span>
+                  <UBadge size="xs" variant="soft" color="neutral">{{ getDialectLabel(item.dialect) || item.dialect }}</UBadge>
+                </div>
+                <p v-if="item.definition" class="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{{ item.definition }}</p>
+              </div>
+              <UButton
+                color="primary"
+                variant="soft"
+                size="xs"
+                icon="i-heroicons-plus"
+              >
+                添加
+              </UButton>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="flex items-center justify-end w-full">
+            <UButton color="neutral" variant="soft" size="sm" @click="morphemeSearchModalOpen = false">
+              關閉
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </template>
+  </UModal>
 </template>
 
 <script setup lang="ts">
@@ -784,6 +962,9 @@ const tableWrapperRef = ref<HTMLElement | null>(null)
 
 // 方案 B：行展開編輯釋義詳情（多義項、例句、分義項）。值為當前展開的 entry id
 const expandedEntryId = ref<string | null>(null)
+
+// 詞素引用展開狀態
+const expandedMorphemeRefsEntryId = ref<string | null>(null)
 
 // 主題展開狀態
 const expandedThemeEntryId = ref<string | null>(null)
@@ -1908,6 +2089,138 @@ function toggleSensesExpand(entry: Entry) {
   if (opening && expandedEntryId.value === key) ensureSensesStructure(entry)
 }
 
+function toggleMorphemeRefsExpand(entry: Entry) {
+  const key = String(entry.id ?? (entry as any)._tempId ?? '')
+  expandedMorphemeRefsEntryId.value = expandedMorphemeRefsEntryId.value === key ? null : key
+}
+
+// 詞素引用搜索 modal 狀態
+const morphemeSearchModalOpen = ref(false)
+const morphemeSearchTargetEntry = ref<Entry | null>(null)
+const morphemeSearchResults = ref<Array<{ id: string; headword: string; jyutping: string; definition: string; dialect: string; entryType: string }>>([])
+const morphemeSearchLoading = ref(false)
+
+// 未連結詞素：自動依詞頭與粵拼帶入，確認或改備註後添加
+const unlinkedMorphemeEntryId = ref<string | null>(null)
+const unlinkedMorphemeCandidates = ref<Array<{ position: number; char: string; jyutping: string; note: string }>>([])
+
+function openUnlinkedMorphemeForm(entry: Entry) {
+  const key = String(entry.id ?? (entry as any)._tempId ?? '')
+  unlinkedMorphemeEntryId.value = key
+  const headword = entry.headword?.display || entry.text || ''
+  const rawJyutping = entry.phonetic?.jyutping
+  // 粵拼統一按空格拆成音節（支援 array 如 ['jau5','tou4'] 或 ['jau5 tou4']）
+  let syllables: string[] = []
+  if (Array.isArray(rawJyutping)) {
+    syllables = rawJyutping.join(' ').split(/\s+/).filter(Boolean)
+  } else if (typeof rawJyutping === 'string') {
+    syllables = rawJyutping.split(/\s+/).filter(Boolean)
+  }
+  const existingPositions = new Set((entry.morphemeRefs || []).map((r: any) => r.position))
+  const candidates: Array<{ position: number; char: string; jyutping: string; note: string }> = []
+  for (let i = 0; i < headword.length; i++) {
+    if (existingPositions.has(i)) continue
+    const char = headword[i]
+    if (!char || char === '□') continue
+    const jyutping = syllables[i] ?? ''
+    candidates.push({ position: i, char, jyutping, note: '' })
+  }
+  unlinkedMorphemeCandidates.value = candidates
+}
+
+function confirmUnlinkedMorphemeRefs(entry: Entry) {
+  const list = entry.morphemeRefs ? [...entry.morphemeRefs] : []
+  for (const cand of unlinkedMorphemeCandidates.value) {
+    list.push({
+      position: cand.position,
+      char: cand.char,
+      jyutping: (cand.jyutping || '').trim() || undefined,
+      note: (cand.note || '').trim() || undefined
+    })
+  }
+  ;(entry as any).morphemeRefs = list
+  entry._isDirty = true
+  closeUnlinkedMorphemeForm()
+}
+
+function closeUnlinkedMorphemeForm() {
+  unlinkedMorphemeEntryId.value = null
+  unlinkedMorphemeCandidates.value = []
+}
+
+function openMorphemeSearch(entry: Entry) {
+  morphemeSearchTargetEntry.value = entry
+  morphemeSearchModalOpen.value = true
+  // 自動搜索：根據當前詞條的詞頭、方言點、粵拼、釋義
+  searchMorphemes(entry)
+}
+
+async function searchMorphemes(entry: Entry) {
+  morphemeSearchLoading.value = true
+  morphemeSearchResults.value = []
+  try {
+    const query: Record<string, string> = {}
+    if (entry.headword?.display) query.headword = entry.headword.display
+    if (entry.dialect?.name) query.dialect = entry.dialect.name
+    if (entry.phonetic?.jyutping?.length) query.jyutping = entry.phonetic.jyutping.join(' ')
+    if (entry.senses?.[0]?.definition) query.definition = entry.senses[0].definition
+    
+    const response = await $fetch<{ success: boolean; data: Array<any> }>('/api/entries/search-morphemes', { query })
+    if (response.success && Array.isArray(response.data)) {
+      morphemeSearchResults.value = response.data
+    }
+  } catch (e: any) {
+    console.error('Failed to search morphemes:', e)
+    alert(e?.data?.message || e?.message || '搜索失敗')
+  } finally {
+    morphemeSearchLoading.value = false
+  }
+}
+
+function addMorphemeRef(targetEntryId: string, morphemeEntry: { headword: string; jyutping: string }) {
+  if (!morphemeSearchTargetEntry.value) return
+  
+  const entry = morphemeSearchTargetEntry.value
+  if (!entry.morphemeRefs) {
+    ;(entry as any).morphemeRefs = []
+  }
+  
+  // 檢查是否已存在
+  if (entry.morphemeRefs && entry.morphemeRefs.some((r: any) => r.targetEntryId === targetEntryId)) {
+    alert('該詞素已引用')
+    return
+  }
+  
+  // 計算位置（根據詞頭中的字符位置）
+  const headword = entry.headword?.display || ''
+  const char = morphemeEntry.headword
+  let position: number | undefined = undefined
+  if (char && headword.includes(char)) {
+    position = headword.indexOf(char)
+  }
+  
+  if (!entry.morphemeRefs) {
+    ;(entry as any).morphemeRefs = []
+  }
+  if (entry.morphemeRefs) {
+    entry.morphemeRefs.push({
+      targetEntryId,
+      position,
+      char: morphemeEntry.headword,
+      jyutping: morphemeEntry.jyutping || undefined
+    })
+  }
+  
+  entry._isDirty = true
+  morphemeSearchModalOpen.value = false
+}
+
+function removeMorphemeRef(entry: Entry, refIdx: number) {
+  if (!entry.morphemeRefs || refIdx < 0 || refIdx >= entry.morphemeRefs.length) return
+  entry.morphemeRefs.splice(refIdx, 1)
+  entry._isDirty = true
+}
+
 function toggleThemeExpand(entry: Entry) {
   const key = String(entry.id ?? (entry as any)._tempId ?? '')
   expandedThemeEntryId.value = expandedThemeEntryId.value === key ? null : key
@@ -2917,6 +3230,7 @@ function duplicateEntry(entry: Entry) {
   const clonedTheme = entry.theme ? deepCopy(entry.theme) : {}
   const clonedMeta = entry.meta ? deepCopy(entry.meta) : {}
   const clonedRefs = entry.refs?.length ? deepCopy(entry.refs) : undefined
+  const clonedMorphemeRefs = entry.morphemeRefs?.length ? deepCopy(entry.morphemeRefs) : undefined
 
   const newEntry: any = {
     _tempId: tempId,
@@ -2932,6 +3246,8 @@ function duplicateEntry(entry: Entry) {
     meta: clonedMeta,
     // 若原詞條已經屬於某個詞語（lexeme），沿用該 lexemeId，方便跨方言聚合
     lexemeId: (entry as any).lexemeId,
+    // 詞素引用也一併複製
+    morphemeRefs: clonedMorphemeRefs,
     status: 'draft',
     _isNew: true,
     _isDirty: false
@@ -2971,6 +3287,10 @@ async function saveNewEntry(entry: Entry) {
     if (lexemeId && !String(lexemeId).startsWith('__unassigned__:')) {
       body.lexemeId = lexemeId
     }
+    // 詞素引用
+    if (entry.morphemeRefs && entry.morphemeRefs.length > 0) {
+      body.morphemeRefs = entry.morphemeRefs
+    }
     const response = await $fetch('/api/entries', {
       method: 'POST',
       body
@@ -2981,7 +3301,7 @@ async function saveNewEntry(entry: Entry) {
       const index = entries.value.findIndex(e => e.id === entry.id || (e as any)._tempId === (entry as any)._tempId)
       if (index !== -1) {
         const prev = entries.value[index] as any
-        const saved = { ...response.data, _isNew: false, _isDirty: false } as Entry
+        const saved = { ...response.data, _isNew: false, _isDirty: false } as unknown as Entry
         if (prev?._tempId) (saved as any)._tempId = prev._tempId
         entries.value[index] = saved
         // 泛粵典「已採納/忽略」是用 entryId 記的；保存後 entryId 從 _tempId 變為真實 id，需遷移否則會重複彈出
@@ -3108,6 +3428,10 @@ async function saveEntryChanges(entry: Entry) {
     const lexemeId = (entry as any).lexemeId
     if (lexemeId !== undefined && lexemeId !== null && !String(lexemeId).startsWith('__unassigned__:')) {
       putBody.lexemeId = lexemeId
+    }
+    // 詞素引用
+    if (entry.morphemeRefs !== undefined) {
+      putBody.morphemeRefs = entry.morphemeRefs || []
     }
     const response = await $fetch<{ success: boolean; data?: { status?: string } }>(`/api/entries/${entry.id}`, {
       method: 'PUT',

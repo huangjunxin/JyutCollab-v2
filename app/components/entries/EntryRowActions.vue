@@ -55,6 +55,15 @@
         title="加入其他詞語組"
         @click.stop="$emit('join-lexeme')"
       />
+      <UButton
+        v-if="canEdit"
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        icon="i-heroicons-link"
+        :title="isMorphemeRefsExpanded ? '收起詞素引用' : '展開詞素引用'"
+        @click.stop="$emit('toggle-morpheme-refs')"
+      />
     </div>
   </td>
 </template>
@@ -68,6 +77,8 @@ defineProps<{
   canEdit: boolean
   /** 是否顯示詞語層相關操作（僅在「按詞語聚合」視圖顯示） */
   showLexemeActions?: boolean
+  /** 詞素引用是否已展開 */
+  isMorphemeRefsExpanded?: boolean
 }>()
 
 defineEmits<{
@@ -77,5 +88,6 @@ defineEmits<{
   cancel: []
   'make-new-lexeme': []
   'join-lexeme': []
+  'toggle-morpheme-refs': []
 }>()
 </script>
