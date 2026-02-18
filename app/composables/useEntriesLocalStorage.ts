@@ -1,4 +1,3 @@
-import { ref, watch } from 'vue'
 import type { Entry } from '~/types'
 
 const STORAGE_KEY = 'jyutcollab-entries-draft'
@@ -7,23 +6,15 @@ const DEBOUNCE_MS = 500
 let debounceTimer: NodeJS.Timeout | null = null
 
 /**
- * 保存词条草稿到本地存储
+ * 保存詞條草稿到本地儲存
  */
 export function saveEntriesToLocalStorage(entries: Entry[]) {
-  // 只保存新建或已修改的条目
+  // 只保存新建或已修改的條目
   const draftEntries = entries.filter(
     (e) => (e as any)._isNew || e._isDirty
   )
 
-  if (draftEntries.length === 0) {
-    // 如果没有草稿，清除本地存储
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY)
-    }
-    return
-  }
-
-  // 深拷贝以避免保存 Vue reactive proxy
+  // 深拷貝以避免保存 Vue reactive proxy
   const entriesToSave = draftEntries.map((entry) => {
     const { _isNew, _isDirty, _tempId, ...entryData } = entry as any
     return {
@@ -34,7 +25,7 @@ export function saveEntriesToLocalStorage(entries: Entry[]) {
     }
   })
 
-  // 使用 debounce 避免频繁写入
+  // 使用 debounce 避免頻繁寫入
   if (debounceTimer) {
     clearTimeout(debounceTimer)
   }
@@ -42,11 +33,30 @@ export function saveEntriesToLocalStorage(entries: Entry[]) {
   debounceTimer = setTimeout(() => {
     try {
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(entriesToSave))
+        // 重要：唔好直接覆寫成「當前頁面」嘅草稿集合，否則切換分頁/排序/取消編輯時會誤刪其他詞條草稿
+        const stored = localStorage.getItem(STORAGE_KEY)
+        const parsed: any[] = stored ? JSON.parse(stored) : []
+        const byKey = new Map<string, any>()
+
+        if (Array.isArray(parsed)) {
+          parsed.forEach((e) => {
+            const k = String(e?.id ?? e?._tempId ?? '')
+            if (k) byKey.set(k, e)
+          })
+        }
+
+        entriesToSave.forEach((e) => {
+          const k = String((e as any)?.id ?? (e as any)?._tempId ?? '')
+          if (k) byKey.set(k, e)
+        })
+
+        const merged = Array.from(byKey.values())
+        if (merged.length === 0) localStorage.removeItem(STORAGE_KEY)
+        else localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
       }
     } catch (error) {
       console.error('Failed to save entries to localStorage:', error)
-      // localStorage 可能已满，尝试清理旧数据
+      // localStorage 可能已滿，嘗試清理舊資料
       try {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(STORAGE_KEY)
@@ -60,7 +70,7 @@ export function saveEntriesToLocalStorage(entries: Entry[]) {
 }
 
 /**
- * 从本地存储恢复词条草稿
+ * 從本地儲存恢復詞條草稿
  */
 export function restoreEntriesFromLocalStorage(): Entry[] {
   if (typeof window === 'undefined') return []
@@ -84,7 +94,7 @@ export function restoreEntriesFromLocalStorage(): Entry[] {
 }
 
 /**
- * 清除本地存储的词条草稿
+ * 清除本地儲存嘅詞條草稿
  */
 export function clearEntriesLocalStorage() {
   if (typeof window !== 'undefined') {
@@ -93,7 +103,7 @@ export function clearEntriesLocalStorage() {
 }
 
 /**
- * 清除特定条目的本地存储（保存成功后调用）
+ * 清除特定詞條嘅本地儲存（保存成功後調用）
  */
 export function removeEntryFromLocalStorage(entryId: string | number) {
   if (typeof window === 'undefined') return

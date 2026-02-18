@@ -523,7 +523,7 @@ definePageMeta({
 
 const { isAuthenticated, user } = useAuth()
 
-// 主题选项列表（用于搜索下拉）
+// 主題選項列表（用於搜尋下拉）
 const themeOptions = getFlatThemeList().map(t => ({
   value: t.id,
   label: `${t.level3Name} (${t.level1Name} > ${t.level2Name})`
@@ -559,6 +559,8 @@ const themeFilterOptions = [
 const entries = ref<Entry[]>([])
 /** 聚合視圖：按詞形分組的列表（每項含 headwordDisplay, headwordNormalized, entries） */
 const aggregatedGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
+/** 詞條 baseline（用於「取消編輯」回滾，避免刷新整個頁面誤傷其他未保存內容）。key: entry.id */
+const entryBaselineById = ref<Map<string, any>>(new Map())
 /** 視圖模式：平鋪（一列一條）或聚合（一列一詞形，可展開多方言） */
 const viewMode = ref<'flat' | 'aggregated'>('flat')
 /** 聚合視圖下已展開的詞形（headwordNormalized），用 Set 便於切換 */
@@ -579,7 +581,7 @@ const inputRefs = ref<Map<string, HTMLInputElement | HTMLSelectElement | HTMLTex
 const aiSuggestion = ref<string | null>(null)
 /** 當前建議對應的列（如 definition / theme），僅在該列編輯時顯示建議 */
 const aiSuggestionForField = ref<string | null>(null)
-/** 用户未採納/忽略就離開單元格時暫存建議，再點回該列時恢復顯示。key: `${entryId}-${field}` */
+/** 用戶未採納/忽略就離開單元格時暫存建議，再點回該列時恢復顯示。key: `${entryId}-${field}` */
 const pendingAISuggestions = ref<Map<string, { entryId: string, field: string, text: string }>>(new Map())
 const aiDebounceTimer = ref<NodeJS.Timeout | null>(null)
 
@@ -1542,7 +1544,7 @@ const statusOptionsForTable = computed(() => {
   ]
 })
 
-// 用户可用的方言選項（用於表格編輯下拉）
+// 用戶可用嘅方言選項（用於表格編輯下拉）
 const userDialectOptions = computed(() => {
   const currentUser = user.value
   if (!currentUser) return []
@@ -1559,7 +1561,7 @@ const userDialectOptions = computed(() => {
   }))
 })
 
-// 獲取用户的默認方言（新建詞條時使用）
+// 獲取用戶嘅預設方言（新建詞條時使用）
 function getUserDefaultDialect(): string {
   const currentUser = user.value
 
@@ -2098,7 +2100,7 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   if (rowIndex >= 0 && colIndex >= 0) {
     focusedCell.value = { rowIndex, colIndex }
   }
-  // 未採納/忽略的建議暫存（按「建議目標列」存），等用户點回該列時再顯示
+  // 未採納/忽略嘅建議暫存（按「建議目標列」存），等用戶點返該列時再顯示
   if (aiSuggestion.value && aiSuggestionForField.value) {
     const key = `${String(entryId)}-${aiSuggestionForField.value}`
     pendingAISuggestions.value.set(key, { entryId: String(entryId), field: aiSuggestionForField.value, text: aiSuggestion.value })
@@ -2127,7 +2129,7 @@ function cancelCellEdit() {
     if (rowIndex >= 0 && colIndex >= 0) {
       focusedCell.value = { rowIndex, colIndex }
     }
-    // 未採納/忽略的建議暫存（按「建議目標列」存），等用户點回該列時再顯示
+    // 未採納/忽略嘅建議暫存（按「建議目標列」存），等用戶點返該列時再顯示
     if (aiSuggestion.value && aiSuggestionForField.value) {
       const key = `${String(entryId)}-${aiSuggestionForField.value}`
       pendingAISuggestions.value.set(key, { entryId: String(entryId), field: aiSuggestionForField.value, text: aiSuggestion.value })
@@ -2302,7 +2304,7 @@ async function triggerAISuggestion(entry: Entry, field: string, value: string) {
     aiSuggestAbortController.value = null
   }
 
-  // 只在用户輸入粵拼時觸發生成釋義建議（詞頭已填好後再問 AI）
+  // 只喺用戶輸入粵拼時觸發生成釋義建議（詞頭已填好後再問 AI）
   const headword = entry.headword?.display?.trim() || ''
   if (field === 'phonetic' && headword.length >= 1) {
     const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
@@ -2609,6 +2611,89 @@ function deepCopy<T>(x: T): T {
   return JSON.parse(JSON.stringify(x))
 }
 
+type EntryBaselineSnapshot = {
+  headword?: any
+  text?: any
+  dialect?: any
+  phonetic?: any
+  phoneticNotation?: any
+  entryType?: any
+  senses?: any
+  refs?: any
+  theme?: any
+  meta?: any
+  status?: any
+  reviewNotes?: any
+}
+
+function getEntryIdKey(entry: Entry): string {
+  return String((entry as any)?.id ?? '')
+}
+
+function makeBaselineSnapshot(entry: Entry): EntryBaselineSnapshot {
+  return deepCopy({
+    headword: (entry as any).headword,
+    text: (entry as any).text,
+    dialect: (entry as any).dialect,
+    phonetic: (entry as any).phonetic,
+    phoneticNotation: (entry as any).phoneticNotation,
+    entryType: (entry as any).entryType,
+    senses: (entry as any).senses,
+    refs: (entry as any).refs,
+    theme: (entry as any).theme,
+    meta: (entry as any).meta,
+    status: (entry as any).status,
+    reviewNotes: (entry as any).reviewNotes
+  })
+}
+
+function setBaselineForEntry(entry: Entry) {
+  const id = getEntryIdKey(entry)
+  if (!id) return
+  entryBaselineById.value.set(id, makeBaselineSnapshot(entry))
+  entryBaselineById.value = new Map(entryBaselineById.value)
+}
+
+function restoreEntryFromBaseline(entry: Entry): boolean {
+  const id = getEntryIdKey(entry)
+  if (!id) return false
+  const snap = entryBaselineById.value.get(id) as EntryBaselineSnapshot | undefined
+  if (!snap) return false
+
+  ;(entry as any).headword = snap.headword ? deepCopy(snap.headword) : undefined
+  ;(entry as any).text = snap.text
+  ;(entry as any).dialect = snap.dialect ? deepCopy(snap.dialect) : undefined
+  ;(entry as any).phonetic = snap.phonetic ? deepCopy(snap.phonetic) : undefined
+  ;(entry as any).phoneticNotation = snap.phoneticNotation
+  ;(entry as any).entryType = snap.entryType
+  ;(entry as any).senses = snap.senses ? deepCopy(snap.senses) : undefined
+  ;(entry as any).refs = snap.refs ? deepCopy(snap.refs) : undefined
+  ;(entry as any).theme = snap.theme ? deepCopy(snap.theme) : undefined
+  ;(entry as any).meta = snap.meta ? deepCopy(snap.meta) : undefined
+  ;(entry as any).status = snap.status
+  ;(entry as any).reviewNotes = snap.reviewNotes
+  entry._isDirty = false
+  return true
+}
+
+function applyDraftOntoEntry(target: Entry, draft: Entry) {
+  ;(target as any).headword = (draft as any).headword ? deepCopy((draft as any).headword) : undefined
+  ;(target as any).text = (draft as any).text
+  ;(target as any).dialect = (draft as any).dialect ? deepCopy((draft as any).dialect) : undefined
+  ;(target as any).phonetic = (draft as any).phonetic ? deepCopy((draft as any).phonetic) : undefined
+  ;(target as any).phoneticNotation = (draft as any).phoneticNotation
+  ;(target as any).entryType = (draft as any).entryType
+  ;(target as any).senses = (draft as any).senses ? deepCopy((draft as any).senses) : undefined
+  ;(target as any).refs = (draft as any).refs ? deepCopy((draft as any).refs) : undefined
+  ;(target as any).theme = (draft as any).theme ? deepCopy((draft as any).theme) : undefined
+  ;(target as any).meta = (draft as any).meta ? deepCopy((draft as any).meta) : undefined
+  ;(target as any).status = (draft as any).status
+  ;(target as any).reviewNotes = (draft as any).reviewNotes
+  ;(target as any)._isNew = (draft as any)._isNew ?? false
+  ;(target as any)._isDirty = (draft as any)._isDirty ?? false
+  if ((draft as any)._tempId) (target as any)._tempId = (draft as any)._tempId
+}
+
 /** 複製詞條：複製所有內容，方言改為當前用戶的母語/默認方言，插入為新行（草稿） */
 function duplicateEntry(entry: Entry) {
   const defaultDialect = getUserDefaultDialect()
@@ -2715,8 +2800,10 @@ async function saveNewEntry(entry: Entry) {
           })
           jyutjyuRefHandled.value = nextHandled
         }
-        // 从本地存储中移除已保存的条目
+        // 從本地儲存中移除已保存嘅詞條
         removeEntryFromLocalStorage(prev?._tempId || entry.id || '')
+        // 更新 baseline（之後「取消編輯」應回滾到最新已保存狀態）
+        setBaselineForEntry(saved)
       }
       pagination.total++
       // 聚合視圖下保存新條目後重新拉取，使新條目歸入對應詞形組
@@ -2761,6 +2848,8 @@ async function saveAllChanges() {
 
     dirtyEntries.forEach(entry => {
       entry._isDirty = false
+      removeEntryFromLocalStorage(entry.id || '')
+      setBaselineForEntry(entry)
     })
   } catch (error: any) {
     console.error('Failed to save changes:', error)
@@ -2805,8 +2894,10 @@ async function saveEntryChanges(entry: Entry) {
     if (response.success) {
       entry._isDirty = false
       if (response.data?.status) entry.status = response.data.status as Entry['status']
-      // 从本地存储中移除已保存的条目
+      // 從本地儲存中移除已保存嘅詞條
       removeEntryFromLocalStorage(entry.id || '')
+      // 更新 baseline（之後「取消編輯」應回滾到最新已保存狀態）
+      setBaselineForEntry(entry)
     }
   } catch (error: any) {
     console.error('Failed to save entry changes:', error)
@@ -2816,19 +2907,38 @@ async function saveEntryChanges(entry: Entry) {
   }
 }
 
-function cancelEdit(entry: Entry) {
+async function cancelEdit(entry: Entry) {
+  // 若正在編輯同一條詞條，先退出單元格編輯，避免把 editValue 寫返去
+  if (editingCell.value && String(editingCell.value.entryId) === String(entry.id ?? (entry as any)._tempId ?? '')) {
+    cancelCellEdit()
+  }
+
   if (entry._isNew) {
     // Remove new entry
     const index = entries.value.findIndex(e => e.id === entry.id || e._tempId === entry.id)
     if (index !== -1) {
       entries.value.splice(index, 1)
-      // 从本地存储中移除取消的条目
+      // 從本地儲存中移除已取消嘅詞條
       removeEntryFromLocalStorage((entry as any)._tempId || entry.id || '')
     }
   } else {
-    // Reset dirty flag and reload data
-    entry._isDirty = false
-    fetchEntries()
+    // 只回滾當前詞條（唔刷新整表，避免其他未保存詞條被沖走/本地草稿被覆寫）
+    const restored = restoreEntryFromBaseline(entry)
+    if (!restored) {
+      try {
+        const resp = await $fetch<{ success: boolean; data?: any }>(`/api/entries/${entry.id}`)
+        if (resp?.success && resp.data) {
+          applyDraftOntoEntry(entry, { ...resp.data, _isNew: false, _isDirty: false } as any)
+        }
+        entry._isDirty = false
+        setBaselineForEntry(entry)
+      } catch (e) {
+        console.error('Failed to restore entry from server:', e)
+        // 兜底：至少清除 dirty，避免一直顯示「有修改」
+        entry._isDirty = false
+      }
+    }
+    removeEntryFromLocalStorage(entry.id || '')
   }
 }
 
@@ -2845,7 +2955,7 @@ async function deleteEntry(entry: Entry) {
     if (index !== -1) {
       entries.value.splice(index, 1)
       pagination.total--
-      // 从本地存储中移除已删除的条目
+      // 從本地儲存中移除已刪除嘅詞條
       removeEntryFromLocalStorage(entry.id || '')
     }
   } catch (error: any) {
@@ -2875,46 +2985,63 @@ async function fetchEntries() {
     const response = await $fetch<{ data: any[]; total: number; page: number; perPage: number; totalPages: number; grouped?: boolean }>('/api/entries', { query })
 
     if (response.grouped && Array.isArray(response.data)) {
-      aggregatedGroups.value = response.data.map((g: any) => ({
+      const nextGroups = response.data.map((g: any) => ({
         headwordDisplay: g.headwordDisplay ?? g.headwordNormalized ?? '',
         headwordNormalized: g.headwordNormalized ?? g.headwordDisplay ?? '',
         entries: (g.entries ?? []).map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
       }))
+      // baseline：以伺服器返回狀態為準（取消編輯用）
+      const nextBaseline = new Map<string, any>()
+      nextGroups.forEach((g: any) => g.entries.forEach((e: any) => nextBaseline.set(String(e.id ?? ''), makeBaselineSnapshot(e))))
+      entryBaselineById.value = nextBaseline
+
+      aggregatedGroups.value = nextGroups
       entries.value = []
     } else {
-      entries.value = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
+      const nextEntries = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
+      const nextBaseline = new Map<string, any>()
+      nextEntries.forEach((e: any) => nextBaseline.set(String(e.id ?? ''), makeBaselineSnapshot(e)))
+      entryBaselineById.value = nextBaseline
+
+      entries.value = nextEntries
       aggregatedGroups.value = []
     }
     
-    // 恢复本地存储的草稿（仅在首次加载或第一页且无搜索/过滤条件时）
-    if (currentPage.value === 1 && !searchQuery.value && filters.region === ALL_FILTER_VALUE && filters.status === ALL_FILTER_VALUE && filters.theme === ALL_FILTER_VALUE) {
-      const restoredEntries = restoreEntriesFromLocalStorage()
-      if (restoredEntries.length > 0) {
-        if (viewMode.value === 'aggregated') {
-          // 聚合视图：将恢复的草稿添加到 entries（会在 displayGroups 中显示）
-          restoredEntries.forEach((restoredEntry) => {
-            const exists = aggregatedGroups.value.some(g => 
-              g.entries.some(e => 
-                (e as any)._tempId === (restoredEntry as any)._tempId || 
-                (e.id && restoredEntry.id && String(e.id) === String(restoredEntry.id))
-              )
-            )
-            if (!exists) {
-              entries.value.unshift(restoredEntry)
+    // 恢復本地儲存嘅草稿：
+    // - 任何頁面/篩選都會嘗試「覆蓋到當前已載入嘅詞條」（避免 fetch 後草稿消失）
+    // - 只喺「第一頁 + 無搜尋/篩選」先會把「搵唔到對應詞條」嘅草稿插入列表頂部（避免干擾篩選結果）
+    const restoredEntries = restoreEntriesFromLocalStorage()
+    const canInsertOrphans =
+      currentPage.value === 1 &&
+      !searchQuery.value &&
+      filters.region === ALL_FILTER_VALUE &&
+      filters.status === ALL_FILTER_VALUE &&
+      filters.theme === ALL_FILTER_VALUE
+
+    if (restoredEntries.length > 0) {
+      if (viewMode.value === 'aggregated') {
+        restoredEntries.forEach((restoredEntry) => {
+          const restoredId = String((restoredEntry as any).id ?? '')
+          let applied = false
+          if (restoredId) {
+            for (const g of aggregatedGroups.value) {
+              const hit = g.entries.find(e => String((e as any).id ?? '') === restoredId)
+              if (hit) {
+                applyDraftOntoEntry(hit, restoredEntry)
+                applied = true
+                break
+              }
             }
-          })
-        } else {
-          // 平铺视图：将恢复的草稿添加到列表顶部
-          restoredEntries.forEach((restoredEntry) => {
-            const exists = entries.value.some(
-              (e) => (e as any)._tempId === (restoredEntry as any)._tempId || 
-                     (e.id && restoredEntry.id && String(e.id) === String(restoredEntry.id))
-            )
-            if (!exists) {
-              entries.value.unshift(restoredEntry)
-            }
-          })
-        }
+          }
+          if (!applied && canInsertOrphans) entries.value.unshift(restoredEntry)
+        })
+      } else {
+        restoredEntries.forEach((restoredEntry) => {
+          const restoredId = String((restoredEntry as any).id ?? '')
+          const hit = restoredId ? entries.value.find(e => String((e as any).id ?? '') === restoredId) : null
+          if (hit) applyDraftOntoEntry(hit, restoredEntry)
+          else if (canInsertOrphans) entries.value.unshift(restoredEntry)
+        })
       }
     }
     
@@ -2956,21 +3083,21 @@ watch([() => filters.region, () => filters.status, () => filters.theme], () => {
   fetchEntries()
 })
 
-// 监听 entries 和 aggregatedGroups 变化，实时保存到本地存储
+// 監聽 entries 同 aggregatedGroups 變化，即時保存到本地儲存
 watch(
   [() => entries.value, () => aggregatedGroups.value],
   () => {
-    // 收集所有需要保存的条目（新建或已修改的）
+    // 收集所有需要保存嘅詞條（新建或已修改）
     const allEntries: Entry[] = []
     
-    // 从 entries 中收集
+    // 從 entries 中收集
     entries.value.forEach(e => {
       if ((e as any)._isNew || e._isDirty) {
         allEntries.push(e)
       }
     })
     
-    // 从 aggregatedGroups 中收集
+    // 從 aggregatedGroups 中收集
     aggregatedGroups.value.forEach(g => {
       g.entries.forEach(e => {
         if ((e as any)._isNew || e._isDirty) {
