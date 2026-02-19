@@ -228,7 +228,7 @@
                   />
                 </div>
               </th>
-              <th class="min-w-[6rem] w-24 px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <th class="min-w-[8rem] w-32 px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
                 操作
               </th>
             </tr>
@@ -277,8 +277,8 @@
               <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
                 {{ getGroupStatus(row.group) }}
               </td>
-              <td class="min-w-[6rem] w-24 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
-                <div class="flex items-center justify-center gap-1">
+              <td class="min-w-[8rem] w-32 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
+                <div class="flex items-center justify-center gap-1 flex-nowrap">
                   <UButton
                     v-if="viewMode === 'lexeme'"
                     icon="i-heroicons-globe-asia-australia"
@@ -291,7 +291,7 @@
                   />
                   <UButton
                     v-if="viewMode === 'lexeme' && canEditExternalEtymons && !String(row.group.headwordNormalized || '').startsWith('__unassigned__:')"
-                    icon="i-heroicons-arrow-path"
+                    icon="i-heroicons-folder-plus"
                     color="neutral"
                     variant="ghost"
                     size="xs"
