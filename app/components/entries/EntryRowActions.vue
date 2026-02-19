@@ -1,6 +1,6 @@
 <template>
-  <td class="min-w-[6rem] w-24 px-2 py-1.5 text-center align-middle overflow-visible">
-    <div class="flex flex-wrap items-center justify-center gap-1">
+  <td class="min-w-[8rem] w-32 px-2 py-1.5 text-center align-middle overflow-visible">
+    <div class="flex flex-nowrap items-center justify-center gap-1">
       <UButton
         v-if="canEdit && (entry._isNew || entry._isDirty)"
         color="success"
@@ -42,7 +42,7 @@
         color="neutral"
         variant="ghost"
         size="xs"
-        icon="i-heroicons-link-slash"
+        icon="i-heroicons-arrow-right-on-rectangle"
         title="將此詞條拆出成新詞語"
         @click.stop="$emit('make-new-lexeme')"
       />
@@ -51,7 +51,7 @@
         color="neutral"
         variant="ghost"
         size="xs"
-        icon="i-heroicons-arrow-path"
+        icon="i-heroicons-folder-plus"
         title="加入其他詞語組"
         @click.stop="$emit('join-lexeme')"
       />
