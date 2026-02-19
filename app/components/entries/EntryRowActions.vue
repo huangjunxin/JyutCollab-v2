@@ -1,6 +1,7 @@
 <template>
   <td class="min-w-[8rem] w-32 px-2 py-1.5 text-center align-middle overflow-visible">
     <div class="flex flex-nowrap items-center justify-center gap-1">
+      <!-- 編輯狀態：保存 / 取消（成對相鄰） -->
       <UButton
         v-if="canEdit && (entry._isNew || entry._isDirty)"
         color="success"
@@ -8,8 +9,20 @@
         size="xs"
         icon="i-heroicons-check"
         :title="entry._isNew ? '保存新詞條' : '保存更改'"
+        :ui="{ base: 'hover:bg-success-500/10 dark:hover:bg-success-500/20' }"
         @click.stop="$emit('save')"
       />
+      <UButton
+        v-if="canEdit && (entry._isNew || entry._isDirty)"
+        color="primary"
+        variant="ghost"
+        size="xs"
+        icon="i-heroicons-x-mark"
+        title="取消"
+        :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
+        @click.stop="$emit('cancel')"
+      />
+      <!-- 詞條操作：複製、刪除 -->
       <UButton
         v-if="!entry._isNew"
         color="primary"
@@ -17,6 +30,7 @@
         size="xs"
         icon="i-heroicons-document-duplicate"
         title="複製詞條（方言改為我的母語）"
+        :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
         @click.stop="$emit('duplicate')"
       />
       <UButton
@@ -26,42 +40,38 @@
         size="xs"
         icon="i-heroicons-trash"
         title="刪除"
+        :ui="{ base: 'hover:bg-error-500/10 dark:hover:bg-error-500/20' }"
         @click.stop="$emit('delete')"
       />
-      <UButton
-        v-if="canEdit && (entry._isNew || entry._isDirty)"
-        color="neutral"
-        variant="ghost"
-        size="xs"
-        icon="i-heroicons-x-mark"
-        title="取消"
-        @click.stop="$emit('cancel')"
-      />
+      <!-- 詞語組相關：拆出、加入組、展開詞素引用 -->
       <UButton
         v-if="canEdit && showLexemeActions && !entry._isNew"
-        color="neutral"
+        color="primary"
         variant="ghost"
         size="xs"
         icon="i-heroicons-arrow-right-on-rectangle"
         title="將此詞條拆出成新詞語"
+        :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
         @click.stop="$emit('make-new-lexeme')"
       />
       <UButton
         v-if="canEdit && showLexemeActions && !entry._isNew"
-        color="neutral"
+        color="primary"
         variant="ghost"
         size="xs"
         icon="i-heroicons-folder-plus"
         title="加入其他詞語組"
+        :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
         @click.stop="$emit('join-lexeme')"
       />
       <UButton
         v-if="canEdit"
-        color="neutral"
+        color="primary"
         variant="ghost"
         size="xs"
-        icon="i-heroicons-link"
+        icon="i-lucide-quote"
         :title="isMorphemeRefsExpanded ? '收起詞素引用' : '展開詞素引用'"
+        :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
         @click.stop="$emit('toggle-morpheme-refs')"
       />
     </div>
