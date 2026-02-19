@@ -777,12 +777,18 @@ async function openExternalEtymonsForGroup(groupKey: string, groupLabel: string,
       alert('無法為空組創建詞語')
       return
     }
+    // 域外方音需先有已保存的詞條（有真實 id）才能調 PATCH；未保存詞條無法綁定 lexeme
+    const savedEntries = groupEntries.filter(e => !(e as any)._isNew)
+    if (savedEntries.length === 0) {
+      alert('此組僅含未保存詞條，請先保存詞條後再操作域外方音。')
+      return
+    }
     if (!confirm(`此組尚未綁定詞語。是否為 ${groupEntries.length} 條詞條創建新詞語組？`)) {
       return
     }
     try {
-      // 為該組的第一個 entry 創建新的 lexemeId（已確保 groupEntries.length > 0）
-      const firstEntry = groupEntries[0]!
+      // 用第一個「已保存」的詞條創建 lexemeId（未保存的沒有資料庫 id，無法 PATCH）
+      const firstEntry = savedEntries[0]!
       const entryId = String(firstEntry.id ?? (firstEntry as any)._tempId ?? '')
       if (!entryId) {
         alert('無法獲取詞條 ID')
@@ -798,19 +804,22 @@ async function openExternalEtymonsForGroup(groupKey: string, groupLabel: string,
         return
       }
       
-      // 將該組的其他 entry 也加入同一個 lexemeId
-      if (groupEntries.length > 1) {
+      // 將該組其他「已保存」的 entry 也加入同一個 lexemeId；未保存的僅在本地寫入 lexemeId，保存時會帶上
+      const othersSaved = savedEntries.slice(1)
+      if (othersSaved.length > 0) {
         await Promise.all(
-          groupEntries.slice(1).map((entry) => {
-            const id = String(entry.id ?? (entry as any)._tempId ?? '')
-            if (!id) return Promise.resolve()
-            return $fetch(`/api/entries/${id}/lexeme`, {
+          othersSaved.map((entry) =>
+            $fetch(`/api/entries/${entry.id}/lexeme`, {
               method: 'PATCH',
               body: { action: 'set', lexemeId: newLexemeId }
             })
-          })
+          )
         )
       }
+      // 未保存的詞條：本地寫入 lexemeId，保存新詞條時 POST body 會帶上
+      groupEntries.filter(e => (e as any)._isNew).forEach((e) => {
+        ;(e as any).lexemeId = newLexemeId
+      })
       
       // 重新拉取列表以更新 lexemeId
       await fetchEntries()
@@ -3149,6 +3158,8 @@ type EntryBaselineSnapshot = {
   meta?: any
   status?: any
   reviewNotes?: any
+  lexemeId?: string
+  morphemeRefs?: any[]
 }
 
 function getEntryIdKey(entry: Entry): string {
@@ -3168,7 +3179,9 @@ function makeBaselineSnapshot(entry: Entry): EntryBaselineSnapshot {
     theme: (entry as any).theme,
     meta: (entry as any).meta,
     status: (entry as any).status,
-    reviewNotes: (entry as any).reviewNotes
+    reviewNotes: (entry as any).reviewNotes,
+    lexemeId: (entry as any).lexemeId,
+    morphemeRefs: (entry as any).morphemeRefs
   })
 }
 
@@ -3197,6 +3210,8 @@ function restoreEntryFromBaseline(entry: Entry): boolean {
   ;(entry as any).meta = snap.meta ? deepCopy(snap.meta) : undefined
   ;(entry as any).status = snap.status
   ;(entry as any).reviewNotes = snap.reviewNotes
+  ;(entry as any).lexemeId = snap.lexemeId
+  ;(entry as any).morphemeRefs = snap.morphemeRefs ? deepCopy(snap.morphemeRefs) : undefined
   entry._isDirty = false
   return true
 }
@@ -3214,6 +3229,8 @@ function applyDraftOntoEntry(target: Entry, draft: Entry) {
   ;(target as any).meta = (draft as any).meta ? deepCopy((draft as any).meta) : undefined
   ;(target as any).status = (draft as any).status
   ;(target as any).reviewNotes = (draft as any).reviewNotes
+  if ((draft as any).lexemeId !== undefined) (target as any).lexemeId = (draft as any).lexemeId
+  if ((draft as any).morphemeRefs !== undefined) (target as any).morphemeRefs = (draft as any).morphemeRefs ? deepCopy((draft as any).morphemeRefs) : undefined
   ;(target as any)._isNew = (draft as any)._isNew ?? false
   ;(target as any)._isDirty = (draft as any)._isDirty ?? false
   if ((draft as any)._tempId) (target as any)._tempId = (draft as any)._tempId
@@ -3370,21 +3387,29 @@ async function saveAllChanges() {
     dirtyEntries.forEach(entry => {
       entry.status = getStatusForSave(entry)
     })
-    await Promise.all(dirtyEntries.map(entry =>
-      $fetch<unknown>(`/api/entries/${entry.id}`, {
+    await Promise.all(dirtyEntries.map(entry => {
+      const putBody: Record<string, unknown> = {
+        headword: entry.headword,
+        dialect: entry.dialect,
+        phonetic: entry.phonetic,
+        entryType: entry.entryType,
+        senses: entry.senses,
+        theme: entry.theme,
+        meta: entry.meta,
+        status: entry.status
+      }
+      const lexemeId = (entry as any).lexemeId
+      if (lexemeId !== undefined && lexemeId !== null && !String(lexemeId).startsWith('__unassigned__:')) {
+        putBody.lexemeId = lexemeId
+      }
+      if (entry.morphemeRefs !== undefined) {
+        putBody.morphemeRefs = entry.morphemeRefs || []
+      }
+      return $fetch<unknown>(`/api/entries/${entry.id}`, {
         method: 'PUT',
-        body: {
-          headword: entry.headword,
-          dialect: entry.dialect,
-          phonetic: entry.phonetic,
-          entryType: entry.entryType,
-          senses: entry.senses,
-          theme: entry.theme,
-          meta: entry.meta,
-          status: entry.status
-        }
+        body: putBody
       })
-    ))
+    }))
 
     dirtyEntries.forEach(entry => {
       entry._isDirty = false
