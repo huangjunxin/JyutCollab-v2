@@ -287,23 +287,26 @@
                     size="xs"
                     :disabled="!canEditExternalEtymons"
                     :title="!canEditExternalEtymons ? '只有審核員及以上可編輯' : (String(row.group.headwordNormalized || '').startsWith('__unassigned__:') ? '編輯域外方音（將自動創建詞語組）' : '編輯域外方音')"
+                    :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
                     @click="openExternalEtymonsForGroup(String(row.group.headwordNormalized || ''), String(row.group.headwordDisplay || ''), row.group.entries)"
                   />
                   <UButton
                     v-if="viewMode === 'lexeme' && canEditExternalEtymons && !String(row.group.headwordNormalized || '').startsWith('__unassigned__:')"
                     icon="i-heroicons-folder-plus"
-                    color="neutral"
+                    color="primary"
                     variant="ghost"
                     size="xs"
                     title="合併到其他詞語組"
+                    :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
                     @click="openMergeModalForGroup(String(row.group.headwordNormalized || ''), String(row.group.headwordDisplay || ''), row.group.entries.map(e => String(e.id || (e as any)._tempId || '')).filter(Boolean))"
                   />
                   <UButton
                     :icon="expandedGroupKeys.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
-                    color="neutral"
+                    color="primary"
                     variant="ghost"
                     size="xs"
                     :aria-label="expandedGroupKeys.has(row.group.headwordNormalized) ? '收合' : '展開'"
+                    :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
                     @click="toggleGroupExpanded(row.group.headwordNormalized)"
                   />
                 </div>
