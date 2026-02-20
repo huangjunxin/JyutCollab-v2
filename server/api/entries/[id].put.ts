@@ -91,9 +91,10 @@ export default defineEventHandler(async (event) => {
     }
 
     // 先用自定義 id 查找，若未找到且 id 形如 MongoDB ObjectId 則用 _id 查找（與列表返回 id 方式一致）
-    let existingEntry = await Entry.findOne({ id })
+    let existingEntry = await Entry.findOne({ id } as any)
     if (!existingEntry && /^[a-f\d]{24}$/i.test(id)) {
-      existingEntry = await Entry.findById(id)
+      // Mongoose model overloads 導致型別不可呼叫，用 assertion
+      existingEntry = await (Entry as any).findById(id)
     }
     if (!existingEntry) {
       throw createError({
@@ -180,7 +181,7 @@ export default defineEventHandler(async (event) => {
     // Update senses (only apply if all senses have a non-empty definition)
     if (data.senses) {
       const validSenses = data.senses.filter(
-        (s): s is { definition: string; label?: string; examples?: any[]; subSenses?: any[] } =>
+        (s): s is { definition: string; label?: string; examples?: any[]; subSenses?: any[]; images?: string[] } =>
           typeof s.definition === 'string' && s.definition.trim().length > 0
       )
       if (validSenses.length > 0) {
@@ -277,6 +278,61 @@ export default defineEventHandler(async (event) => {
         changedFields,
         action: 'update'
       })
+    }
+
+    // 詞素詞頭同步：當本詞條的 headword.display 變更時，同步更新所有引用本詞條的多音節詞的對應選字與詞頭
+    if (changedFields.includes('headword')) {
+      const oldDisplay = beforeSnapshot.headword?.display ?? ''
+      const newDisplay = convertToHongKongTraditional((existingEntry.headword?.display ?? '').trim())
+      if (oldDisplay !== newDisplay && newDisplay !== '') {
+        // Mongoose 點號路徑查詢，型別不推斷故用 assertion
+        const affected = await Entry.find({ 'morphemeRefs.targetEntryId': id } as any).sort({ id: 1 }).exec()
+        for (const E of affected) {
+          const refs = E.morphemeRefs || []
+          const matchingRefs = refs
+            .map((r: { targetEntryId?: string; position?: number; char?: string }, i: number) => ({ ref: r, i }))
+            .filter(({ ref }: { ref: { targetEntryId?: string } }) => ref.targetEntryId === id)
+          if (matchingRefs.length === 0) continue
+
+          let display = (E.headword?.display ?? '') || ''
+          const normalizedWasDisplay = (E.headword?.normalized ?? '') === display
+
+          // 按 position 升序處理，避免位置錯位
+          const sorted = [...matchingRefs].sort(
+            (a, b) => (a.ref.position ?? 0) - (b.ref.position ?? 0)
+          )
+          for (const { ref } of sorted) {
+            const position = ref.position
+            const oldLen = (ref.char ? String(ref.char).length : 0) || 1
+            ref.char = newDisplay
+            if (position != null && position >= 0) {
+              // 邊界檢查：避免 position + oldLen 超出 display 長度導致錯位
+              const end = position + oldLen
+              if (end > display.length) continue
+              // 等長替換：避免多音節詞頭長度變化導致後續 position 錯位
+              const newChar = newDisplay.length === oldLen
+                ? newDisplay
+                : (oldLen >= 1 ? newDisplay.slice(0, oldLen) : '')
+              display = display.slice(0, position) + newChar + display.slice(end)
+            }
+          }
+
+          if (!E.headword) {
+            E.headword = { display: '', normalized: '', isPlaceholder: false, variants: [] }
+          }
+          E.headword.display = display
+          if (normalizedWasDisplay) {
+            E.headword.normalized = display
+          }
+          E.headword.isPlaceholder = display.includes('□')
+          E.morphemeRefs = refs
+          try {
+            await E.save()
+          } catch (err: any) {
+            console.error('Morpheme headword sync: failed to update entry', E.id, err?.message)
+          }
+        }
+      }
     }
 
     return {
