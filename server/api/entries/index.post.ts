@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
+import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
@@ -49,7 +50,7 @@ const CreateEntrySchema = z.object({
   }).optional(),
   // 兼容舊格式
   text: z.string().min(1).max(200).optional(),
-  region: z.enum(['guangzhou', 'hongkong', 'taishan', 'overseas']).optional(),
+  region: z.enum(DIALECT_IDS as unknown as [string, ...string[]]).optional(),
   themeIdL1: z.number().int().optional(),
   themeIdL2: z.number().int().optional(),
   themeIdL3: z.number().int().optional(),

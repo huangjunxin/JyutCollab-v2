@@ -1,8 +1,8 @@
 // Re-export from auth types
 export * from './auth'
 
-// Entry types - 根據 PRD 要求設計
-export type Region = 'guangzhou' | 'hongkong' | 'taishan' | 'overseas'
+// Entry types - 根據 PRD 要求設計；方言與 shared/dialects 統一
+export type { DialectId as Region } from '~shared/dialects'
 export type EntryStatus = 'draft' | 'pending_review' | 'approved' | 'rejected'
 export type EntryType = 'character' | 'word' | 'phrase'
 export type Register = '口語' | '書面' | '粗俗' | '文雅' | '中性'

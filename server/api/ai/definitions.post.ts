@@ -1,9 +1,10 @@
 import { z } from 'zod'
+import { DIALECT_IDS, getDialectLabel } from '../../../shared/dialects'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
 const RequestSchema = z.object({
   expression: z.string().trim().min(1, '請輸入表達').max(200, '表達過長'),
-  region: z.enum(['guangzhou', 'hongkong', 'taishan', 'overseas']).default('hongkong'),
+  region: z.enum(DIALECT_IDS as unknown as [string, ...string[]]).default('hongkong'),
   context: z.string().trim().max(500).optional(),
   referenceExpressions: z.array(z.object({
     text: z.string(),
@@ -12,13 +13,6 @@ const RequestSchema = z.object({
     region: z.string()
   })).optional()
 })
-
-const regionMap: Record<string, string> = {
-  guangzhou: '廣州',
-  hongkong: '香港',
-  taishan: '台山',
-  overseas: '海外'
-}
 
 export default defineEventHandler(async (event) => {
   try {
@@ -44,7 +38,7 @@ export default defineEventHandler(async (event) => {
 
     const result = await generateDefinitions(
       validated.data.expression,
-      regionMap[validated.data.region],
+      getDialectLabel(validated.data.region),
       validated.data.context,
       validated.data.referenceExpressions
     )
