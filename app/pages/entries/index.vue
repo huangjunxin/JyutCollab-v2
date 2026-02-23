@@ -17,12 +17,12 @@
           </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <!-- 審核員/管理員：新建詞條時預設方言，連續新增時無需每次手動改 -->
-          <div v-if="isAuthenticated && isReviewerOrAdmin" class="flex items-center gap-2">
+          <!-- 新建詞條時預設方言：審核員/管理員可選全部；貢獻者有多個方言權限時可選其一 -->
+          <div v-if="isAuthenticated && showNewEntryDialectSelector" class="flex items-center gap-2">
             <span class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">新建時方言</span>
             <USelectMenu
-              v-model="reviewerDefaultDialectForNew"
-              :items="newEntryDialectOptions"
+              v-model="defaultDialectForNew"
+              :items="newEntryDialectOptionsForSelector"
               value-key="value"
               size="sm"
               class="w-24"
@@ -732,7 +732,7 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '~/composables/useAuth'
+import { useAuth, useProfileUpdatedUser } from '~/composables/useAuth'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, DIALECT_CODE_TO_NAME, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
 import type { DialectId } from '~shared/dialects'
@@ -758,6 +758,7 @@ definePageMeta({
 })
 
 const { isAuthenticated, user } = useAuth()
+const profileUpdatedUser = useProfileUpdatedUser()
 
 const canEditExternalEtymons = computed(() => {
   const r = user.value?.role
@@ -1910,14 +1911,23 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: '已拒絕'
 }
 
-// 審核員/管理員新建詞條時的預設方言（僅用於此角色；貢獻者用其貢獻語言，無需選擇）
-const REVIEWER_NEW_ENTRY_DIALECT_KEY = 'jyutcollab_reviewer_new_entry_dialect'
-const newEntryDialectOptions = DIALECT_OPTIONS_FOR_SELECT
-const reviewerDefaultDialectForNew = ref<DialectId>('hongkong')
+// 新建詞條時的預設方言：審核員/管理員可選全部；貢獻者有多個方言權限時可選其一
+const NEW_ENTRY_DIALECT_KEY = 'jyutcollab_new_entry_dialect'
 const isReviewerOrAdmin = computed(() => {
   const r = user.value?.role
   return r === 'reviewer' || r === 'admin'
 })
+// 貢獻者有多個方言時顯示選擇器；審核員/管理員一律顯示
+const showNewEntryDialectSelector = computed(() => {
+  if (isReviewerOrAdmin.value) return true
+  return (userDialectOptions.value?.length ?? 0) > 1
+})
+// 選項：審核員/管理員為全部方言，貢獻者為其權限內方言
+const newEntryDialectOptionsForSelector = computed(() => {
+  if (isReviewerOrAdmin.value) return DIALECT_OPTIONS_FOR_SELECT
+  return userDialectOptions.value
+})
+const defaultDialectForNew = ref<string>('hongkong')
 
 // 方言代碼到顯示名稱的映射（由統一常數提供）
 const dialectCodeToName = DIALECT_CODE_TO_NAME
@@ -1940,6 +1950,15 @@ const statusOptionsForTable = computed(() => {
   ]
 })
 
+// 貢獻者實際使用的 dialectPermissions：個人資料更新後以 profileUpdatedUser 為準，否則用 session user
+const effectiveDialectPermissions = computed(() => {
+  const currentUser = user.value
+  if (!currentUser) return []
+  if (currentUser.role === 'reviewer' || currentUser.role === 'admin') return null
+  const fromProfile = profileUpdatedUser.value?.id === currentUser.id ? profileUpdatedUser.value.dialectPermissions : null
+  return fromProfile ?? currentUser.dialectPermissions ?? []
+})
+
 // 用戶可用嘅方言選項（用於表格編輯下拉）
 const userDialectOptions = computed(() => {
   const currentUser = user.value
@@ -1950,27 +1969,36 @@ const userDialectOptions = computed(() => {
     return DIALECT_OPTIONS_FOR_SELECT
   }
 
-  // 貢獻者只能選擇自己有權限的方言（方案 A：dialectPermissions 即可貢獻方言列表）
-  return (currentUser.dialectPermissions || []).map(p => ({
-    value: p.dialectName,
-    label: dialectCodeToName[p.dialectName] || p.dialectName
-  }))
+  // 貢獻者：使用 effectiveDialectPermissions（個人資料更新後即時反映刪除/新增）
+  const perms = effectiveDialectPermissions.value ?? []
+  const seen = new Set<string>()
+  return perms
+    .filter(p => {
+      if (seen.has(p.dialectName)) return false
+      seen.add(p.dialectName)
+      return true
+    })
+    .map(p => ({
+      value: p.dialectName,
+      label: dialectCodeToName[p.dialectName] || p.dialectName
+    }))
 })
 
 // 獲取用戶嘅預設方言（新建詞條時使用）
 function getUserDefaultDialect(): string {
   const currentUser = user.value
+  const options = newEntryDialectOptionsForSelector.value
+  const chosen = defaultDialectForNew.value
 
-  // 審核員/管理員：優先使用頁面上選擇的「新建時方言」
-  if (currentUser?.role === 'reviewer' || currentUser?.role === 'admin') {
-    if (reviewerDefaultDialectForNew.value) {
-      return reviewerDefaultDialectForNew.value
-    }
+  // 若頁面上選擇的方言在當前可選項內，則使用
+  if (chosen && options.some((o: { value: string }) => o.value === chosen)) {
+    return chosen
   }
 
-  // 貢獻者：使用其權限內的方言（已默認貢獻語言，無需額外選擇）
-  if (currentUser?.dialectPermissions?.length) {
-    return currentUser.dialectPermissions?.[0]?.dialectName ?? 'hongkong'
+  // 貢獻者：使用 effectiveDialectPermissions 的第一個方言（與選項列表一致）
+  const perms = currentUser?.role === 'contributor' ? effectiveDialectPermissions.value : currentUser?.dialectPermissions
+  if (Array.isArray(perms) && perms.length) {
+    return perms[0]?.dialectName ?? 'hongkong'
   }
 
   return 'hongkong'
@@ -3706,18 +3734,27 @@ watch(
 // Initial fetch
 onMounted(fetchEntries)
 
-// 審核員新建詞條預設方言：從 localStorage 恢復
-onMounted(() => {
-  if (import.meta.client) {
-    const stored = localStorage.getItem(REVIEWER_NEW_ENTRY_DIALECT_KEY)
-    if (stored && newEntryDialectOptions.some(o => o.value === stored)) {
-      reviewerDefaultDialectForNew.value = stored as DialectId
-    }
+function restoreDefaultDialectForNew() {
+  if (!import.meta.client) return
+  const options = newEntryDialectOptionsForSelector.value
+  if (options.length === 0) return
+  const stored = localStorage.getItem(NEW_ENTRY_DIALECT_KEY)
+  if (stored && options.some((o: { value: string }) => o.value === stored)) {
+    defaultDialectForNew.value = stored
+  } else {
+    const first = options[0]
+    if (first) defaultDialectForNew.value = first.value
   }
-})
-watch(reviewerDefaultDialectForNew, (v) => {
+}
+onMounted(restoreDefaultDialectForNew)
+watch(newEntryDialectOptionsForSelector, (opts) => {
+  if (opts.length > 0 && !opts.some((o: { value: string }) => o.value === defaultDialectForNew.value)) {
+    restoreDefaultDialectForNew()
+  }
+}, { deep: true })
+watch(defaultDialectForNew, (v) => {
   if (import.meta.client && v) {
-    localStorage.setItem(REVIEWER_NEW_ENTRY_DIALECT_KEY, v)
+    localStorage.setItem(NEW_ENTRY_DIALECT_KEY, v)
   }
 })
 </script>

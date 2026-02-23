@@ -65,11 +65,14 @@ export async function registerUser(data: RegisterData): Promise<{ user?: AuthUse
 
     const passwordHash = await bcryptHash(data.password)
 
-    // 根據用户選擇的方言自動分配貢獻者權限（駝峰命名）
-    const dialectPermissions = data.dialect ? [{
-      dialectName: data.dialect,
+    // 根據用户選擇的方言自動分配貢獻者權限
+    const dialects = data.dialects && data.dialects.length > 0
+      ? data.dialects
+      : (data.dialect ? [data.dialect] : [])
+    const dialectPermissions = dialects.map(name => ({
+      dialectName: name,
       role: 'contributor' as const
-    }] : []
+    }))
 
     // Create user
     const newUser = await User.create({
@@ -78,7 +81,7 @@ export async function registerUser(data: RegisterData): Promise<{ user?: AuthUse
       passwordHash,
       displayName: data.displayName || data.username,
       location: data.location || '',
-      nativeDialect: data.nativeDialect || data.dialect || '',
+      nativeDialect: data.nativeDialect || dialects[0] || '',
       role: 'contributor',
       dialectPermissions,
       contributionCount: 0,

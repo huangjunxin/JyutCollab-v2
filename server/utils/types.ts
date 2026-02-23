@@ -297,6 +297,9 @@ export interface RegisterData {
   displayName?: string
   location?: string
   nativeDialect?: string
+  /** 可編輯的方言點（多選）；註冊 API 正規化後必為非空陣列 */
+  dialects?: string[]
+  /** 相容舊前端單選 */
   dialect?: string
 }
 
