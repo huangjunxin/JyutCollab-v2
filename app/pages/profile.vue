@@ -49,26 +49,6 @@
           </div>
         </div>
 
-        <!-- 可貢獻的方言（方案 A：只顯示方言範圍，不顯示 per-dialect 角色） -->
-        <div v-if="profile.role === 'reviewer' || profile.role === 'admin'" class="mb-8">
-          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">方言權限</h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400">可操作所有方言</p>
-        </div>
-        <div v-else-if="profile.dialectPermissions?.length" class="mb-8">
-          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">可貢獻的方言</h3>
-          <div class="flex flex-wrap gap-2">
-            <UBadge
-              v-for="p in profile.dialectPermissions"
-              :key="p.dialectName"
-              color="neutral"
-              variant="subtle"
-              size="sm"
-            >
-              {{ dialectLabel(p.dialectName) }}
-            </UBadge>
-          </div>
-        </div>
-
         <!-- 可編輯表單 -->
         <form @submit.prevent="handleSubmit" class="space-y-5">
           <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">編輯資料</h3>
@@ -93,6 +73,26 @@
               maxlength="100"
               size="lg"
               icon="i-heroicons-map-pin"
+              class="w-full"
+            />
+          </div>
+
+          <!-- 可貢獻的方言（多選）；reviewer/admin 可操作所有方言，此處可標記常用 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              可貢獻的方言
+              <span class="text-gray-400 font-normal">（可多選，至少一項）</span>
+            </label>
+            <p v-if="profile.role === 'reviewer' || profile.role === 'admin'" class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              您可審核所有方言，此處為您常用的方言標籤
+            </p>
+            <USelect
+              v-model="form.dialects"
+              multiple
+              :items="dialectOptions"
+              value-key="value"
+              placeholder="請選擇方言點（可多選）"
+              size="lg"
               class="w-full"
             />
           </div>
@@ -176,7 +176,8 @@
 </template>
 
 <script setup lang="ts">
-import { getDialectLabel, DIALECT_OPTIONS_OPTIONAL, normalizeNativeDialect } from '~/utils/dialects'
+import { useProfileUpdatedUser } from '~/composables/useAuth'
+import { getDialectLabel, DIALECT_OPTIONS_FOR_SELECT, DIALECT_OPTIONS_OPTIONAL, normalizeNativeDialect } from '~/utils/dialects'
 
 definePageMeta({
   middleware: ['auth'],
@@ -212,9 +213,12 @@ const saving = ref(false)
 const error = ref('')
 const success = ref(false)
 
+const dialectOptions = DIALECT_OPTIONS_FOR_SELECT
+
 const form = reactive({
   displayName: '',
   location: '',
+  dialects: [] as string[],
   nativeDialect: '',
   avatarUrl: '',
   bio: ''
@@ -249,6 +253,7 @@ async function loadProfile() {
       profile.value = res.data
       form.displayName = res.data.displayName ?? ''
       form.location = res.data.location ?? ''
+      form.dialects = [...new Set((res.data.dialectPermissions ?? []).map(p => p.dialectName))]
       form.nativeDialect = normalizeNativeDialect(res.data.nativeDialect)
       form.avatarUrl = res.data.avatarUrl ?? ''
       form.bio = res.data.bio ?? ''
@@ -261,25 +266,40 @@ async function loadProfile() {
 }
 
 async function handleSubmit() {
+  const isContributor = profile.value?.role === 'contributor'
+  if (isContributor && form.dialects.length < 1) {
+    error.value = '請至少選擇一個可貢獻的方言點'
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = false
   try {
+    const body: Record<string, unknown> = {
+      displayName: form.displayName || undefined,
+      location: form.location || undefined,
+      nativeDialect: form.nativeDialect || undefined,
+      avatarUrl: form.avatarUrl || undefined,
+      bio: form.bio || undefined
+    }
+    if (form.dialects.length >= 1) {
+      body.dialects = [...new Set(form.dialects)]
+    }
     const res = await $fetch<{ success: boolean; data?: Profile; error?: string }>('/api/auth/me', {
       method: 'PATCH',
-      body: {
-        displayName: form.displayName || undefined,
-        location: form.location || undefined,
-        nativeDialect: form.nativeDialect || undefined,
-        avatarUrl: form.avatarUrl || undefined,
-        bio: form.bio || undefined
-      }
+      body
     })
     if (res.success && res.data) {
       profile.value = res.data
       success.value = true
-      const { fetch: fetchSession } = useUserSession()
-      await fetchSession()
+      const { session } = useUserSession()
+      const updatedUser = res.data
+      if (session.value) {
+        session.value = { ...session.value, user: updatedUser }
+      }
+      const profileUpdatedUser = useProfileUpdatedUser()
+      profileUpdatedUser.value = { id: updatedUser.id, dialectPermissions: updatedUser.dialectPermissions ?? [] }
+      // 不呼叫 fetchSession()，避免帶回舊快取覆蓋剛寫入的 dialectPermissions；伺服器已在 me.patch 用 setUserSession 更新 cookie
     } else if (res.success === false && (res as any).error) {
       error.value = (res as any).error
     }

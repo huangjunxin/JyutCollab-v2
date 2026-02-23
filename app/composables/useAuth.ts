@@ -1,5 +1,25 @@
+export interface RegisterPayload {
+  email: string
+  username: string
+  password: string
+  displayName?: string
+  location?: string
+  nativeDialect?: string
+  /** 可編輯的方言點（多選，至少一項） */
+  dialects: string[]
+}
+
+/** 個人資料更新後暫存的 user（含 dialectPermissions），供詞條頁等即時使用，登出時清空 */
+export function useProfileUpdatedUser() {
+  return useState<{ id: string; dialectPermissions: Array<{ dialectName: string; role?: string }> } | null>(
+    'profileUpdatedUser',
+    () => null
+  )
+}
+
 export const useAuth = () => {
   const { user, loggedIn, fetch: fetchSession, clear: clearSession } = useUserSession()
+  const profileUpdatedUser = useProfileUpdatedUser()
   const router = useRouter()
   const getRoute = () => useRoute()
 
@@ -27,15 +47,7 @@ export const useAuth = () => {
     }
   }
 
-  const register = async (data: {
-    email: string
-    username: string
-    password: string
-    displayName?: string
-    location?: string
-    nativeDialect?: string
-    dialect?: string
-  }) => {
+  const register = async (data: RegisterPayload) => {
     try {
       const res = await $fetch<{ success: boolean; data?: { user: any }; error?: string }>('/api/auth/register', {
         method: 'POST',
@@ -61,6 +73,7 @@ export const useAuth = () => {
     } catch (_) {
       // 確保即使接口報錯也繼續清空本地並跳轉
     }
+    profileUpdatedUser.value = null
     await clearSession()
     await router.push('/login')
   }

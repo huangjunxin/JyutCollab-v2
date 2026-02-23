@@ -120,22 +120,24 @@
               />
             </div>
 
-            <!-- Dialect selection (required) -->
+            <!-- Dialect selection (required, multiple) -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 您要貢獻的方言點
                 <span class="text-red-500">*</span>
+                <span class="text-gray-400 font-normal">（可多選）</span>
               </label>
-              <USelectMenu
-                v-model="formDialectModel"
+              <USelect
+                v-model="form.dialects"
+                multiple
                 :items="dialectOptions"
-                placeholder="請選擇方言點"
+                value-key="value"
+                placeholder="請選擇方言點（可多選）"
                 size="lg"
                 class="w-full"
-                value-key="value"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                註冊後您將成為該方言點的貢獻者，可以創建和編輯該方言點的詞條
+                註冊後您將成為所選方言點的貢獻者，可創建和編輯該些方言點的詞條；請至少選擇一項
               </p>
             </div>
 
@@ -200,8 +202,8 @@ definePageMeta({
   layout: false
 })
 
+import { useAuth, type RegisterPayload } from '~/composables/useAuth'
 import type { DialectId } from '~shared/dialects'
-import { useAuth } from '~/composables/useAuth'
 import { DIALECT_OPTIONS_FOR_SELECT, DIALECT_OPTIONS_OPTIONAL_FOR_COMBO, NATIVE_DIALECT_NONE } from '~/utils/dialects'
 
 const { register, isAuthenticated } = useAuth()
@@ -212,19 +214,11 @@ const form = reactive({
   email: '',
   password: '',
   displayName: '',
-  dialect: '' as string,
+  dialects: [] as DialectId[],
   nativeDialect: NATIVE_DIALECT_NONE as string
 })
 
 const dialectOptions = DIALECT_OPTIONS_FOR_SELECT
-
-/** USelectMenu 綁定用：組件可能回傳 value 或整個 item，統一寫回字串 */
-const formDialectModel = computed({
-  get: () => (form.dialect || undefined) as DialectId | undefined,
-  set: (v: DialectId | { value: string; label: string } | undefined) => {
-    form.dialect = (typeof v === 'object' && v && 'value' in v) ? (v as { value: string }).value : (v ?? '')
-  }
-})
 
 /** 母語方言：Combobox 不允許 value 為空，用 NATIVE_DIALECT_NONE；提交時轉回 undefined */
 const formNativeDialectModel = computed({
@@ -251,8 +245,8 @@ async function handleSubmit() {
     return
   }
 
-  if (!form.dialect) {
-    error.value = '請選擇您要貢獻的方言點'
+  if (!form.dialects.length) {
+    error.value = '請至少選擇一個方言點'
     return
   }
 
@@ -264,14 +258,15 @@ async function handleSubmit() {
   loading.value = true
   error.value = ''
 
-  const result = await register({
+  const payload: RegisterPayload = {
     username: form.username,
     email: form.email,
     password: form.password,
     displayName: form.displayName || undefined,
-    dialect: form.dialect,
+    dialects: form.dialects,
     nativeDialect: (form.nativeDialect && form.nativeDialect !== NATIVE_DIALECT_NONE) ? form.nativeDialect : undefined
-  })
+  }
+  const result = await register(payload)
 
   if (!result.success) {
     error.value = result.error || '註冊失敗'
