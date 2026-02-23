@@ -164,8 +164,26 @@ export const DIALECT_IDS = [
   'shaoguan',
   // 賀州（原有）
   'hezhou',
+  // 海外 — 北美
+  'usa_san_francisco',
+  'usa_new_york',
+  'usa_los_angeles',
+  'canada_vancouver',
+  'canada_toronto',
+  // 海外 — 澳洲、紐西蘭
+  'australia_sydney',
+  'australia_melbourne',
+  'newzealand_auckland',
+  // 海外 — 英國
+  'uk_london',
+  // 海外 — 東南亞
+  'singapore',
+  'malaysia_kualalumpur',
+  'malaysia_penang',
+  'vietnam_hochiminh',
+  'thailand_bangkok',
   // 其他
-  'overseas'
+  'other'
 ] as const
 
 export type DialectId = (typeof DIALECT_IDS)[number]
@@ -316,7 +334,21 @@ export const DIALECT_LABELS: Record<DialectId, string> = {
   liannan_zhaigang: '連南 寨崗',
   shaoguan: '韶關',
   hezhou: '賀州',
-  overseas: '海外'
+  usa_san_francisco: '美國 三藩市',
+  usa_new_york: '美國 紐約',
+  usa_los_angeles: '美國 洛杉磯',
+  canada_vancouver: '加拿大 溫哥華',
+  canada_toronto: '加拿大 多倫多',
+  australia_sydney: '澳洲 悉尼',
+  australia_melbourne: '澳洲 墨爾本',
+  newzealand_auckland: '紐西蘭 奧克蘭',
+  uk_london: '英國 倫敦',
+  singapore: '新加坡',
+  malaysia_kualalumpur: '馬來西亞 吉隆坡',
+  malaysia_penang: '馬來西亞 檳城',
+  vietnam_hochiminh: '越南 胡志明市',
+  thailand_bangkok: '泰國 曼谷',
+  other: '其他'
 }
 
 /**
@@ -468,7 +500,21 @@ export const DIALECT_REGION_CODES: Record<DialectId, string> = {
   liannan_zhaigang: 'LNZG',
   shaoguan: 'SG',
   hezhou: 'HZhou',
-  overseas: 'OS'
+  usa_san_francisco: 'USSF',
+  usa_new_york: 'USNY',
+  usa_los_angeles: 'USLA',
+  canada_vancouver: 'CAVC',
+  canada_toronto: 'CATO',
+  australia_sydney: 'AUSY',
+  australia_melbourne: 'AUMB',
+  newzealand_auckland: 'NZAK',
+  uk_london: 'UKLN',
+  singapore: 'SGAP',
+  malaysia_kualalumpur: 'MYKL',
+  malaysia_penang: 'MYPE',
+  vietnam_hochiminh: 'VNHCM',
+  thailand_bangkok: 'THBK',
+  other: 'OT'
 }
 
 /** Jyutjyu 地區代碼（region_code） → 方言代碼 */
@@ -499,7 +545,7 @@ const COLOR_PALETTE = ['blue', 'green', 'teal', 'orange', 'amber', 'yellow', 'pu
 
 /** 方言對應的 UBadge 顏色（用於審核頁等） */
 export const DIALECT_COLORS: Record<DialectId, string> = Object.fromEntries(
-  DIALECT_IDS.map((id, i) => [id, id === 'overseas' ? 'gray' : COLOR_PALETTE[i % (COLOR_PALETTE.length - 1)]])
+  DIALECT_IDS.map((id, i) => [id, id === 'other' ? 'gray' : COLOR_PALETTE[i % (COLOR_PALETTE.length - 1)]])
 ) as Record<DialectId, string>
 
 export function getDialectColor(id: string): string {
