@@ -12,7 +12,7 @@
           </h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ pagination.total }}</span>
-            {{ viewMode === 'aggregated' ? '個詞形' : (viewMode === 'lexeme' ? '個詞語' : '個詞條') }}
+            個{{ viewModeEntityLabel }}
             <span v-if="hasUnsavedChanges" class="ml-2 text-amber-600">· 有未保存的更改</span>
           </p>
         </div>
@@ -234,7 +234,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            <template v-for="(row, rowIndex) in tableRows" :key="row.type === 'group' ? `group-${row.group.headwordNormalized}-${row.groupIndex}` : (row.entry as any)?._tempId ?? row.entry.id ?? `entry-${rowIndex}`">
+            <template v-for="(row, rowIndex) in tableRows" :key="row.type === 'group' ? `group-${row.group.headwordNormalized}-${row.groupIndex}` : getEntryKey(row.entry) ?? `entry-${rowIndex}`">
             <!-- 聚合視圖：詞形組標題行 -->
             <tr
               v-if="row.type === 'group'"
@@ -335,10 +335,10 @@
               </td>
               <EntriesEditableCell
                 v-for="(col, colIndex) in editableColumns"
-                :key="`${row.entry.id ?? (row.entry as any)._tempId}-${col.key}`"
+                :key="`${getEntryKey(row.entry)}-${col.key}`"
                 :col="col"
                 :can-edit="canEditEntry(row.entry)"
-                :is-editing="isEditing(row.entry.id ?? (row.entry as any)._tempId, col.key)"
+                :is-editing="isEditing(getEntryKey(row.entry), col.key)"
                 v-model:edit-value="editValue"
                 :display-text="getCellDisplay(row.entry, col)"
                 :cell-class="getCellClass(row.entry, col.key).join(' ')"
@@ -348,17 +348,17 @@
                 :review-notes="col.key === 'status' && row.entry.status === 'rejected' ? row.entry.reviewNotes : undefined"
                 :show-ai-definition="col.key === 'definition' && !!row.entry.headword?.display && !row.entry.senses?.[0]?.definition"
                 :show-ai-theme="col.key === 'theme' && !!row.entry.headword?.display && !row.entry.theme?.level3Id"
-                :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && String(row.entry.id ?? (row.entry as any)._tempId ?? '') === aiLoadingInlineFor.entryId)"
-                :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && String(row.entry.id ?? (row.entry as any)._tempId ?? '') === aiLoadingInlineFor.entryId)"
+                :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
+                :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
                 :show-expand="col.key === 'definition'"
-                :is-expanded="expandedEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                :is-expanded="expandedEntryId === getEntryIdString(row.entry)"
                 :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
                 :headword-expand-hint="col.key === 'headword' ? getHeadwordExpandHint(row.entry) : undefined"
                 :phonetic-hint="col.key === 'phonetic' ? getPhoneticHint(row.entry) : undefined"
                 :theme-id="col.key === 'theme' ? row.entry.theme?.level3Id : undefined"
-                :is-theme-expanded="expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                :is-theme-expanded="expandedThemeEntryId === getEntryIdString(row.entry)"
                 @click="handleCellClick(row.entry, col.key, $event, rowIndex, colIndex)"
-                @set-ref="(el: any) => setInputRef(el, String(row.entry.id ?? (row.entry as any)._tempId ?? ''), col.key)"
+                @set-ref="(el: any) => setInputRef(el, getEntryIdString(row.entry), col.key)"
                 @keydown="handleKeydown($event, row.entry, col.key)"
                 @blur="handleBlur(row.entry, col.key)"
                 @ai-definition="generateAIDefinition(row.entry)"
@@ -372,7 +372,7 @@
                 :entry="row.entry"
                 :can-edit="canEditEntry(row.entry)"
                 :show-lexeme-actions="viewMode === 'lexeme' && canEditExternalEtymons"
-                :is-morpheme-refs-expanded="expandedMorphemeRefsEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                :is-morpheme-refs-expanded="expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
                 @save="(row.entry as any)._isNew ? saveNewEntry(row.entry) : saveEntryChanges(row.entry)"
                 @duplicate="duplicateEntry(row.entry)"
                 @delete="deleteEntry(row.entry)"
@@ -384,7 +384,7 @@
             </tr>
             <!-- 行內 AI 釋義建議（Tab 落在釋義格且有待處理建議時顯示） -->
             <AISuggestionRow
-              v-if="row.type === 'entry' && aiSuggestion && aiSuggestionForField && editingCell && editingCell.field === aiSuggestionForField && String(row.entry.id ?? (row.entry as any)._tempId) === String(editingCell.entryId)"
+              v-if="row.type === 'entry' && aiSuggestion && aiSuggestionForField && editingCell && editingCell.field === aiSuggestionForField && getEntryIdString(row.entry) === String(editingCell.entryId)"
               :text="aiSuggestion"
               :title="aiSuggestionForField === 'theme' ? 'AI 分類建議' : 'AI 釋義建議'"
               :colspan="editableColumns.length + 2"
@@ -393,8 +393,8 @@
             />
             <!-- 行內 AI 分類建議 -->
             <AISuggestionRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === themeColIndex && themeAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
-              :text="formatThemeSuggestion(themeAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? '')))"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === themeColIndex && themeAISuggestions.get(getEntryIdString(row.entry))"
+              :text="formatThemeSuggestion(themeAISuggestions.get(getEntryIdString(row.entry)))"
               title="AI 分類建議"
               :colspan="editableColumns.length + 2"
               @accept="acceptThemeAI(row.entry)"
@@ -402,21 +402,21 @@
             />
             <!-- 泛粵典粵拼建議 -->
             <JyutdictSuggestionRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === phoneticColIndex && getJyutdictVisible(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === phoneticColIndex && getJyutdictVisible(getEntryIdString(row.entry))"
               :colspan="editableColumns.length + 2"
-              :char-data="getJyutdictData(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :char-data="getJyutdictData(getEntryIdString(row.entry))"
               :dialect-name="getDialectLabel(row.entry.dialect?.name || '') || row.entry.dialect?.name || ''"
-              :suggested-pronunciation="getJyutdictSuggested(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
-              :is-loading="getJyutdictLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :suggested-pronunciation="getJyutdictSuggested(getEntryIdString(row.entry))"
+              :is-loading="getJyutdictLoading(getEntryIdString(row.entry))"
               @accept="(pronunciation: string) => acceptJyutdict(row.entry, pronunciation)"
               @dismiss="dismissJyutdict(row.entry)"
             />
             <!-- 詞頭重複檢測 -->
             <DuplicateCheckRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? '')) || getDuplicateCheckEntriesFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length > 0)"
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(getEntryIdString(row.entry)) || getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry)).length > 0)"
               :colspan="editableColumns.length + 2"
-              :entries="getDuplicateCheckEntriesFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
-              :is-loading="getDuplicateCheckLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :entries="getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry))"
+              :is-loading="getDuplicateCheckLoading(getEntryIdString(row.entry))"
               @dismiss="dismissDuplicateCheck(row.entry)"
             />
             <!-- 其他方言點已有該詞條（若已觸發同方言詞頭重複檢測則不再顯示，避免重複提示） -->
@@ -424,11 +424,11 @@
               v-if="
                 row.type === 'entry' &&
                 focusedCell?.rowIndex === rowIndex &&
-                getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length > 0 &&
-                getDuplicateCheckEntriesFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? '')).length === 0
+                getOtherDialectsFormatted(getEntryIdString(row.entry)).length > 0 &&
+                getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry)).length === 0
               "
               :colspan="editableColumns.length + 2"
-              :entries="getOtherDialectsFormatted(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :entries="getOtherDialectsFormatted(getEntryIdString(row.entry))"
               @dismiss="dismissDuplicateCheck(row.entry)"
               @apply-template="applyOtherDialectTemplate(row.entry, $event)"
             />
@@ -437,21 +437,21 @@
               v-if="
                 row.type === 'entry' &&
                 focusedCell?.rowIndex === rowIndex &&
-                getJyutjyuRowVisible(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))
+                getJyutjyuRowVisible(getEntryIdString(row.entry))
               "
               :colspan="editableColumns.length + 2"
-              :query="getJyutjyuQuery(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
-              :results="formatJyutjyuResults(jyutjyuRefResult.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))?.results || [])"
-              :raw-results="jyutjyuRefResult.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))?.results || []"
-              :total="getJyutjyuTotal(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
-              :is-loading="getJyutjyuLoading(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
-              :error-message="getJyutjyuError(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+              :query="getJyutjyuQuery(getEntryIdString(row.entry))"
+              :results="formatJyutjyuResults(jyutjyuRefResult.get(getEntryIdString(row.entry))?.results || [])"
+              :raw-results="jyutjyuRefResult.get(getEntryIdString(row.entry))?.results || []"
+              :total="getJyutjyuTotal(getEntryIdString(row.entry))"
+              :is-loading="getJyutjyuLoading(getEntryIdString(row.entry))"
+              :error-message="getJyutjyuError(getEntryIdString(row.entry))"
               @dismiss="dismissJyutjyuRef(row.entry)"
               @apply-template="applyJyutjyuTemplate(row.entry, $event)"
             />
             <!-- 行內釋義建議錯誤 + 重試 -->
             <tr
-              v-if="row.type === 'entry' && aiInlineError && String(row.entry.id ?? (row.entry as any)._tempId) === aiInlineError.entryId && aiInlineError.field === 'definition'"
+              v-if="row.type === 'entry' && aiInlineError && getEntryIdString(row.entry) === aiInlineError.entryId && aiInlineError.field === 'definition'"
               class="bg-red-50/80 dark:bg-red-900/20 border-b border-gray-200 dark:border-gray-700"
               role="alert"
             >
@@ -471,13 +471,13 @@
             </tr>
             <!-- 釋義詳情展開區 -->
             <tr
-              v-if="row.type === 'entry' && expandedEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+              v-if="row.type === 'entry' && expandedEntryId === getEntryIdString(row.entry)"
               class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
             >
               <td :colspan="editableColumns.length + 2" class="p-0 align-top">
                 <EntrySensesExpand
                   :entry="row.entry"
-                  :ai-suggestion="definitionAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+                  :ai-suggestion="definitionAISuggestions.get(getEntryIdString(row.entry))"
                   :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition'"
                   :ai-loading-examples="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'examples'"
                   @close="toggleSensesExpand(row.entry)"
@@ -498,7 +498,7 @@
             </tr>
             <!-- 詞素引用展開區 -->
             <tr
-              v-if="row.type === 'entry' && expandedMorphemeRefsEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+              v-if="row.type === 'entry' && expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
               class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
             >
               <td :colspan="editableColumns.length + 2" class="p-0 align-top">
@@ -563,7 +563,7 @@
                     </div>
                     <!-- 未連結詞素：自動依詞頭與粵拼帶入，確認或改備註後添加 -->
                     <div
-                      v-if="unlinkedMorphemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+                      v-if="unlinkedMorphemeEntryId === getEntryIdString(row.entry)"
                       class="mt-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 space-y-2"
                     >
                       <p class="text-xs text-amber-800 dark:text-amber-200">以下為詞頭各字自動帶入的未連結詞素，可補備註後確認添加。</p>
@@ -606,13 +606,13 @@
             <!-- 詞頭詳情展開區（已由詞頭欄位直接展示「主詞形 [異形]」格式取代，暫不再使用） -->
             <!-- 主題分類展開區 -->
             <tr
-              v-if="row.type === 'entry' && expandedThemeEntryId === String(row.entry.id ?? (row.entry as any)._tempId ?? '')"
+              v-if="row.type === 'entry' && expandedThemeEntryId === getEntryIdString(row.entry)"
               class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700"
             >
               <td :colspan="editableColumns.length + 2" class="p-0 align-top">
                 <EntryThemeExpand
                   :entry="row.entry"
-                  :ai-suggestion="themeAISuggestions.get(String(row.entry.id ?? (row.entry as any)._tempId ?? ''))"
+                  :ai-suggestion="themeAISuggestions.get(getEntryIdString(row.entry))"
                   :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme'"
                   @close="toggleThemeExpand(row.entry)"
                   @update:theme="onThemeUpdate(row.entry, $event)"
@@ -734,12 +734,23 @@
 <script setup lang="ts">
 import { useAuth, useProfileUpdatedUser } from '~/composables/useAuth'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
-import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, DIALECT_CODE_TO_NAME, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
+import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
+import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
+import { ALL_FILTER_VALUE, SORTABLE_COLUMN_KEYS, STATUS_LABELS, ENTRY_TYPE_LABELS } from '~/utils/entriesTableConstants'
+import { getGroupPhonetic, getGroupEntryType, getGroupTheme, getGroupRegister, getGroupStatus } from '~/composables/useEntryGroupDisplay'
+import { useEntriesTableColumns } from '~/composables/useEntriesTableColumns'
+import { deepCopy, getEntryIdKey, makeBaselineSnapshot, useEntryBaseline } from '~/composables/useEntryBaseline'
+import { ensureSensesStructure, addSense, removeSense, addExample, removeExample, addSubSense, removeSubSense, addSubSenseExample, removeSubSenseExample } from '~/composables/useEntrySenses'
+import { useEntriesList } from '~/composables/useEntriesList'
+import { useEntriesSelection } from '~/composables/useEntriesSelection'
+import { useNewEntryDialect } from '~/composables/useNewEntryDialect'
+import { useEntryMorphemeRefs } from '~/composables/useEntryMorphemeRefs'
+import { useEntriesTableEdit } from '~/composables/useEntriesTableEdit'
+import { useEntriesAISuggestions } from '~/composables/useEntriesAISuggestions'
+import { useEntriesRowHints } from '~/composables/useEntriesRowHints'
 import type { DialectId } from '~shared/dialects'
-import { queryJyutdict, getSuggestedPronunciation } from '~/composables/useJyutdict'
 import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
 import type { Entry, Register } from '~/types'
-import type { CharPronunciationData } from '~/types/jyutdict'
 import AISuggestionRow from '~/components/entries/AISuggestionRow.vue'
 import JyutdictSuggestionRow from '~/components/entries/JyutdictSuggestionRow.vue'
 import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
@@ -748,7 +759,7 @@ import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
 import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
-import JyutjyuRefRow, { type JyutjyuRefItem } from '~/components/entries/JyutjyuRefRow.vue'
+import JyutjyuRefRow from '~/components/entries/JyutjyuRefRow.vue'
 import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymonsModal.vue'
 import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
 
@@ -887,7 +898,7 @@ async function handleLexemeMerge(targetLexemeId: string) {
 }
 
 async function makeEntryNewLexeme(entry: Entry) {
-  const id = String(entry.id ?? (entry as any)._tempId ?? '')
+  const id = getEntryIdString(entry)
   if (!id) return
   if (!confirm(`確定要將「${entry.headword?.display || entry.text || id}」拆出成獨立詞語？`)) {
     return
@@ -912,8 +923,6 @@ const themeOptions = getFlatThemeList().map(t => ({
 }))
 
 // Sentinel for "all" – ComboboxItem does not allow value to be empty string
-const ALL_FILTER_VALUE = '__all__'
-
 // Local filters managed by this page (right sidebar filters)
 const filters = reactive({ region: ALL_FILTER_VALUE, status: ALL_FILTER_VALUE, theme: ALL_FILTER_VALUE })
 
@@ -938,36 +947,26 @@ const themeFilterOptions = [
 ]
 
 // State
-const entries = ref<Entry[]>([])
-/** 聚合視圖：按詞形分組的列表（每項含 headwordDisplay, headwordNormalized, entries） */
-const aggregatedGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
-/** 詞語聚合視圖：按 lexemeId 分組的列表（字段名沿用聚合視圖以減少模板改動） */
-const lexemeGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
 /** 詞條 baseline（用於「取消編輯」回滾，避免刷新整個頁面誤傷其他未保存內容）。key: entry.id */
 const entryBaselineById = ref<Map<string, any>>(new Map())
+const { setBaselineForEntry, restoreEntryFromBaseline, applyDraftOntoEntry } = useEntryBaseline(entryBaselineById)
 /** 視圖模式：平鋪（一列一條）或聚合（一列一詞形，可展開多方言） */
 const viewMode = ref<'flat' | 'aggregated' | 'lexeme'>('flat')
+/** 當前視圖對應的實體標籤（詞條/詞形/詞語），用於標題與空狀態文案 */
+const viewModeEntityLabel = computed(() => ({ flat: '詞條', aggregated: '詞形', lexeme: '詞語' }[viewMode.value] ?? '詞條'))
 /** 聚合視圖下已展開的詞形（headwordNormalized），用 Set 便於切換 */
 const expandedGroupKeys = ref<Set<string>>(new Set())
-const loading = ref(false)
 const saving = ref(false)
 const searchQuery = ref('')
-const currentPage = ref(1)
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
+const { entries, aggregatedGroups, lexemeGroups, loading, currentPage, pagination, fetchEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
 /** API 僅支援以下欄位排序 */
-const SORTABLE_COLUMN_KEYS = ['createdAt', 'updatedAt', 'viewCount', 'likeCount', 'headword'] as const
 
 // Inline editing state
 const editingCell = ref<{ entryId: string; field: string } | null>(null)
 const editValue = ref<any>('')
 const inputRefs = ref<Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>>(new Map())
-const aiSuggestion = ref<string | null>(null)
-/** 當前建議對應的列（如 definition / theme），僅在該列編輯時顯示建議 */
-const aiSuggestionForField = ref<string | null>(null)
-/** 用戶未採納/忽略就離開單元格時暫存建議，再點回該列時恢復顯示。key: `${entryId}-${field}` */
-const pendingAISuggestions = ref<Map<string, { entryId: string, field: string, text: string }>>(new Map())
-const aiDebounceTimer = ref<NodeJS.Timeout | null>(null)
 
 // 唯一焦點格：未編輯時表示「選中格」（方向鍵/Enter/Tab 目標），編輯時即正在編輯的格
 const focusedCell = ref<{ rowIndex: number; colIndex: number } | null>(null)
@@ -981,524 +980,6 @@ const expandedMorphemeRefsEntryId = ref<string | null>(null)
 
 // 主題展開狀態
 const expandedThemeEntryId = ref<string | null>(null)
-
-// 主題 AI 建議緩存（key: entryKey, value: AI 建議結果）
-const themeAISuggestions = ref<Map<string, {
-  level1Name: string
-  level2Name: string
-  level3Name: string
-  level1Id: number
-  level2Id: number
-  level3Id: number
-  confidence?: number
-  explanation?: string
-}>>(new Map())
-
-/** 釋義詳情展開區的 AI 釋義建議（key: entryKey，先展示給用戶，採納後才寫入） */
-const definitionAISuggestions = ref<Map<string, {
-  definition: string
-  usageNotes?: string
-  formalityLevel?: string
-}>>(new Map())
-
-/** 行內釋義建議 loading：正在為該 entry 拉取建議時顯示 */
-const aiLoadingInlineFor = ref<{ entryId: string, field: string } | null>(null)
-/** 行內釋義建議錯誤（可重試） */
-const aiInlineError = ref<{ entryId: string, field: string, message: string } | null>(null)
-
-// 粵拼建議相關狀態（採納或忽略後不再顯示，與分類/釋義 AI 一致）
-const jyutdictData = ref<Map<string, CharPronunciationData[]>>(new Map())
-const jyutdictLoading = ref<Map<string, boolean>>(new Map())
-const jyutdictSuggested = ref<Map<string, string>>(new Map())
-const jyutdictVisible = ref<Map<string, boolean>>(new Map())
-/** 已採納或忽略粵拼建議的 entryId，不再重複顯示 */
-const jyutdictHandled = ref<Set<string>>(new Set())
-
-/** 其他方言詞條（API 會帶 senses、theme、meta 供預覽） */
-type OtherDialectEntryRaw = {
-  id: string
-  headword?: { display?: string }
-  dialect?: { name?: string }
-  status?: string
-  createdAt?: string
-  senses?: Array<{ definition?: string }>
-  theme?: { level1?: string; level2?: string; level3?: string }
-  meta?: { pos?: string; register?: string }
-}
-
-/** 詞頭重複檢測結果（新建詞條離開詞頭格時觸發）。sameDialect=同詞頭+同方言，otherDialects=同詞頭+其他方言可參考。API 兩者均帶 senses/theme/meta 供預覽。 */
-const duplicateCheckResult = ref<Map<string, {
-  loading: boolean
-  entries?: OtherDialectEntryRaw[]
-  otherDialects?: OtherDialectEntryRaw[]
-}>>(new Map())
-
-/** Jyutjyu 參考結果（新建詞條離開詞頭格時觸發）。 */
-const jyutjyuRefResult = ref<Map<string, {
-  loading: boolean
-  q: string
-  total: number | null
-  results: any[]
-  errorMessage: string
-}>>(new Map())
-
-/** Jyutjyu：是否顯示提示（按 entryId 記） */
-const jyutjyuRefVisible = ref<Map<string, boolean>>(new Map())
-
-/** Jyutjyu：已忽略的查詢（按 entryId + q 記，避免同一詞頭反覆彈出；詞頭變更則會重新顯示） */
-const jyutjyuRefHandled = ref<Set<string>>(new Set())
-
-// 獲取粵拼建議相關數據
-function getJyutdictData(entryId: string): CharPronunciationData[] {
-  return jyutdictData.value.get(entryId) || []
-}
-
-function getJyutdictLoading(entryId: string): boolean {
-  return jyutdictLoading.value.get(entryId) || false
-}
-
-function getJyutdictSuggested(entryId: string): string {
-  return jyutdictSuggested.value.get(entryId) || ''
-}
-
-function getJyutdictVisible(entryId: string): boolean {
-  if (jyutdictHandled.value.has(entryId)) return false
-  return jyutdictVisible.value.get(entryId) || false
-}
-
-function getJyutjyuHandledKey(entryId: string, q: string): string {
-  return `${entryId}::${q}`
-}
-
-function getJyutjyuRowVisible(entryId: string): boolean {
-  return jyutjyuRefVisible.value.get(entryId) || false
-}
-
-function getJyutjyuVisible(entryId: string): boolean {
-  const state = jyutjyuRefResult.value.get(entryId)
-  const q = state?.q || ''
-  if (!q) return false
-  if (jyutjyuRefHandled.value.has(getJyutjyuHandledKey(entryId, q))) return false
-  return jyutjyuRefVisible.value.get(entryId) || false
-}
-
-function getJyutjyuLoading(entryId: string): boolean {
-  return jyutjyuRefResult.value.get(entryId)?.loading || false
-}
-
-function getJyutjyuError(entryId: string): string {
-  return jyutjyuRefResult.value.get(entryId)?.errorMessage || ''
-}
-
-function getJyutjyuTotal(entryId: string): number | null {
-  return jyutjyuRefResult.value.get(entryId)?.total ?? null
-}
-
-function getJyutjyuQuery(entryId: string): string {
-  return jyutjyuRefResult.value.get(entryId)?.q || ''
-}
-
-function formatJyutjyuResults(list: any[]): JyutjyuRefItem[] {
-  if (!Array.isArray(list) || list.length === 0) return []
-  return list.map((r: any) => ({
-    id: String(r.id || ''),
-    headwordDisplay: r?.headword?.display || '-',
-    jyutping: r?.phonetic?.jyutping?.[0] || '',
-    dialectLabel: getDialectLabelByRegionCode(r?.dialect?.region_code || ''),
-    sourceBook: r?.source_book || '',
-    definitionSummary: r?.senses?.[0]?.definition || ''
-  }))
-}
-
-async function runJyutjyuRef(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  const q = entry.headword?.display?.trim() || ''
-  if (!entryId || !q) return
-
-  const handledKey = getJyutjyuHandledKey(entryId, q)
-  if (jyutjyuRefHandled.value.has(handledKey)) return
-
-  // 若同一詞頭已查詢過（且不在 loading），則僅恢復顯示即可，避免重複請求
-  const existing = jyutjyuRefResult.value.get(entryId)
-  if (existing && existing.q === q && existing.loading === false && (existing.total !== null || existing.results.length > 0 || existing.errorMessage)) {
-    jyutjyuRefVisible.value.set(entryId, true)
-    jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
-    return
-  }
-
-  jyutjyuRefResult.value.set(entryId, {
-    loading: true,
-    q,
-    total: null,
-    results: [],
-    errorMessage: ''
-  })
-  jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
-  jyutjyuRefVisible.value.set(entryId, true)
-  jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
-
-  try {
-    const res = await $fetch<any>('/api/jyutjyu/search', { query: { q } })
-    jyutjyuRefResult.value.set(entryId, {
-      loading: false,
-      q,
-      total: typeof res?.total === 'number' ? res.total : (Array.isArray(res?.results) ? res.results.length : 0),
-      results: Array.isArray(res?.results) ? res.results : [],
-      errorMessage: ''
-    })
-  } catch (e) {
-    jyutjyuRefResult.value.set(entryId, {
-      loading: false,
-      q,
-      total: null,
-      results: [],
-      errorMessage: '查詢 Jyutjyu 時出現問題，請稍後再試。'
-    })
-  }
-  jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
-}
-
-// 查詢泛粵典（方言用香港繁體顯示名，如「廣州」，以便推理與 API 匹配）
-async function queryJyutdictForEntry(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  const headword = entry.headword?.display || entry.text || ''
-  const dialectId = entry.dialect?.name || ''
-  const dialectLabel = getDialectLabel(dialectId) || dialectId
-
-  if (!headword || !dialectLabel) return
-
-  jyutdictLoading.value.set(entryId, true)
-  jyutdictVisible.value.set(entryId, true)
-
-  try {
-    const data = await queryJyutdict(headword, dialectLabel)
-    jyutdictData.value.set(entryId, data)
-
-    const suggested = getSuggestedPronunciation(data, dialectLabel)
-    jyutdictSuggested.value.set(entryId, suggested)
-  } catch (error) {
-    console.error('Failed to query jyutdict:', error)
-  } finally {
-    jyutdictLoading.value.set(entryId, false)
-  }
-}
-
-/** 新建詞條：離開詞頭格時檢測數據庫是否已有相同詞頭+方言，並將結果存入 duplicateCheckResult */
-async function runDuplicateCheck(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  const headword = entry.headword?.display?.trim() || ''
-  const dialect = entry.dialect?.name || ''
-  if (!headword || !dialect) return
-
-  duplicateCheckResult.value.set(entryId, { loading: true })
-  duplicateCheckResult.value = new Map(duplicateCheckResult.value)
-
-  try {
-    const res = await $fetch<{ sameDialect: OtherDialectEntryRaw[], otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
-      query: { headword, dialect }
-    })
-    duplicateCheckResult.value.set(entryId, {
-      loading: false,
-      entries: res.sameDialect || [],
-      otherDialects: res.otherDialects || []
-    })
-  } catch (e) {
-    duplicateCheckResult.value.set(entryId, { loading: false, entries: [], otherDialects: [] })
-  }
-  duplicateCheckResult.value = new Map(duplicateCheckResult.value)
-}
-
-const DEFINITION_SUMMARY_MAX_LEN = 50
-
-/** 格式化同方言重複詞條，帶釋義摘要、主題分類、義項數、meta 簡要（與「其他方言點」預覽一致） */
-function formatDuplicateEntries(list: OtherDialectEntryRaw[]): Array<{
-  id: string
-  headwordDisplay: string
-  dialectLabel: string
-  status: string
-  statusLabel: string
-  createdAtLabel: string
-  definitionSummary: string
-  themeLabel: string
-  senseCount: number
-  metaLabel: string
-}> {
-  if (!list?.length) return []
-  return list.map(e => {
-    const firstDef = e.senses?.[0]?.definition?.trim() || ''
-    const definitionSummary = firstDef
-      ? (firstDef.length <= DEFINITION_SUMMARY_MAX_LEN ? firstDef : firstDef.slice(0, DEFINITION_SUMMARY_MAX_LEN) + '…')
-      : '（無釋義）'
-    const themeParts = [e.theme?.level1, e.theme?.level2, e.theme?.level3].filter(Boolean) as string[]
-    const themeLabel = themeParts.length ? themeParts.join(' → ') : '（未分類）'
-    const senseCount = e.senses?.length ?? 0
-    const metaParts = [e.meta?.pos, e.meta?.register].filter(Boolean) as string[]
-    const metaLabel = metaParts.length ? metaParts.join(' · ') : ''
-    return {
-      id: e.id,
-      headwordDisplay: e.headword?.display || '-',
-      dialectLabel: DIALECT_CODE_TO_NAME[e.dialect?.name || ''] || e.dialect?.name || '-',
-      status: e.status || 'draft',
-      statusLabel: STATUS_LABELS[e.status || 'draft'] || e.status || '-',
-      createdAtLabel: e.createdAt ? new Date(e.createdAt).toLocaleString('zh-HK', { dateStyle: 'short', timeStyle: 'short' }) : '-',
-      definitionSummary,
-      themeLabel,
-      senseCount,
-      metaLabel
-    }
-  })
-}
-
-/** 格式化「其他方言」詞條，帶釋義摘要、主題分類、義項數、meta 簡要 */
-function formatOtherDialectsEntries(list: OtherDialectEntryRaw[]): Array<{
-  id: string
-  headwordDisplay: string
-  dialectLabel: string
-  status: string
-  statusLabel: string
-  createdAtLabel: string
-  definitionSummary: string
-  themeLabel: string
-  senseCount: number
-  metaLabel: string
-}> {
-  if (!list?.length) return []
-  return list.map(e => {
-    const firstDef = e.senses?.[0]?.definition?.trim() || ''
-    const definitionSummary = firstDef
-      ? (firstDef.length <= DEFINITION_SUMMARY_MAX_LEN ? firstDef : firstDef.slice(0, DEFINITION_SUMMARY_MAX_LEN) + '…')
-      : '（無釋義）'
-    const themeParts = [e.theme?.level1, e.theme?.level2, e.theme?.level3].filter(Boolean) as string[]
-    const themeLabel = themeParts.length ? themeParts.join(' → ') : '（未分類）'
-    const senseCount = e.senses?.length ?? 0
-    const metaParts = [e.meta?.pos, e.meta?.register].filter(Boolean) as string[]
-    const metaLabel = metaParts.length ? metaParts.join(' · ') : ''
-    return {
-      id: e.id,
-      headwordDisplay: e.headword?.display || '-',
-      dialectLabel: DIALECT_CODE_TO_NAME[e.dialect?.name || ''] || e.dialect?.name || '-',
-      status: e.status || 'draft',
-      statusLabel: STATUS_LABELS[e.status || 'draft'] || e.status || '-',
-      createdAtLabel: e.createdAt ? new Date(e.createdAt).toLocaleString('zh-HK', { dateStyle: 'short', timeStyle: 'short' }) : '-',
-      definitionSummary,
-      themeLabel,
-      senseCount,
-      metaLabel
-    }
-  })
-}
-
-function getDuplicateCheckEntriesFormatted(entryId: string) {
-  return formatDuplicateEntries(duplicateCheckResult.value.get(entryId)?.entries || [])
-}
-
-function getOtherDialectsFormatted(entryId: string) {
-  return formatOtherDialectsEntries(duplicateCheckResult.value.get(entryId)?.otherDialects || [])
-}
-
-/** 將「其他方言點」中的某條詞條內容作為範本，填入當前正在編輯/新建的詞條。
- *  僅在同詞頭但不同方言時使用：保留當前詞條的詞頭與方言，只複製釋義、分類等內容。 */
-async function applyOtherDialectTemplate(targetEntry: Entry, sourceId: string) {
-  const sid = String(sourceId)
-
-  try {
-    // 從後端拉取來源詞條的完整數據（同 EntryModal）
-    const response = await $fetch<{ success: boolean; data?: any }>(`/api/entries/${sid}`)
-    if (!response?.success || !response.data) return
-
-    const source = response.data as any
-
-    // 深拷貝需要複製的字段，避免共享引用
-    const clonedSenses = source.senses?.length ? deepCopy(source.senses) : [{ definition: '', examples: [] }]
-    const clonedTheme = source.theme ? deepCopy(source.theme) : {}
-    const clonedMeta = source.meta ? deepCopy(source.meta) : {}
-    const clonedRefs = source.refs?.length ? deepCopy(source.refs) : undefined
-    const clonedEntryType = source.entryType ?? 'word'
-
-    // 僅覆寫內容相關字段，保留當前詞頭與方言
-    targetEntry.entryType = clonedEntryType as any
-    targetEntry.senses = clonedSenses as any
-    if (clonedRefs) {
-      ;(targetEntry as any).refs = clonedRefs
-    }
-    targetEntry.theme = clonedTheme as any
-    targetEntry.meta = clonedMeta as any
-
-    // 來源詞條若已隸屬某個詞語（lexeme），沿用其 lexemeId，方便跨方言詞語聚合
-    if (source.lexemeId) {
-      ;(targetEntry as any).lexemeId = source.lexemeId
-    }
-
-    targetEntry._isDirty = true
-  } catch (e) {
-    console.error('Failed to apply other dialect template', e)
-  }
-}
-
-/** 將 Jyutjyu 的某條結果內容作為範本，填入當前正在編輯/新建的詞條。
- *  保留當前詞條的詞頭與方言，主要複製釋義（及其例句）；若當前尚未填粵拼，會順便補上。 */
-function applyJyutjyuTemplate(targetEntry: Entry, sourceId: string) {
-  const entryId = String(targetEntry.id ?? (targetEntry as any)._tempId ?? '')
-  if (!entryId) return
-
-  const state = jyutjyuRefResult.value.get(entryId)
-  const rawList = state?.results || []
-  const sid = String(sourceId)
-  const source = Array.isArray(rawList) ? rawList.find((r: any) => String(r?.id || '') === sid) : null
-  if (!source) return
-
-  try {
-    const rawSenses = Array.isArray(source?.senses) ? source.senses : []
-    const nextSenses = rawSenses.length
-      ? rawSenses
-        .map((s: any) => {
-          const definition = String(s?.definition || '').trim()
-          if (!definition) return null
-
-          const rawExamples = Array.isArray(s?.examples) ? s.examples : []
-          const examples = rawExamples
-            .map((ex: any) => {
-              const text = String(ex?.text || '').trim()
-              if (!text) return null
-              return {
-                text,
-                jyutping: ex?.jyutping ? String(ex.jyutping) : undefined,
-                translation: ex?.translation ? String(ex.translation) : undefined
-              }
-            })
-            .filter(Boolean) as any
-
-          return {
-            definition,
-            label: s?.label ? String(s.label) : undefined,
-            examples: examples.length ? examples : []
-          }
-        })
-        .filter(Boolean)
-      : [{ definition: '', examples: [] }]
-
-    targetEntry.senses = deepCopy(nextSenses as any)
-
-    // 若當前未填粵拼，嘗試用 Jyutjyu 結果補上
-    const currentJyutping = targetEntry.phonetic?.jyutping || []
-    const sourceJyutping = source?.phonetic?.jyutping
-    if ((!currentJyutping || currentJyutping.length === 0) && Array.isArray(sourceJyutping) && sourceJyutping.length > 0) {
-      targetEntry.phonetic = targetEntry.phonetic || {}
-      targetEntry.phonetic.jyutping = deepCopy(sourceJyutping)
-    }
-
-    targetEntry._isDirty = true
-  } catch (e) {
-    console.error('Failed to apply Jyutjyu template', e)
-  }
-}
-
-function dismissDuplicateCheck(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  duplicateCheckResult.value.delete(entryId)
-  duplicateCheckResult.value = new Map(duplicateCheckResult.value)
-}
-
-function getDuplicateCheckVisible(entryId: string): boolean {
-  const r = duplicateCheckResult.value.get(entryId)
-  return !!(r && (r.loading || (r.entries && r.entries.length > 0) || (r.otherDialects && r.otherDialects.length > 0)))
-}
-
-function getDuplicateCheckLoading(entryId: string): boolean {
-  return duplicateCheckResult.value.get(entryId)?.loading ?? false
-}
-
-function getDuplicateCheckRowVisible(entryId: string): boolean {
-  return getDuplicateCheckLoading(entryId) || getDuplicateCheckEntriesFormatted(entryId).length > 0
-}
-
-function getOtherDialectsRowVisible(entryId: string): boolean {
-  return getOtherDialectsFormatted(entryId).length > 0 && getDuplicateCheckEntriesFormatted(entryId).length === 0
-}
-
-function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-
-  // 1) 行內 AI 釋義建議（最上面）
-  if (
-    aiSuggestion.value &&
-    editingCell.value &&
-    String(editingCell.value.entryId) === entryId &&
-    editingCell.value.field === aiSuggestionForField.value
-  ) {
-    dismissAISuggestion()
-    return true
-  }
-
-  // 2) 行內 AI 分類建議（顯示條件：焦點在分類列）
-  if (colIndex === themeColIndex && themeAISuggestions.value.get(entryId)) {
-    dismissThemeAI(entry)
-    return true
-  }
-
-  // 3) 泛粵典粵拼建議（顯示條件：焦點在粵拼列）
-  if (colIndex === phoneticColIndex && getJyutdictVisible(entryId)) {
-    dismissJyutdict(entry)
-    return true
-  }
-
-  // 4) 詞頭重複檢測（與 v-if 一致：loading 或 sameDialect 有結果）
-  if (getDuplicateCheckRowVisible(entryId)) {
-    dismissDuplicateCheck(entry)
-    return true
-  }
-
-  // 5) 其他方言點參考（與 v-if 一致）
-  if (getOtherDialectsRowVisible(entryId)) {
-    dismissDuplicateCheck(entry)
-    return true
-  }
-
-  // 6) Jyutjyu 參考（最下面）
-  if (getJyutjyuRowVisible(entryId)) {
-    dismissJyutjyuRef(entry)
-    return true
-  }
-
-  return false
-}
-
-// 接受粵拼建議（採納後不再顯示，與分類/釋義一致）
-function acceptJyutdict(entry: Entry, pronunciation: string) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  const col = editableColumns.find(c => c.key === 'phonetic')
-  if (col) {
-    col.set(entry, pronunciation as never)
-    entry._isDirty = true
-  }
-  // 若當前正在編輯該格，同步 editValue，否則 saveCellEdit 會用舊輸入覆蓋剛採納的值
-  if (editingCell.value && String(editingCell.value.entryId) === entryId && editingCell.value.field === 'phonetic') {
-    editValue.value = pronunciation
-  }
-  jyutdictHandled.value.add(entryId)
-  jyutdictHandled.value = new Set(jyutdictHandled.value)
-  jyutdictVisible.value.set(entryId, false)
-}
-
-// 忽略粵拼建議（忽略後不再顯示）
-function dismissJyutdict(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  jyutdictHandled.value.add(entryId)
-  jyutdictHandled.value = new Set(jyutdictHandled.value)
-  jyutdictVisible.value.set(entryId, false)
-}
-
-function dismissJyutjyuRef(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  const q = getJyutjyuQuery(entryId).trim()
-  if (!entryId || !q) return
-
-  const key = getJyutjyuHandledKey(entryId, q)
-  jyutjyuRefHandled.value.add(key)
-  jyutjyuRefHandled.value = new Set(jyutjyuRefHandled.value)
-  jyutjyuRefVisible.value.set(entryId, false)
-  jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
-}
 
 // 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
 const displayGroups = computed(() => {
@@ -1539,6 +1020,47 @@ const currentPageEntries = computed(() => {
   return displayGroups.value.flatMap(g => g.entries)
 })
 
+const {
+  selectedEntryIds,
+  selectAllChecked,
+  selectAllIndeterminate,
+  selectedCount,
+  selectedSavedEntries,
+  isEntrySelected,
+  toggleSelectEntry,
+  toggleSelectAll,
+  clearSelection,
+  batchDeleting,
+  batchDeleteSelected,
+  headerCheckboxRef
+} = useEntriesSelection(currentPageEntries, fetchEntries)
+
+const {
+  aiSuggestion,
+  aiSuggestionForField,
+  pendingAISuggestions,
+  themeAISuggestions,
+  definitionAISuggestions,
+  aiLoadingFor,
+  aiLoading,
+  aiLoadingInlineFor,
+  aiInlineError,
+  formatThemeSuggestion,
+  triggerAISuggestion,
+  generateAIExamples,
+  generateAIDefinition,
+  generateAICategorization,
+  clearPendingSuggestionForCurrentCell,
+  retryInlineAISuggestion,
+  acceptAISuggestion,
+  dismissAISuggestion,
+  acceptThemeAI,
+  dismissThemeAI,
+  clearThemeSuggestionForEntry,
+  acceptDefinitionAI,
+  dismissDefinitionAI
+} = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
+
 function toggleGroupExpanded(headwordNormalized: string) {
   const next = new Set(expandedGroupKeys.value)
   if (next.has(headwordNormalized)) next.delete(headwordNormalized)
@@ -1559,119 +1081,6 @@ const isEmpty = computed(() => {
   return base.length === 0 && !entries.value.some(e => (e as any)._isNew)
 })
 
-/** 聚合組列顯示：粵拼（首條或「多種」） */
-function getGroupPhonetic(group: { entries: Entry[] }): string {
-  const first = group.entries[0]?.phonetic?.jyutping?.join?.(' ')
-  if (!first) return '—'
-  const allSame = group.entries.every(e => (e.phonetic?.jyutping?.join?.(' ') ?? '') === first)
-  return allSame ? first : '多種'
-}
-
-const ENTRY_TYPE_LABELS: Record<string, string> = { character: '字', word: '詞', phrase: '短語' }
-/** 聚合組列顯示：類型（首條或「混合」） */
-function getGroupEntryType(group: { entries: Entry[] }): string {
-  const first = group.entries[0]?.entryType ?? 'word'
-  const allSame = group.entries.every(e => (e.entryType ?? 'word') === first)
-  return allSame ? (ENTRY_TYPE_LABELS[first] ?? first) : '混合'
-}
-
-/** 聚合組列顯示：分類（首條 L3 名稱或「多種」） */
-function getGroupTheme(group: { entries: Entry[] }): string {
-  const firstId = group.entries[0]?.theme?.level3Id
-  if (firstId == null) return group.entries.some(e => e.theme?.level3Id != null) ? '多種' : '—'
-  const name = getThemeNameById(firstId)
-  const allSame = group.entries.every(e => (e.theme?.level3Id ?? null) === (firstId ?? null))
-  return allSame ? (name || '—') : '多種'
-}
-
-/** 聚合組列顯示：語域（首條或「多種」） */
-function getGroupRegister(group: { entries: Entry[] }): string {
-  const first = (group.entries[0]?.meta?.register as string) ?? '__none__'
-  const allSame = group.entries.every(e => ((e.meta?.register as string) ?? '__none__') === first)
-  if (first === '__none__' || first === '') return allSame ? '—' : '多種'
-  return allSame ? first : '多種'
-}
-
-/** 聚合組列顯示：狀態（一致則一項，否則列出各狀態數量） */
-function getGroupStatus(group: { entries: Entry[] }): string {
-  const statuses = group.entries.map(e => e.status || 'draft')
-  const uniq = [...new Set(statuses)]
-  const first = uniq[0]
-  if (uniq.length === 1 && first) return STATUS_LABELS[first] ?? first
-  const counts = statuses.reduce((acc, s) => { acc[s] = (acc[s] ?? 0) + 1; return acc }, {} as Record<string, number>)
-  return uniq.filter(Boolean).map(s => `${counts[s]} ${STATUS_LABELS[s] ?? s}`).join(' · ')
-}
-
-// 多選：當前選中的詞條 key（id 或 _tempId）集合，用 Set 並整體替換以觸發響應式
-const selectedEntryIds = ref<Set<string>>(new Set())
-const selectAllChecked = computed(() => {
-  if (currentPageEntries.value.length === 0) return false
-  return currentPageEntries.value.every((e) => selectedEntryIds.value.has(String(getEntryKey(e))))
-})
-const selectAllIndeterminate = computed(() => {
-  const n = selectedOnCurrentPageCount.value
-  return n > 0 && n < currentPageEntries.value.length
-})
-const selectedOnCurrentPageCount = computed(() =>
-  currentPageEntries.value.filter((e) => selectedEntryIds.value.has(String(getEntryKey(e)))).length
-)
-const selectedCount = computed(() => selectedEntryIds.value.size)
-/** 當前選中且已保存（有 id）的詞條，可用於批量刪除 */
-const selectedSavedEntries = computed(() =>
-  currentPageEntries.value.filter((e) => e.id && selectedEntryIds.value.has(String(e.id)))
-)
-
-function isEntrySelected(entry: Entry) {
-  return selectedEntryIds.value.has(String(getEntryKey(entry)))
-}
-function toggleSelectEntry(entry: Entry, event?: Event) {
-  event?.stopPropagation()
-  const key = String(getEntryKey(entry))
-  const next = new Set(selectedEntryIds.value)
-  if (next.has(key)) next.delete(key)
-  else next.add(key)
-  selectedEntryIds.value = next
-}
-function toggleSelectAll() {
-  if (selectAllChecked.value) {
-    const onPage = new Set(currentPageEntries.value.map((e) => String(getEntryKey(e))))
-    selectedEntryIds.value = new Set([...selectedEntryIds.value].filter((id) => !onPage.has(id)))
-  } else {
-    const next = new Set(selectedEntryIds.value)
-    currentPageEntries.value.forEach((e) => next.add(String(getEntryKey(e))))
-    selectedEntryIds.value = next
-  }
-}
-function clearSelection() {
-  selectedEntryIds.value = new Set()
-}
-
-const headerCheckboxRef = ref<HTMLInputElement | null>(null)
-watch(selectAllIndeterminate, (val) => {
-  if (headerCheckboxRef.value) headerCheckboxRef.value.indeterminate = val
-}, { immediate: true })
-
-const batchDeleting = ref(false)
-async function batchDeleteSelected() {
-  const toDelete = selectedSavedEntries.value
-  if (toDelete.length === 0) return
-  if (!confirm(`確定要刪除所選的 ${toDelete.length} 條詞條嗎？此操作不可撤銷。`)) return
-  batchDeleting.value = true
-  try {
-    for (const entry of toDelete) {
-      await $fetch<unknown>(`/api/entries/${entry.id}`, { method: 'DELETE' })
-      selectedEntryIds.value = new Set([...selectedEntryIds.value].filter((id) => id !== String(entry.id)))
-    }
-    await fetchEntries()
-    clearSelection()
-  } catch (error: any) {
-    console.error('Batch delete failed:', error)
-    alert(error?.data?.message || '批量刪除失敗')
-  } finally {
-    batchDeleting.value = false
-  }
-}
-
 // Notion 風格：所有列在瀏覽態自動換行顯示（Wrap column），最多 4 行
 function useWrapForField(_field: string) {
   return true
@@ -1681,216 +1090,6 @@ function isSelected(rowIndex: number, colIndex: number) {
   const f = focusedCell.value
   return f != null && f.rowIndex === rowIndex && f.colIndex === colIndex
 }
-
-const pagination = reactive({
-  total: 0,
-  page: 1,
-  perPage: 20,
-  totalPages: 0
-})
-
-// Editable columns with inline editing support
-const editableColumns = [
-  {
-    key: 'headword',
-    label: '詞頭',
-    width: '120px',
-    type: 'text',
-    get: (entry: Entry) => {
-      const hw = entry.headword
-      const main = hw?.display || entry.text || ''
-      const variants = (hw?.variants || []).map(v => v.trim()).filter(Boolean)
-      if (!main) return ''
-      if (!variants.length) return main
-      // 顯示格式：主詞形 [異形1; 異形2]
-      return `${main} [${variants.join('; ')}]`
-    },
-    set: (entry: Entry, value: string) => {
-      const raw = (value || '').trim()
-
-      // 解析規則：
-      // - 可選中括號：主詞形 [異形1; 異形2]，亦兼容全角【】。
-      // - 多個詞形用半角/全角逗號、分號分隔。
-      let outside = raw
-      let inside = ''
-
-      // 兼容半角 [ ] 及全角 【 】 作為包裹異形詞的括號
-      const bracketMatch = raw.match(/^(.*?)(?:[\[\uFF3B](.*)[\]\uFF3D])\s*$/)
-      if (bracketMatch) {
-        outside = (bracketMatch[1] || '').trim()
-        inside = (bracketMatch[2] || '').trim()
-      }
-
-      const parts: string[] = []
-      const pushFrom = (s: string) => {
-        // 支援半角/全角逗號、分號：, ; ， ；
-        s.split(/[;,，；]/).forEach(token => {
-          const v = token.trim()
-          if (v) parts.push(v)
-        })
-      }
-
-      if (outside) pushFrom(outside)
-      if (inside) pushFrom(inside)
-
-      const uniq = [...new Set(parts)]
-      const main = uniq[0] || ''
-      const variants = uniq.slice(1)
-
-      if (!entry.headword) {
-        entry.headword = { display: '', normalized: '', isPlaceholder: false, variants: [] }
-      }
-
-      entry.headword.display = main
-      // 標準化詞頭默認等於顯示詞頭
-      entry.headword.normalized = main
-      entry.headword.isPlaceholder = main.includes('□')
-      entry.headword.variants = variants
-      entry.text = main
-    }
-  },
-  {
-    key: 'dialect',
-    label: '方言',
-    width: '80px',
-    type: 'select',
-    options: [], // 動態設置，見 getOptions
-    getOptions: () => userDialectOptions.value,
-    get: (entry: Entry) => entry.dialect?.name || '',
-    set: (entry: Entry, value: string) => {
-      if (!entry.dialect) entry.dialect = { name: value }
-      entry.dialect.name = value
-    }
-  },
-  {
-    key: 'phonetic',
-    label: '粵拼',
-    width: '100px',
-    type: 'phonetic',
-    get: (entry: Entry) => {
-      const arr = entry.phonetic?.jyutping
-      if (Array.isArray(arr) && arr.length > 0) {
-        // 新格式：每個元素為一套完整讀音（可包含空格）；舊格式：單讀音按音節拆分
-        const hasSpaceInside = arr.some(s => (s || '').includes(' '))
-        if (!hasSpaceInside) {
-          // 舊數據：視為單一讀音的音節陣列
-          return arr.join(' ')
-        }
-        // 新數據：視為多讀音列表，使用分號連接
-        return arr.join('; ')
-      }
-      return entry.phoneticNotation || ''
-    },
-    set: (entry: Entry, value: string) => {
-      const raw = (value || '').trim()
-      if (!entry.phonetic) entry.phonetic = { jyutping: [] }
-
-      // 多個讀音用半角/全角逗號或分號分隔；每個元素為一套完整讀音字串
-      const readings = raw
-        .split(/[;,，；]/)
-        .map(s => s.trim())
-        .filter(Boolean)
-
-      entry.phonetic.jyutping = readings
-      // phoneticNotation 作為兼容字段，使用分號連接
-      entry.phoneticNotation = readings.join('; ')
-    }
-  },
-  {
-    key: 'entryType',
-    label: '類型',
-    width: '80px',
-    type: 'select',
-    options: [
-      { value: 'character', label: '字' },
-      { value: 'word', label: '詞' },
-      { value: 'phrase', label: '短語' }
-    ],
-    get: (entry: Entry) => entry.entryType || 'word',
-    set: (entry: Entry, value: string) => { entry.entryType = value as any }
-  },
-  {
-    key: 'theme',
-    label: '分類',
-    width: '140px',
-    type: 'theme',
-    options: [], // 靜態選項在這裡設置，實際使用 getOptions
-    getOptions: () => themeOptions,
-    get: (entry: Entry) => entry.theme?.level3Id || undefined,
-    set: (entry: Entry, value: number | undefined) => {
-      if (!entry.theme) entry.theme = {}
-      if (value) {
-        // 從 ID 獲取完整的主題信息
-        const theme = getThemeById(value)
-        if (theme) {
-          entry.theme.level1 = theme.level1Name
-          entry.theme.level2 = theme.level2Name
-          entry.theme.level3 = theme.level3Name
-          entry.theme.level1Id = theme.level1Id
-          entry.theme.level2Id = theme.level2Id
-          entry.theme.level3Id = theme.level3Id
-        }
-      } else {
-        entry.theme.level1 = undefined
-        entry.theme.level2 = undefined
-        entry.theme.level3 = undefined
-        entry.theme.level1Id = undefined
-        entry.theme.level2Id = undefined
-        entry.theme.level3Id = undefined
-      }
-    }
-  },
-  {
-    key: 'definition',
-    label: '釋義',
-    width: '200px',
-    type: 'text',
-    get: (entry: Entry) => entry.senses?.[0]?.definition || entry.definition || '',
-    set: (entry: Entry, value: string) => {
-      if (!entry.senses || entry.senses.length === 0) {
-        entry.senses = [{ definition: value, examples: [] }]
-      } else {
-        const first = entry.senses[0]
-        if (first) first.definition = value
-      }
-      entry.definition = value
-    }
-  },
-  {
-    key: 'register',
-    label: '語域',
-    width: '80px',
-    type: 'select',
-    options: [
-      { value: '__none__', label: '-' },
-      { value: '口語', label: '口語' },
-      { value: '書面', label: '書面' },
-      { value: '粗俗', label: '粗俗' },
-      { value: '文雅', label: '文雅' },
-      { value: '中性', label: '中性' }
-    ],
-    get: (entry: Entry) => entry.meta?.register || '__none__',
-    set: (entry: Entry, value: string) => {
-      if (!entry.meta) entry.meta = {}
-      entry.meta.register = (value === '__none__' ? '' : value) as any
-    }
-  },
-  {
-    key: 'status',
-    label: '狀態',
-    width: '80px',
-    type: 'select',
-    options: [], // 動態設置，見 getOptions
-    getOptions: () => statusOptionsForTable.value,
-    get: (entry: Entry) => entry.status || 'draft',
-    set: (entry: Entry, value: string) => { entry.status = value as any }
-  }
-]
-
-/** 分類列在 editableColumns 中的索引，用於 Tab 落在分類列時顯示 AI 建議 */
-const themeColIndex = editableColumns.findIndex(c => c.key === 'theme')
-const phoneticColIndex = editableColumns.findIndex(c => c.key === 'phonetic')
-const headwordColIndex = editableColumns.findIndex(c => c.key === 'headword')
 
 // Options（方言選項由統一常數提供）
 const dialectOptions = dialectOptionsWithAll(ALL_FILTER_VALUE)
@@ -1904,30 +1103,11 @@ const statusOptions = [
 ]
 
 /** 狀態值 → 中文標籤（用於表格顯示，與角色無關，避免貢獻者看到 approved/rejected 時顯示英文） */
-const STATUS_LABELS: Record<string, string> = {
-  draft: '草稿',
-  pending_review: '待審核',
-  approved: '已發佈',
-  rejected: '已拒絕'
-}
 
-// 新建詞條時的預設方言：審核員/管理員可選全部；貢獻者有多個方言權限時可選其一
-const NEW_ENTRY_DIALECT_KEY = 'jyutcollab_new_entry_dialect'
 const isReviewerOrAdmin = computed(() => {
   const r = user.value?.role
   return r === 'reviewer' || r === 'admin'
 })
-// 貢獻者有多個方言時顯示選擇器；審核員/管理員一律顯示
-const showNewEntryDialectSelector = computed(() => {
-  if (isReviewerOrAdmin.value) return true
-  return (userDialectOptions.value?.length ?? 0) > 1
-})
-// 選項：審核員/管理員為全部方言，貢獻者為其權限內方言
-const newEntryDialectOptionsForSelector = computed(() => {
-  if (isReviewerOrAdmin.value) return DIALECT_OPTIONS_FOR_SELECT
-  return userDialectOptions.value
-})
-const defaultDialectForNew = ref<string>('hongkong')
 
 // 方言代碼到顯示名稱的映射（由統一常數提供）
 const dialectCodeToName = DIALECT_CODE_TO_NAME
@@ -1984,24 +1164,87 @@ const userDialectOptions = computed(() => {
     }))
 })
 
-// 獲取用戶嘅預設方言（新建詞條時使用）
-function getUserDefaultDialect(): string {
-  const currentUser = user.value
-  const options = newEntryDialectOptionsForSelector.value
-  const chosen = defaultDialectForNew.value
+const {
+  defaultDialectForNew,
+  newEntryDialectOptionsForSelector,
+  showNewEntryDialectSelector,
+  getUserDefaultDialect
+} = useNewEntryDialect(isReviewerOrAdmin, userDialectOptions, user, effectiveDialectPermissions)
 
-  // 若頁面上選擇的方言在當前可選項內，則使用
-  if (chosen && options.some((o: { value: string }) => o.value === chosen)) {
-    return chosen
+const { editableColumns, themeColIndex, phoneticColIndex, headwordColIndex } = useEntriesTableColumns(userDialectOptions, themeOptions, statusOptionsForTable)
+const tableEdit = useEntriesTableEdit(editableColumns, dialectCodeToName)
+const getCellDisplay = tableEdit.getCellDisplay as (entry: Entry, col: { key: string; type: string; get: (e: Entry) => unknown }) => string
+const getCellClass = tableEdit.getCellClass
+const getColumnOptions = tableEdit.getColumnOptions as (col: { getOptions?: () => unknown[]; options?: unknown[] }) => Array<{ value: string; label: string }>
+const resizeTextarea = tableEdit.resizeTextarea
+
+const rowHints = useEntriesRowHints({ editableColumns, editingCell, editValue })
+const jyutdictData = rowHints.jyutdictData
+const jyutdictLoading = rowHints.jyutdictLoading
+const jyutdictSuggested = rowHints.jyutdictSuggested
+const jyutdictVisible = rowHints.jyutdictVisible
+const jyutdictHandled = rowHints.jyutdictHandled
+const duplicateCheckResult = rowHints.duplicateCheckResult
+const jyutjyuRefResult = rowHints.jyutjyuRefResult
+const jyutjyuRefVisible = rowHints.jyutjyuRefVisible
+const jyutjyuRefHandled = rowHints.jyutjyuRefHandled
+const getJyutdictData = rowHints.getJyutdictData
+const getJyutdictLoading = rowHints.getJyutdictLoading
+const getJyutdictSuggested = rowHints.getJyutdictSuggested
+const getJyutdictVisible = rowHints.getJyutdictVisible
+const getJyutjyuHandledKey = rowHints.getJyutjyuHandledKey
+const getJyutjyuRowVisible = rowHints.getJyutjyuRowVisible
+const getJyutjyuVisible = rowHints.getJyutjyuVisible
+const getJyutjyuLoading = rowHints.getJyutjyuLoading
+const getJyutjyuError = rowHints.getJyutjyuError
+const getJyutjyuTotal = rowHints.getJyutjyuTotal
+const getJyutjyuQuery = rowHints.getJyutjyuQuery
+const formatJyutjyuResults = rowHints.formatJyutjyuResults
+const runJyutjyuRef = rowHints.runJyutjyuRef
+const queryJyutdictForEntry = rowHints.queryJyutdictForEntry
+const runDuplicateCheck = rowHints.runDuplicateCheck
+const formatDuplicateEntries = rowHints.formatDuplicateEntries
+const formatOtherDialectsEntries = rowHints.formatOtherDialectsEntries
+const getDuplicateCheckEntriesFormatted = rowHints.getDuplicateCheckEntriesFormatted
+const getOtherDialectsFormatted = rowHints.getOtherDialectsFormatted
+const applyOtherDialectTemplate = rowHints.applyOtherDialectTemplate
+const applyJyutjyuTemplate = rowHints.applyJyutjyuTemplate
+const dismissDuplicateCheck = rowHints.dismissDuplicateCheck
+const getDuplicateCheckVisible = rowHints.getDuplicateCheckVisible
+const getDuplicateCheckLoading = rowHints.getDuplicateCheckLoading
+const getDuplicateCheckRowVisible = rowHints.getDuplicateCheckRowVisible
+const getOtherDialectsRowVisible = rowHints.getOtherDialectsRowVisible
+const acceptJyutdict = rowHints.acceptJyutdict
+const dismissJyutdict = rowHints.dismissJyutdict
+const dismissJyutjyuRef = rowHints.dismissJyutjyuRef
+
+function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
+  const entryId = getEntryIdString(entry)
+  if (aiSuggestion.value && editingCell.value && String(editingCell.value.entryId) === entryId && editingCell.value.field === aiSuggestionForField.value) {
+    dismissAISuggestion()
+    return true
   }
-
-  // 貢獻者：使用 effectiveDialectPermissions 的第一個方言（與選項列表一致）
-  const perms = currentUser?.role === 'contributor' ? effectiveDialectPermissions.value : currentUser?.dialectPermissions
-  if (Array.isArray(perms) && perms.length) {
-    return perms[0]?.dialectName ?? 'hongkong'
+  if (colIndex === themeColIndex.value && themeAISuggestions.value.get(entryId)) {
+    dismissThemeAI(entry)
+    return true
   }
-
-  return 'hongkong'
+  if (colIndex === phoneticColIndex.value && getJyutdictVisible(entryId)) {
+    dismissJyutdict(entry)
+    return true
+  }
+  if (getDuplicateCheckRowVisible(entryId)) {
+    dismissDuplicateCheck(entry)
+    return true
+  }
+  if (getOtherDialectsRowVisible(entryId)) {
+    dismissDuplicateCheck(entry)
+    return true
+  }
+  if (getJyutjyuRowVisible(entryId)) {
+    dismissJyutjyuRef(entry)
+    return true
+  }
+  return false
 }
 
 // Computed
@@ -2018,17 +1261,6 @@ function setInputRef(el: any, entryId: string, field: string) {
   if (el) {
     inputRefs.value.set(`${entryId}-${field}`, el)
   }
-}
-
-const MAX_TEXTAREA_HEIGHT_PX = 240
-
-function resizeTextarea(el: EventTarget | null) {
-  const ta = el instanceof HTMLTextAreaElement ? el : null
-  if (!ta) return
-  ta.style.height = 'auto'
-  const h = ta.scrollHeight
-  ta.style.height = `${h}px`
-  ta.style.overflowY = h > MAX_TEXTAREA_HEIGHT_PX ? 'auto' : 'hidden'
 }
 
 /** 釋義列展開區旁的數量提示：多義項或例句時顯示「N義項 · M例」 */
@@ -2072,197 +1304,35 @@ function getPhoneticHint(entry: Entry): string {
   return `${othersCount} 其他讀音`
 }
 
-function getCellDisplay(entry: Entry, col: any) {
-  const value = col.get(entry)
-  // 詞頭：顯示主詞形本身，異形數量用第二行提示顯示
-  if (col.key === 'headword') {
-    const main = entry.headword?.display || entry.text || value
-    return main || '-'
-  }
-  // 粵拼：顯示主讀音，若有多個讀音則提示「N 其他讀音」
-  if (col.key === 'phonetic') {
-    const arr = entry.phonetic?.jyutping
-    if (Array.isArray(arr) && arr.length > 0) {
-      const hasSpaceInside = arr.some(s => (s || '').includes(' '))
-      if (!hasSpaceInside) {
-        // 舊數據：視為單一讀音的音節陣列
-        return arr.join(' ')
-      }
-      // 新數據：多讀音列表，主行只顯示第一個讀音，其他讀音數量交給提示函數處理
-      return arr[0] || '-'
-    }
-    return entry.phoneticNotation || value || '-'
-  }
-  if (col.type === 'theme') {
-    // 主題類型：顯示 L3 名稱
-    if (!value) return '選擇分類'
-    return getThemeNameById(value) || '選擇分類'
-  }
-  if (col.type === 'select') {
-    // 特殊處理方言列，使用映射顯示中文名稱
-    if (col.key === 'dialect') {
-      return dialectCodeToName[value] || value || '-'
-    }
-    // 狀態列：始終用完整對照表顯示，貢獻者雖不能選「已發佈/已拒絕」，但看到時應顯示中文
-    if (col.key === 'status') {
-      return STATUS_LABELS[value] || value || '-'
-    }
-    const options = getColumnOptions(col)
-    const opt = options?.find((o: any) => o.value === value)
-    return opt?.label || value || '-'
-  }
-  return value || '-'
-}
-
-// 獲取列的選項（支持靜態和動態選項）
-function getColumnOptions(col: any) {
-  if (col.getOptions) {
-    return col.getOptions()
-  }
-  return col.options || []
-}
-
 function toggleSensesExpand(entry: Entry) {
-  const key = String(entry.id ?? (entry as any)._tempId ?? '')
+  const key = getEntryIdString(entry)
   const opening = expandedEntryId.value !== key
   expandedEntryId.value = expandedEntryId.value === key ? null : key
   if (opening && expandedEntryId.value === key) ensureSensesStructure(entry)
 }
 
 function toggleMorphemeRefsExpand(entry: Entry) {
-  const key = String(entry.id ?? (entry as any)._tempId ?? '')
+  const key = getEntryIdString(entry)
   expandedMorphemeRefsEntryId.value = expandedMorphemeRefsEntryId.value === key ? null : key
 }
 
-// 詞素引用搜索 modal 狀態
-const morphemeSearchModalOpen = ref(false)
-const morphemeSearchTargetEntry = ref<Entry | null>(null)
-const morphemeSearchResults = ref<Array<{ id: string; headword: string; jyutping: string; definition: string; dialect: string; entryType: string }>>([])
-const morphemeSearchLoading = ref(false)
-
-// 未連結詞素：自動依詞頭與粵拼帶入，確認或改備註後添加
-const unlinkedMorphemeEntryId = ref<string | null>(null)
-const unlinkedMorphemeCandidates = ref<Array<{ position: number; char: string; jyutping: string; note: string }>>([])
-
-function openUnlinkedMorphemeForm(entry: Entry) {
-  const key = String(entry.id ?? (entry as any)._tempId ?? '')
-  unlinkedMorphemeEntryId.value = key
-  const headword = entry.headword?.display || entry.text || ''
-  const rawJyutping = entry.phonetic?.jyutping
-  // 粵拼統一按空格拆成音節（支援 array 如 ['jau5','tou4'] 或 ['jau5 tou4']）
-  let syllables: string[] = []
-  if (Array.isArray(rawJyutping)) {
-    syllables = rawJyutping.join(' ').split(/\s+/).filter(Boolean)
-  } else if (typeof rawJyutping === 'string') {
-    syllables = rawJyutping.split(/\s+/).filter(Boolean)
-  }
-  const existingPositions = new Set((entry.morphemeRefs || []).map((r: any) => r.position))
-  const candidates: Array<{ position: number; char: string; jyutping: string; note: string }> = []
-  for (let i = 0; i < headword.length; i++) {
-    if (existingPositions.has(i)) continue
-    const char = headword[i]
-    if (!char || char === '□') continue
-    const jyutping = syllables[i] ?? ''
-    candidates.push({ position: i, char, jyutping, note: '' })
-  }
-  unlinkedMorphemeCandidates.value = candidates
-}
-
-function confirmUnlinkedMorphemeRefs(entry: Entry) {
-  const list = entry.morphemeRefs ? [...entry.morphemeRefs] : []
-  for (const cand of unlinkedMorphemeCandidates.value) {
-    list.push({
-      position: cand.position,
-      char: cand.char,
-      jyutping: (cand.jyutping || '').trim() || undefined,
-      note: (cand.note || '').trim() || undefined
-    })
-  }
-  ;(entry as any).morphemeRefs = list
-  entry._isDirty = true
-  closeUnlinkedMorphemeForm()
-}
-
-function closeUnlinkedMorphemeForm() {
-  unlinkedMorphemeEntryId.value = null
-  unlinkedMorphemeCandidates.value = []
-}
-
-function openMorphemeSearch(entry: Entry) {
-  morphemeSearchTargetEntry.value = entry
-  morphemeSearchModalOpen.value = true
-  // 自動搜索：根據當前詞條的詞頭、方言點、粵拼、釋義
-  searchMorphemes(entry)
-}
-
-async function searchMorphemes(entry: Entry) {
-  morphemeSearchLoading.value = true
-  morphemeSearchResults.value = []
-  try {
-    const query: Record<string, string> = {}
-    if (entry.headword?.display) query.headword = entry.headword.display
-    if (entry.dialect?.name) query.dialect = entry.dialect.name
-    if (entry.phonetic?.jyutping?.length) query.jyutping = entry.phonetic.jyutping.join(' ')
-    if (entry.senses?.[0]?.definition) query.definition = entry.senses[0].definition
-    
-    const response = await $fetch<{ success: boolean; data: Array<any> }>('/api/entries/search-morphemes', { query })
-    if (response.success && Array.isArray(response.data)) {
-      morphemeSearchResults.value = response.data
-    }
-  } catch (e: any) {
-    console.error('Failed to search morphemes:', e)
-    alert(e?.data?.message || e?.message || '搜索失敗')
-  } finally {
-    morphemeSearchLoading.value = false
-  }
-}
-
-function addMorphemeRef(targetEntryId: string, morphemeEntry: { headword: string; jyutping: string }) {
-  if (!morphemeSearchTargetEntry.value) return
-  
-  const entry = morphemeSearchTargetEntry.value
-  if (!entry.morphemeRefs) {
-    ;(entry as any).morphemeRefs = []
-  }
-  
-  // 檢查是否已存在
-  if (entry.morphemeRefs && entry.morphemeRefs.some((r: any) => r.targetEntryId === targetEntryId)) {
-    alert('該詞素已引用')
-    return
-  }
-  
-  // 計算位置（根據詞頭中的字符位置）
-  const headword = entry.headword?.display || ''
-  const char = morphemeEntry.headword
-  let position: number | undefined = undefined
-  if (char && headword.includes(char)) {
-    position = headword.indexOf(char)
-  }
-  
-  if (!entry.morphemeRefs) {
-    ;(entry as any).morphemeRefs = []
-  }
-  if (entry.morphemeRefs) {
-    entry.morphemeRefs.push({
-      targetEntryId,
-      position,
-      char: morphemeEntry.headword,
-      jyutping: morphemeEntry.jyutping || undefined
-    })
-  }
-  
-  entry._isDirty = true
-  morphemeSearchModalOpen.value = false
-}
-
-function removeMorphemeRef(entry: Entry, refIdx: number) {
-  if (!entry.morphemeRefs || refIdx < 0 || refIdx >= entry.morphemeRefs.length) return
-  entry.morphemeRefs.splice(refIdx, 1)
-  entry._isDirty = true
-}
+const {
+  morphemeSearchModalOpen,
+  morphemeSearchTargetEntry,
+  morphemeSearchResults,
+  morphemeSearchLoading,
+  unlinkedMorphemeEntryId,
+  unlinkedMorphemeCandidates,
+  openUnlinkedMorphemeForm,
+  confirmUnlinkedMorphemeRefs,
+  closeUnlinkedMorphemeForm,
+  openMorphemeSearch,
+  addMorphemeRef,
+  removeMorphemeRef
+} = useEntryMorphemeRefs(getEntryIdString)
 
 function toggleThemeExpand(entry: Entry) {
-  const key = String(entry.id ?? (entry as any)._tempId ?? '')
+  const key = getEntryIdString(entry)
   expandedThemeEntryId.value = expandedThemeEntryId.value === key ? null : key
 }
 
@@ -2273,76 +1343,6 @@ function getThemeExpandHint(entry: Entry): string {
     return `AI 建議: ${suggestion.level3Name} (${suggestion.level1Name})`
   }
   return ''
-}
-
-/** 用於行內 AI 分類建議的展示文案 */
-function formatThemeSuggestion(s: { level1Name: string; level2Name: string; level3Name: string } | undefined): string {
-  if (!s) return ''
-  return `${s.level3Name} (${s.level1Name} > ${s.level2Name})`
-}
-
-function acceptThemeAI(entry: Entry) {
-  const key = getEntryKey(entry)
-  const keyStr = String(key)
-  const suggestion = themeAISuggestions.value.get(keyStr)
-  if (suggestion) {
-    if (!entry.theme) entry.theme = {}
-    entry.theme.level1 = suggestion.level1Name
-    entry.theme.level2 = suggestion.level2Name
-    entry.theme.level3 = suggestion.level3Name
-    entry.theme.level1Id = suggestion.level1Id
-    entry.theme.level2Id = suggestion.level2Id
-    entry.theme.level3Id = suggestion.level3Id
-    entry._isDirty = true
-    // 若當前正在編輯該格，同步 editValue，否則 saveCellEdit 會用舊值覆蓋剛採納的分類
-    if (editingCell.value && String(editingCell.value.entryId) === keyStr && editingCell.value.field === 'theme') {
-      editValue.value = suggestion.level3Id
-    }
-    themeAISuggestions.value.delete(keyStr)
-    themeAISuggestions.value = new Map(themeAISuggestions.value)
-  }
-}
-
-function dismissThemeAI(entry: Entry) {
-  const key = getEntryKey(entry)
-  themeAISuggestions.value.delete(String(key))
-  themeAISuggestions.value = new Map(themeAISuggestions.value)
-}
-
-function acceptDefinitionAI(entry: Entry) {
-  const key = String(getEntryKey(entry))
-  const suggestion = definitionAISuggestions.value.get(key)
-  if (!suggestion) return
-  if (!entry.senses || entry.senses.length === 0) {
-    entry.senses = [{ definition: suggestion.definition, examples: [] }]
-  } else {
-    const first = entry.senses[0]
-    entry.senses[0] = { ...first, definition: suggestion.definition }
-    entry.senses = [...entry.senses]
-  }
-  if (suggestion.usageNotes) {
-    if (!entry.meta) entry.meta = {}
-    entry.meta.usage = suggestion.usageNotes
-  }
-  if (suggestion.formalityLevel) {
-    const formalityMap: Record<string, string> = {
-      formal: '文雅',
-      neutral: '中性',
-      informal: '口語',
-      slang: '口語',
-      vulgar: '粗俗'
-    }
-    if (!entry.meta) entry.meta = {}
-    entry.meta.register = (formalityMap[suggestion.formalityLevel] || '中性') as Register
-  }
-  entry._isDirty = true
-  definitionAISuggestions.value.delete(key)
-  definitionAISuggestions.value = new Map(definitionAISuggestions.value)
-}
-
-function dismissDefinitionAI(entry: Entry) {
-  definitionAISuggestions.value.delete(String(getEntryKey(entry)))
-  definitionAISuggestions.value = new Map(definitionAISuggestions.value)
 }
 
 function onThemeUpdate(entry: Entry, theme: {
@@ -2362,84 +1362,7 @@ function onThemeUpdate(entry: Entry, theme: {
   entry.theme.level3Id = theme.level3Id
   entry._isDirty = true
   // 清除 AI 建議
-  const key = getEntryKey(entry)
-  themeAISuggestions.value.delete(String(key))
-  themeAISuggestions.value = new Map(themeAISuggestions.value)
-}
-
-/** 確保 entry.senses 至少有一項，且每項有 examples / subSenses 陣列 */
-function ensureSensesStructure(entry: Entry) {
-  if (!entry.senses || entry.senses.length === 0) {
-    entry.senses = [{ definition: '', examples: [], subSenses: [] }]
-    entry._isDirty = true
-  }
-  entry.senses.forEach((s: any) => {
-    if (!Array.isArray(s.examples)) s.examples = []
-    if (!Array.isArray(s.subSenses)) s.subSenses = []
-    s.subSenses?.forEach((sub: any) => {
-      if (!Array.isArray(sub.examples)) sub.examples = []
-    })
-  })
-}
-
-function addSense(entry: Entry) {
-  ensureSensesStructure(entry)
-  entry.senses.push({ definition: '', label: '', examples: [], subSenses: [] })
-  entry._isDirty = true
-}
-
-function removeSense(entry: Entry, senseIndex: number) {
-  if (entry.senses.length <= 1) return
-  entry.senses.splice(senseIndex, 1)
-  entry._isDirty = true
-}
-
-function addExample(entry: Entry, senseIndex: number) {
-  ensureSensesStructure(entry)
-  const sense = entry.senses[senseIndex]
-  if (!sense) return
-  if (!sense.examples) sense.examples = []
-  sense.examples.push({ text: '', jyutping: '', translation: '' })
-  entry._isDirty = true
-}
-
-function removeExample(entry: Entry, senseIndex: number, exIndex: number) {
-  const sense = entry.senses[senseIndex]
-  if (!sense?.examples) return
-  sense.examples.splice(exIndex, 1)
-  entry._isDirty = true
-}
-
-function addSubSense(entry: Entry, senseIndex: number) {
-  ensureSensesStructure(entry)
-  const sense = entry.senses[senseIndex]
-  if (!sense) return
-  if (!sense.subSenses) sense.subSenses = []
-  sense.subSenses.push({ label: '', definition: '', examples: [] })
-  entry._isDirty = true
-}
-
-function removeSubSense(entry: Entry, senseIndex: number, subIndex: number) {
-  const sense = entry.senses[senseIndex]
-  if (!sense?.subSenses) return
-  sense.subSenses.splice(subIndex, 1)
-  entry._isDirty = true
-}
-
-function addSubSenseExample(entry: Entry, senseIndex: number, subIndex: number) {
-  ensureSensesStructure(entry)
-  const sub = entry.senses[senseIndex]?.subSenses?.[subIndex]
-  if (!sub) return
-  if (!sub.examples) sub.examples = []
-  sub.examples.push({ text: '', jyutping: '', translation: '' })
-  entry._isDirty = true
-}
-
-function removeSubSenseExample(entry: Entry, senseIndex: number, subIndex: number, exIndex: number) {
-  const sub = entry.senses[senseIndex]?.subSenses?.[subIndex]
-  if (!sub?.examples) return
-  sub.examples.splice(exIndex, 1)
-  entry._isDirty = true
+  clearThemeSuggestionForEntry(entry)
 }
 
 // Typed payload handlers for EntrySensesExpand emits (avoid implicit any in template)
@@ -2466,20 +1389,6 @@ function subSenseExampleRemoveHandler(entry: Entry) {
     removeSubSenseExample(entry, payload.senseIdx, payload.subIdx, payload.exIdx)
 }
 
-function getCellClass(entry: Entry, field: string) {
-  const classes: string[] = []
-  if (field === 'status') {
-    const statusColors: Record<string, string> = {
-      draft: 'text-gray-500',
-      pending_review: 'text-yellow-600',
-      approved: 'text-green-600',
-      rejected: 'text-red-600'
-    }
-    classes.push(statusColors[entry.status] || '')
-  }
-  return classes
-}
-
 /** 貢獻者只能編輯自己創建的詞條；審核員/管理員可編輯任意詞條。新建詞條（_isNew）視為可編輯。 */
 function canEditEntry(entry: Entry): boolean {
   const role = user.value?.role
@@ -2493,11 +1402,11 @@ function canEditEntry(entry: Entry): boolean {
 function handleCellClick(entry: Entry, field: string, event: MouseEvent | KeyboardEvent, rowIndex?: number, colIndex?: number, forceEdit?: boolean) {
   if (!isAuthenticated.value) return
 
-  const col = editableColumns.find(c => c.key === field)
+  const col = editableColumns.value.find(c => c.key === field)
   if (!col) return
 
-  const r = rowIndex ?? tableRows.value.findIndex(row => row.type === 'entry' && (row.entry.id ?? (row.entry as any)._tempId) === (entry.id ?? (entry as any)._tempId))
-  const c = colIndex ?? editableColumns.findIndex(colDef => colDef.key === field)
+  const r = rowIndex ?? tableRows.value.findIndex(row => row.type === 'entry' && getEntryKey(row.entry) === getEntryKey(entry))
+  const c = colIndex ?? editableColumns.value.findIndex(colDef => colDef.key === field)
   if (r < 0 || c < 0) return
 
   const alreadyFocused = focusedCell.value?.rowIndex === r && focusedCell.value?.colIndex === c
@@ -2521,8 +1430,8 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
   // 貢獻者只能編輯自己創建的詞條；審核員/管理員可編輯任意詞條
   if (!canEditEntry(entry)) return
 
-  const entryId = entry.id ?? (entry as any)._tempId ?? ''
-  editingCell.value = { entryId: String(entryId), field }
+  const entryId = getEntryIdString(entry)
+  editingCell.value = { entryId, field }
   editValue.value = col.get(entry)
   // 若該列有未採納的 AI 建議（如釋義建議），再點回該列時恢復顯示
   const pendingKey = `${String(entryId)}-${field}`
@@ -2573,7 +1482,7 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
 }
 
 function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
-  const col = editableColumns.find(c => c.key === field)
+  const col = editableColumns.value.find(c => c.key === field)
   if (!col) return
 
   switch (event.key) {
@@ -2596,7 +1505,7 @@ function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
         acceptAISuggestion()
       }
       // 如果有粵拼建議，採納它（與顯示條件一致：getJyutdictVisible）
-      const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
+      const entryId = getEntryIdString(entry)
       const jyutSuggestion = jyutdictSuggested.value.get(entryId)
       if (jyutSuggestion && getJyutdictVisible(entryId)) {
         acceptJyutdict(entry, jyutSuggestion)
@@ -2614,7 +1523,7 @@ function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
     case 'Escape':
       event.preventDefault()
       // 有多個提示時：Esc 逐個由上到下忽略（不要一次全關）
-      if (dismissTopHintForEntry(entry, editableColumns.findIndex(c => c.key === field))) {
+      if (dismissTopHintForEntry(entry, editableColumns.value.findIndex(c => c.key === field))) {
         return
       }
       cancelCellEdit()
@@ -2641,7 +1550,7 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
 
   const { entryId, field } = editingCell.value
   const entry = currentPageEntries.value.find(e => String(e.id ?? (e as any)._tempId) === String(entryId))
-  const col = editableColumns.find(c => c.key === field)
+  const col = editableColumns.value.find(c => c.key === field)
 
   if (entry && col) {
     const oldValue = col.get(entry)
@@ -2651,8 +1560,8 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
     }
   }
 
-  const rowIndex = entry ? tableRows.value.findIndex(r => r.type === 'entry' && (r.entry === entry || String(r.entry.id ?? (r.entry as any)._tempId) === String(entryId))) : -1
-  const colIndex = editableColumns.findIndex(c => c.key === field)
+  const rowIndex = entry ? tableRows.value.findIndex(r => r.type === 'entry' && (r.entry === entry || getEntryIdString(r.entry) === String(entryId))) : -1
+  const colIndex = editableColumns.value.findIndex(c => c.key === field)
   if (rowIndex >= 0 && colIndex >= 0) {
     focusedCell.value = { rowIndex, colIndex }
   }
@@ -2680,8 +1589,8 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
 function cancelCellEdit() {
   if (editingCell.value) {
     const { entryId, field } = editingCell.value
-    const rowIndex = tableRows.value.findIndex(r => r.type === 'entry' && String(r.entry.id ?? (r.entry as any)._tempId) === String(entryId))
-    const colIndex = editableColumns.findIndex(c => c.key === field)
+    const rowIndex = tableRows.value.findIndex(r => r.type === 'entry' && getEntryIdString(r.entry) === String(entryId))
+    const colIndex = editableColumns.value.findIndex(c => c.key === field)
     if (rowIndex >= 0 && colIndex >= 0) {
       focusedCell.value = { rowIndex, colIndex }
     }
@@ -2706,15 +1615,15 @@ function cancelCellEdit() {
 
 /** 保存當前格並跳到下一格（Tab 方向）。返回是否成功打開下一格。 */
 function moveToNextCell(entry: Entry, currentField: string, direction: number): boolean {
-  const currentRowIndex = tableRows.value.findIndex(r => r.type === 'entry' && (r.entry.id ?? (r.entry as any)._tempId) === (entry.id ?? (entry as any)._tempId))
-  const currentColIndex = editableColumns.findIndex(c => c.key === currentField)
+  const currentRowIndex = tableRows.value.findIndex(r => r.type === 'entry' && getEntryKey(r.entry) === getEntryKey(entry))
+  const currentColIndex = editableColumns.value.findIndex(c => c.key === currentField)
   let nextRow = currentRowIndex
   let nextCol = currentColIndex + direction
 
   if (nextCol < 0) {
-    nextCol = editableColumns.length - 1
+    nextCol = editableColumns.value.length - 1
     nextRow--
-  } else if (nextCol >= editableColumns.length) {
+  } else if (nextCol >= editableColumns.value.length) {
     nextCol = 0
     nextRow++
   }
@@ -2729,7 +1638,7 @@ function moveToNextCell(entry: Entry, currentField: string, direction: number): 
     row = rows[nextRow]
   }
   const nextEntry = row?.type === 'entry' ? row.entry : null
-  const nextColDef = editableColumns[nextCol]
+  const nextColDef = editableColumns.value[nextCol]
   if (!nextEntry || !nextColDef) return false
   handleCellClick(nextEntry, nextColDef.key, new MouseEvent('click'), nextRow, nextCol, true)
   return true
@@ -2749,7 +1658,7 @@ function handleTableKeydown(event: KeyboardEvent) {
   }
   if (editingCell.value) return
   const rows = entries.value.length
-  const cols = editableColumns.length
+  const cols = editableColumns.value.length
   if (rows === 0 || cols === 0) return
 
   // 尚無焦點格時，用方向鍵/Enter/Tab 從 (0,0) 開始
@@ -2787,7 +1696,7 @@ function handleTableKeydown(event: KeyboardEvent) {
     case 'Tab':
       event.preventDefault()
       // 若當前在分類列且有待採納的 AI 分類建議，Tab 先採納再移動（與釋義列一致）
-      if (colIndex === themeColIndex && currentEntry && themeAISuggestions.value.get(entryKeyForTheme)) {
+      if (colIndex === themeColIndex.value && currentEntry && themeAISuggestions.value.get(entryKeyForTheme)) {
         acceptThemeAI(currentEntry)
       }
       if (event.shiftKey) {
@@ -2804,7 +1713,7 @@ function handleTableKeydown(event: KeyboardEvent) {
         }
       }
       const tabEntry = entries.value[nextRow]
-      const tabColDef = editableColumns[nextCol]
+      const tabColDef = editableColumns.value[nextCol]
       if (tabEntry && tabColDef) {
         handleCellClick(tabEntry, tabColDef.key, event, nextRow, nextCol, true)
       }
@@ -2819,7 +1728,7 @@ function handleTableKeydown(event: KeyboardEvent) {
     case 'Enter':
       event.preventDefault()
       const entry = entries.value[rowIndex]
-      const colDef = editableColumns[colIndex]
+      const colDef = editableColumns.value[colIndex]
       if (entry && colDef) {
         handleCellClick(entry, colDef.key, event, rowIndex, colIndex, true)
       }
@@ -2828,7 +1737,7 @@ function handleTableKeydown(event: KeyboardEvent) {
       // Notion: 直接輸入字符激活當前選中格進入編輯，並把該字符填入
       if (focusedCell.value && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
         const typableEntry = entries.value[focusedCell.value.rowIndex]
-        const typableCol = editableColumns[focusedCell.value.colIndex]
+        const typableCol = editableColumns.value[focusedCell.value.colIndex]
         if (typableEntry && typableCol) {
           event.preventDefault()
           handleCellClick(typableEntry, typableCol.key, event, focusedCell.value.rowIndex, focusedCell.value.colIndex, true)
@@ -2839,307 +1748,6 @@ function handleTableKeydown(event: KeyboardEvent) {
   }
 
   focusedCell.value = { rowIndex: nextRow, colIndex: nextCol }
-}
-
-// AI Suggestion（按「條」+「操作」記錄 loading，避免整表一起轉）
-function getEntryKey(entry: Entry): string | number {
-  return (entry as any).id ?? (entry as any)._tempId ?? ''
-}
-const aiLoadingFor = ref<{ entryKey: string | number, action: 'definition' | 'theme' | 'examples' } | null>(null)
-const aiLoading = ref(false) // 僅用於編輯時 inline 建議等
-/** 行內建議請求的 AbortController，用於取消上一次請求 */
-const aiSuggestAbortController = ref<AbortController | null>(null)
-
-async function triggerAISuggestion(entry: Entry, field: string, value: string) {
-  // 僅對「新建詞條」啟用行內 AI 建議；編輯已有詞條時不再觸發。
-  if (!(entry as any)._isNew) {
-    return
-  }
-
-  if (aiDebounceTimer.value) {
-    clearTimeout(aiDebounceTimer.value)
-    aiDebounceTimer.value = null
-  }
-  // 取消正在進行的行內建議請求（用戶再次輸入時）
-  if (aiSuggestAbortController.value) {
-    aiSuggestAbortController.value.abort()
-    aiSuggestAbortController.value = null
-  }
-
-  // 只喺用戶輸入粵拼時觸發生成釋義建議（詞頭已填好後再問 AI）
-  const headword = entry.headword?.display?.trim() || ''
-  if (field === 'phonetic' && headword.length >= 1) {
-    const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-    aiDebounceTimer.value = setTimeout(async () => {
-      aiSuggestAbortController.value = new AbortController()
-      const signal = aiSuggestAbortController.value.signal
-      aiLoadingInlineFor.value = { entryId, field: 'definition' }
-      aiInlineError.value = null
-      aiLoading.value = true
-      try {
-        // 並行調用釋義和分類 API（支援取消）
-        const [definitionResponse, categorizeResponse] = await Promise.all([
-          $fetch<{ success: boolean; data?: { definition?: string } }>('/api/ai/definitions', {
-            method: 'POST',
-            body: {
-              expression: headword,
-              region: 'hongkong'
-            },
-            signal
-          }),
-          $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string } }>('/api/ai/categorize', {
-            method: 'POST',
-            body: {
-              expression: headword
-            },
-            signal
-          }).catch(e => {
-            if (e?.name === 'AbortError') throw e
-            console.error('AI categorization error:', e)
-            return null
-          })
-        ])
-
-        // 結果校驗：詞頭已變更則不套用
-        const currentEntry = currentPageEntries.value.find(e => String(e.id ?? (e as any)._tempId) === entryId)
-        const currentHeadword = currentEntry?.headword?.display?.trim() || ''
-        if (currentHeadword !== headword) {
-          return
-        }
-
-        // 處理釋義建議
-        if (definitionResponse?.success && definitionResponse.data?.definition) {
-          const suggestionText = `建議釋義: ${definitionResponse.data.definition}`
-          const targetField = 'definition'
-          aiSuggestion.value = suggestionText
-          aiSuggestionForField.value = targetField
-          const stillEditingThisCell = editingCell.value && String(editingCell.value.entryId) === entryId && editingCell.value.field === targetField
-          if (!stillEditingThisCell) {
-            const key = `${entryId}-${targetField}`
-            pendingAISuggestions.value.set(key, { entryId, field: targetField, text: suggestionText })
-            pendingAISuggestions.value = new Map(pendingAISuggestions.value)
-            aiSuggestion.value = null
-            aiSuggestionForField.value = null
-          }
-        }
-
-        // 處理分類建議
-        if (categorizeResponse?.success && categorizeResponse.data?.themeId) {
-          const themeId = categorizeResponse.data.themeId
-          const theme = getThemeById(themeId)
-          if (theme) {
-            themeAISuggestions.value.set(entryId, {
-              level1Name: theme.level1Name,
-              level2Name: theme.level2Name,
-              level3Name: theme.level3Name,
-              level1Id: theme.level1Id,
-              level2Id: theme.level2Id,
-              level3Id: theme.level3Id,
-              confidence: categorizeResponse.data.confidence,
-              explanation: categorizeResponse.data.explanation
-            })
-            themeAISuggestions.value = new Map(themeAISuggestions.value)
-          }
-        }
-      } catch (error: any) {
-        // 用戶切換格或再次觸發時會 abort 上一次請求，不必當成錯誤記錄或展示
-        const isAborted =
-          error?.name === 'AbortError' ||
-          error?.cause?.name === 'AbortError' ||
-          (typeof error?.message === 'string' && error.message.toLowerCase().includes('abort'))
-        if (isAborted) return
-        console.error('AI suggestion error:', error)
-        const message = error?.data?.message || error?.message || '釋義建議暫時無法生成'
-        aiInlineError.value = { entryId, field: 'definition', message }
-      } finally {
-        if (aiLoadingInlineFor.value?.entryId === entryId) {
-          aiLoadingInlineFor.value = null
-        }
-        aiLoading.value = false
-        aiSuggestAbortController.value = null
-      }
-    }, 800)
-  }
-}
-
-async function generateAIExamples(entry: Entry) {
-  if (!entry.headword?.display || !entry.senses?.[0]?.definition) {
-    alert('請先填寫詞條文本和釋義')
-    return
-  }
-
-  aiLoadingFor.value = { entryKey: getEntryKey(entry), action: 'examples' }
-  try {
-    const response = await $fetch('/api/ai/examples', {
-      method: 'POST',
-      body: {
-        expression: entry.headword.display,
-        definition: entry.senses[0].definition,
-        region: 'hongkong'
-      }
-    })
-
-    // API 返回 { success: true, data: [{ sentence, explanation, scenario }, ...] }
-    // data 直接是數組，不是 { examples: [...] }
-    if (response.success && Array.isArray(response.data) && response.data.length > 0) {
-      if (!entry.senses?.length) entry.senses = [{ definition: '', examples: [] }]
-      const firstSense = entry.senses[0]
-      if (firstSense) {
-        if (!firstSense.examples) firstSense.examples = []
-        const examples = firstSense.examples
-        response.data.forEach((ex: any) => {
-          examples.push({
-            text: ex.sentence || ex.text,
-            translation: ex.explanation || ex.translation,
-            scenario: ex.scenario,
-            source: 'ai_generated'
-          })
-        })
-      }
-      entry._isDirty = true
-    }
-  } catch (error) {
-    console.error('AI examples generation error:', error)
-    alert('生成例句失敗')
-  } finally {
-    aiLoadingFor.value = null
-  }
-}
-
-async function generateAIDefinition(entry: Entry) {
-  if (!entry.headword?.display) {
-    alert('請先填寫詞條文本')
-    return
-  }
-
-  const key = getEntryKey(entry)
-  aiLoadingFor.value = { entryKey: key, action: 'definition' }
-  try {
-    const response: any = await $fetch('/api/ai/definitions', {
-      method: 'POST',
-      body: {
-        expression: entry.headword.display,
-        region: 'hongkong'
-      }
-    })
-
-    // 檢查響應（API 返回 { success: true, data: { definition, usageNotes, formalityLevel } }）
-    const data = response?.data
-    if (response?.success === true && data && typeof data.definition === 'string') {
-      const entryKey = String(getEntryKey(entry))
-      definitionAISuggestions.value.set(entryKey, {
-        definition: data.definition,
-        usageNotes: data.usageNotes,
-        formalityLevel: data.formalityLevel
-      })
-      definitionAISuggestions.value = new Map(definitionAISuggestions.value)
-    } else {
-      alert('AI 未能生成釋義，請檢查服務端日誌')
-    }
-  } catch (error: any) {
-    console.error('[Frontend] AI definition generation error:', error)
-    const errMsg = error?.data?.message || error?.message || JSON.stringify(error)
-    alert(`生成釋義失敗: ${errMsg}`)
-  } finally {
-    aiLoadingFor.value = null
-  }
-}
-
-async function generateAICategorization(entry: Entry) {
-  if (!entry.headword?.display) {
-    alert('請先填寫詞條文本')
-    return
-  }
-
-  aiLoadingFor.value = { entryKey: getEntryKey(entry), action: 'theme' }
-  try {
-    const response: any = await $fetch('/api/ai/categorize', {
-      method: 'POST',
-      body: {
-        expression: entry.headword.display
-      }
-    })
-
-    // API 返回 { success: true, data: { themeId: number, explanation: string, confidence: number } }
-    if (response.success && response.data?.themeId) {
-      const themeId = response.data.themeId
-      const theme = getThemeById(themeId)
-      if (theme) {
-        // 存入 themeAISuggestions，讓用戶在展開區域查看並決定是否接受
-        const entryKey = String(getEntryKey(entry))
-        themeAISuggestions.value.set(entryKey, {
-          level1Name: theme.level1Name,
-          level2Name: theme.level2Name,
-          level3Name: theme.level3Name,
-          level1Id: theme.level1Id,
-          level2Id: theme.level2Id,
-          level3Id: theme.level3Id,
-          confidence: response.data.confidence,
-          explanation: response.data.explanation
-        })
-        themeAISuggestions.value = new Map(themeAISuggestions.value)
-      }
-    } else {
-      alert('AI 未能生成分類，請重試或手動選擇')
-    }
-  } catch (error: any) {
-    console.error('AI categorization error:', error)
-    alert(`AI分類失敗: ${error?.data?.message || error?.message || '未知錯誤'}`)
-  } finally {
-    aiLoadingFor.value = null
-  }
-}
-
-function clearPendingSuggestionForCurrentCell() {
-  if (editingCell.value && aiSuggestionForField.value) {
-    const key = `${String(editingCell.value.entryId)}-${aiSuggestionForField.value}`
-    pendingAISuggestions.value.delete(key)
-    pendingAISuggestions.value = new Map(pendingAISuggestions.value)
-  }
-}
-
-/** 重試行內釋義建議（由錯誤列「重試」觸發） */
-function retryInlineAISuggestion(entry: Entry) {
-  const entryId = String(entry.id ?? (entry as any)._tempId ?? '')
-  if (aiInlineError.value?.entryId === entryId) {
-    aiInlineError.value = null
-  }
-  const phoneticValue = entry.phonetic?.jyutping?.join(' ') ?? (entry as any).phoneticNotation ?? ''
-  triggerAISuggestion(entry, 'phonetic', phoneticValue)
-}
-
-function acceptAISuggestion() {
-  if (!aiSuggestion.value) return
-  // 釋義建議：支持 "建議釋義: xxx" 或直接整段作為釋義
-  const isDefinition = aiSuggestionForField.value === 'definition'
-  let defText = aiSuggestion.value
-  const defMatch = aiSuggestion.value.match(/^建議釋義: (.+)$/s)
-  if (defMatch) defText = defMatch[1]?.trim() ?? aiSuggestion.value
-
-  if (isDefinition && editingCell.value?.entryId !== undefined) {
-    const entry = currentPageEntries.value.find(e => String(e.id ?? (e as any)._tempId) === String(editingCell.value!.entryId))
-    if (entry) {
-      if (!entry.senses || entry.senses.length === 0) {
-        entry.senses = [{ definition: defText, examples: [] }]
-      } else {
-        const first = entry.senses[0]
-        if (first) first.definition = defText
-      }
-      entry._isDirty = true
-    }
-    editValue.value = defText
-  } else {
-    editValue.value = aiSuggestion.value
-  }
-  clearPendingSuggestionForCurrentCell()
-  aiSuggestion.value = null
-  aiSuggestionForField.value = null
-}
-
-function dismissAISuggestion() {
-  clearPendingSuggestionForCurrentCell()
-  aiSuggestion.value = null
-  aiSuggestionForField.value = null
 }
 
 // Entry operations
@@ -3166,102 +1774,6 @@ function addNewRow() {
   nextTick(() => {
     handleCellClick(newEntry, 'headword', new MouseEvent('click'), 0, 0, true)
   })
-}
-
-/** 深拷貝（避開 Vue reactive Proxy，structuredClone 會報 DataCloneError） */
-function deepCopy<T>(x: T): T {
-  return JSON.parse(JSON.stringify(x))
-}
-
-type EntryBaselineSnapshot = {
-  headword?: any
-  text?: any
-  dialect?: any
-  phonetic?: any
-  phoneticNotation?: any
-  entryType?: any
-  senses?: any
-  refs?: any
-  theme?: any
-  meta?: any
-  status?: any
-  reviewNotes?: any
-  lexemeId?: string
-  morphemeRefs?: any[]
-}
-
-function getEntryIdKey(entry: Entry): string {
-  return String((entry as any)?.id ?? '')
-}
-
-function makeBaselineSnapshot(entry: Entry): EntryBaselineSnapshot {
-  return deepCopy({
-    headword: (entry as any).headword,
-    text: (entry as any).text,
-    dialect: (entry as any).dialect,
-    phonetic: (entry as any).phonetic,
-    phoneticNotation: (entry as any).phoneticNotation,
-    entryType: (entry as any).entryType,
-    senses: (entry as any).senses,
-    refs: (entry as any).refs,
-    theme: (entry as any).theme,
-    meta: (entry as any).meta,
-    status: (entry as any).status,
-    reviewNotes: (entry as any).reviewNotes,
-    lexemeId: (entry as any).lexemeId,
-    morphemeRefs: (entry as any).morphemeRefs
-  })
-}
-
-function setBaselineForEntry(entry: Entry) {
-  const id = getEntryIdKey(entry)
-  if (!id) return
-  entryBaselineById.value.set(id, makeBaselineSnapshot(entry))
-  entryBaselineById.value = new Map(entryBaselineById.value)
-}
-
-function restoreEntryFromBaseline(entry: Entry): boolean {
-  const id = getEntryIdKey(entry)
-  if (!id) return false
-  const snap = entryBaselineById.value.get(id) as EntryBaselineSnapshot | undefined
-  if (!snap) return false
-
-  ;(entry as any).headword = snap.headword ? deepCopy(snap.headword) : undefined
-  ;(entry as any).text = snap.text
-  ;(entry as any).dialect = snap.dialect ? deepCopy(snap.dialect) : undefined
-  ;(entry as any).phonetic = snap.phonetic ? deepCopy(snap.phonetic) : undefined
-  ;(entry as any).phoneticNotation = snap.phoneticNotation
-  ;(entry as any).entryType = snap.entryType
-  ;(entry as any).senses = snap.senses ? deepCopy(snap.senses) : undefined
-  ;(entry as any).refs = snap.refs ? deepCopy(snap.refs) : undefined
-  ;(entry as any).theme = snap.theme ? deepCopy(snap.theme) : undefined
-  ;(entry as any).meta = snap.meta ? deepCopy(snap.meta) : undefined
-  ;(entry as any).status = snap.status
-  ;(entry as any).reviewNotes = snap.reviewNotes
-  ;(entry as any).lexemeId = snap.lexemeId
-  ;(entry as any).morphemeRefs = snap.morphemeRefs ? deepCopy(snap.morphemeRefs) : undefined
-  entry._isDirty = false
-  return true
-}
-
-function applyDraftOntoEntry(target: Entry, draft: Entry) {
-  ;(target as any).headword = (draft as any).headword ? deepCopy((draft as any).headword) : undefined
-  ;(target as any).text = (draft as any).text
-  ;(target as any).dialect = (draft as any).dialect ? deepCopy((draft as any).dialect) : undefined
-  ;(target as any).phonetic = (draft as any).phonetic ? deepCopy((draft as any).phonetic) : undefined
-  ;(target as any).phoneticNotation = (draft as any).phoneticNotation
-  ;(target as any).entryType = (draft as any).entryType
-  ;(target as any).senses = (draft as any).senses ? deepCopy((draft as any).senses) : undefined
-  ;(target as any).refs = (draft as any).refs ? deepCopy((draft as any).refs) : undefined
-  ;(target as any).theme = (draft as any).theme ? deepCopy((draft as any).theme) : undefined
-  ;(target as any).meta = (draft as any).meta ? deepCopy((draft as any).meta) : undefined
-  ;(target as any).status = (draft as any).status
-  ;(target as any).reviewNotes = (draft as any).reviewNotes
-  if ((draft as any).lexemeId !== undefined) (target as any).lexemeId = (draft as any).lexemeId
-  if ((draft as any).morphemeRefs !== undefined) (target as any).morphemeRefs = (draft as any).morphemeRefs ? deepCopy((draft as any).morphemeRefs) : undefined
-  ;(target as any)._isNew = (draft as any)._isNew ?? false
-  ;(target as any)._isDirty = (draft as any)._isDirty ?? false
-  if ((draft as any)._tempId) (target as any)._tempId = (draft as any)._tempId
 }
 
 /** 複製詞條：複製所有內容，方言改為當前用戶的母語/默認方言，插入為新行（草稿） */
@@ -3512,7 +2024,7 @@ async function saveEntryChanges(entry: Entry) {
 
 async function cancelEdit(entry: Entry) {
   // 若正在編輯同一條詞條，先退出單元格編輯，避免把 editValue 寫返去
-  if (editingCell.value && String(editingCell.value.entryId) === String(entry.id ?? (entry as any)._tempId ?? '')) {
+  if (editingCell.value && String(editingCell.value.entryId) === getEntryIdString(entry)) {
     cancelCellEdit()
   }
 
@@ -3571,118 +2083,6 @@ async function deleteEntry(entry: Entry) {
   }
 }
 
-// Fetch entries
-async function fetchEntries() {
-  loading.value = true
-  try {
-    const query: Record<string, any> = {
-      page: currentPage.value,
-      perPage: pagination.perPage,
-      sortBy: sortBy.value,
-      sortOrder: sortOrder.value
-    }
-
-    if (searchQuery.value) query.query = searchQuery.value
-    if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
-    if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
-    if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
-
-    if (viewMode.value === 'aggregated') query.groupBy = 'headword'
-    if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
-
-    const response = await $fetch<{ data: any[]; total: number; page: number; perPage: number; totalPages: number; grouped?: boolean }>('/api/entries', { query })
-
-    if (response.grouped && Array.isArray(response.data)) {
-      const nextGroups = response.data.map((g: any) => ({
-        headwordDisplay: g.headwordDisplay ?? g.headwordNormalized ?? '',
-        headwordNormalized: g.headwordNormalized ?? g.headwordDisplay ?? '',
-        entries: (g.entries ?? []).map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
-      }))
-      // baseline：以伺服器返回狀態為準（取消編輯用）
-      const nextBaseline = new Map<string, any>()
-      nextGroups.forEach((g: any) => g.entries.forEach((e: any) => nextBaseline.set(String(e.id ?? ''), makeBaselineSnapshot(e))))
-      entryBaselineById.value = nextBaseline
-
-      if (viewMode.value === 'lexeme') lexemeGroups.value = nextGroups
-      else aggregatedGroups.value = nextGroups
-      entries.value = []
-    } else {
-      const nextEntries = response.data.map((e: any) => ({ ...e, _isNew: false, _isDirty: false } as Entry))
-      const nextBaseline = new Map<string, any>()
-      nextEntries.forEach((e: any) => nextBaseline.set(String(e.id ?? ''), makeBaselineSnapshot(e)))
-      entryBaselineById.value = nextBaseline
-
-      entries.value = nextEntries
-      aggregatedGroups.value = []
-      lexemeGroups.value = []
-    }
-    
-    // 恢復本地儲存嘅草稿：
-    // - 任何頁面/篩選都會嘗試「覆蓋到當前已載入嘅詞條」（避免 fetch 後草稿消失）
-    // - 只喺「第一頁 + 無搜尋/篩選」先會把「搵唔到對應詞條」嘅草稿插入列表頂部（避免干擾篩選結果）
-    const restoredEntries = restoreEntriesFromLocalStorage()
-    const canInsertOrphans =
-      currentPage.value === 1 &&
-      !searchQuery.value &&
-      filters.region === ALL_FILTER_VALUE &&
-      filters.status === ALL_FILTER_VALUE &&
-      filters.theme === ALL_FILTER_VALUE
-
-    if (restoredEntries.length > 0) {
-      if (viewMode.value === 'aggregated' || viewMode.value === 'lexeme') {
-        restoredEntries.forEach((restoredEntry) => {
-          const restoredId = String((restoredEntry as any).id ?? '')
-          let applied = false
-          if (restoredId) {
-            const base = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
-            for (const g of base) {
-              const hit = g.entries.find(e => String((e as any).id ?? '') === restoredId)
-              if (hit) {
-                applyDraftOntoEntry(hit, restoredEntry)
-                applied = true
-                break
-              }
-            }
-          }
-          if (!applied && canInsertOrphans) entries.value.unshift(restoredEntry)
-        })
-      } else {
-        restoredEntries.forEach((restoredEntry) => {
-          const restoredId = String((restoredEntry as any).id ?? '')
-          const hit = restoredId ? entries.value.find(e => String((e as any).id ?? '') === restoredId) : null
-          if (hit) applyDraftOntoEntry(hit, restoredEntry)
-          else if (canInsertOrphans) entries.value.unshift(restoredEntry)
-        })
-      }
-    }
-    
-    pagination.total = response.total
-    pagination.page = response.page
-    pagination.totalPages = response.totalPages
-  } catch (error) {
-    console.error('Failed to fetch entries:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-// Handlers
-function handleSearch() {
-  currentPage.value = 1
-  fetchEntries()
-}
-
-function handleSort(key: string) {
-  if (!SORTABLE_COLUMN_KEYS.includes(key as any)) return
-  if (sortBy.value === key) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortBy.value = key
-    sortOrder.value = 'asc'
-  }
-  fetchEntries()
-}
-
 // Watch for page changes
 watch(currentPage, () => {
   fetchEntries()
@@ -3733,30 +2133,6 @@ watch(
 
 // Initial fetch
 onMounted(fetchEntries)
-
-function restoreDefaultDialectForNew() {
-  if (!import.meta.client) return
-  const options = newEntryDialectOptionsForSelector.value
-  if (options.length === 0) return
-  const stored = localStorage.getItem(NEW_ENTRY_DIALECT_KEY)
-  if (stored && options.some((o: { value: string }) => o.value === stored)) {
-    defaultDialectForNew.value = stored
-  } else {
-    const first = options[0]
-    if (first) defaultDialectForNew.value = first.value
-  }
-}
-onMounted(restoreDefaultDialectForNew)
-watch(newEntryDialectOptionsForSelector, (opts) => {
-  if (opts.length > 0 && !opts.some((o: { value: string }) => o.value === defaultDialectForNew.value)) {
-    restoreDefaultDialectForNew()
-  }
-}, { deep: true })
-watch(defaultDialectForNew, (v) => {
-  if (import.meta.client && v) {
-    localStorage.setItem(NEW_ENTRY_DIALECT_KEY, v)
-  }
-})
 </script>
 
 <style scoped>
