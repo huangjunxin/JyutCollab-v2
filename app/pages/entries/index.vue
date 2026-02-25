@@ -115,6 +115,26 @@
               @update:model-value="setViewMode"
             />
           </div>
+          <div class="flex items-center gap-1 border-l border-gray-200 dark:border-gray-600 pl-2">
+            <UTooltip text="根據本頁內容自動調整各欄寬度">
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                icon="i-heroicons-arrows-right-left"
+                @click="autoFit(tableRef, editableColumns.map(c => c.key))"
+              />
+            </UTooltip>
+            <UTooltip text="重置所有欄寬為默認值">
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                icon="i-heroicons-arrow-path"
+                @click="resetWidths"
+              />
+            </UTooltip>
+          </div>
         </div>
       </div>
     </div>
@@ -198,7 +218,16 @@
         class="flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset rounded-b-xl"
         @keydown="handleTableKeydown"
       >
-        <table class="w-full border-collapse" ref="tableRef">
+        <table class="border-collapse w-full" style="table-layout: fixed" ref="tableRef">
+          <colgroup>
+            <col style="width: 40px" />
+            <col
+              v-for="col in editableColumns"
+              :key="col.key"
+              :style="{ width: (columnWidths[col.key] ?? parseInt(col.width, 10)) + 'px' }"
+            />
+            <col style="width: 128px" />
+          </colgroup>
           <thead class="sticky top-0 z-10">
             <tr class="bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <th class="w-10 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700">
@@ -214,19 +243,23 @@
               <th
                 v-for="col in editableColumns"
                 :key="col.key"
-                class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700"
+                class="relative select-none px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 overflow-hidden"
                 :class="SORTABLE_COLUMN_KEYS.includes(col.key as any) ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800' : ''"
-                :style="{ minWidth: col.width, maxWidth: col.width }"
                 @click="handleSort(col.key)"
               >
-                <div class="flex items-center gap-1">
-                  {{ col.label }}
+                <div class="flex items-center gap-1 overflow-hidden">
+                  <span class="truncate">{{ col.label }}</span>
                   <UIcon
                     v-if="SORTABLE_COLUMN_KEYS.includes(col.key as any) && sortBy === col.key"
                     :name="sortOrder === 'asc' ? 'i-heroicons-arrow-up' : 'i-heroicons-arrow-down'"
-                    class="w-3 h-3"
+                    class="w-3 h-3 flex-shrink-0"
                   />
                 </div>
+                <!-- 拖動手柄 -->
+                <div
+                  class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize z-20 hover:bg-primary/40 active:bg-primary/60 transition-colors"
+                  @mousedown.stop="startResize($event, col.key, columnWidths[col.key] ?? parseInt(col.width, 10))"
+                />
               </th>
               <th class="min-w-[8rem] w-32 px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
                 操作
@@ -739,6 +772,7 @@ import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
 import { ALL_FILTER_VALUE, SORTABLE_COLUMN_KEYS, STATUS_LABELS, ENTRY_TYPE_LABELS } from '~/utils/entriesTableConstants'
 import { getGroupPhonetic, getGroupEntryType, getGroupTheme, getGroupRegister, getGroupStatus } from '~/composables/useEntryGroupDisplay'
 import { useEntriesTableColumns } from '~/composables/useEntriesTableColumns'
+import { useColumnResize } from '~/composables/useColumnResize'
 import { deepCopy, getEntryIdKey, makeBaselineSnapshot, useEntryBaseline } from '~/composables/useEntryBaseline'
 import { ensureSensesStructure, addSense, removeSense, addExample, removeExample, addSubSense, removeSubSense, addSubSenseExample, removeSubSenseExample } from '~/composables/useEntrySenses'
 import { useEntriesList } from '~/composables/useEntriesList'
@@ -971,6 +1005,7 @@ const inputRefs = ref<Map<string, HTMLInputElement | HTMLSelectElement | HTMLTex
 // 唯一焦點格：未編輯時表示「選中格」（方向鍵/Enter/Tab 目標），編輯時即正在編輯的格
 const focusedCell = ref<{ rowIndex: number; colIndex: number } | null>(null)
 const tableWrapperRef = ref<HTMLElement | null>(null)
+const tableRef = ref<HTMLTableElement | null>(null)
 
 // 方案 B：行展開編輯釋義詳情（多義項、例句、分義項）。值為當前展開的 entry id
 const expandedEntryId = ref<string | null>(null)
@@ -1172,6 +1207,21 @@ const {
 } = useNewEntryDialect(isReviewerOrAdmin, userDialectOptions, user, effectiveDialectPermissions)
 
 const { editableColumns, themeColIndex, phoneticColIndex, headwordColIndex } = useEntriesTableColumns(userDialectOptions, themeOptions, statusOptionsForTable)
+
+// 欄寬調整：預設寬度從 editableColumns 的 width 字段讀取
+const defaultColumnWidths = computed(() =>
+  Object.fromEntries(editableColumns.value.map(col => [col.key, parseInt(col.width, 10)]))
+)
+const { columnWidths, resizingCol: _resizingCol, startResize, autoFit, resetWidths } = useColumnResize(defaultColumnWidths.value)
+// 當 editableColumns 變動時補齊新欄（如首次渲染時 computed 還未穩定）
+watch(defaultColumnWidths, (newDefaults) => {
+  for (const [key, val] of Object.entries(newDefaults)) {
+    if (!(key in columnWidths.value)) {
+      columnWidths.value[key] = val
+    }
+  }
+}, { immediate: false })
+
 const tableEdit = useEntriesTableEdit(editableColumns, dialectCodeToName)
 const getCellDisplay = tableEdit.getCellDisplay as (entry: Entry, col: { key: string; type: string; get: (e: Entry) => unknown }) => string
 const getCellClass = tableEdit.getCellClass
