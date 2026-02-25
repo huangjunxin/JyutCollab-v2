@@ -514,11 +514,17 @@ async function saveDraft() {
 async function getAICategorization() {
   aiLoading.categorize = true
   try {
+    const firstDefinition = form.senses[0]?.definition?.trim()
+    const body: any = {
+      expression: form.headword.display
+    }
+    if (firstDefinition) {
+      body.context = firstDefinition
+    }
+
     const response = await $fetch('/api/ai/categorize', {
       method: 'POST',
-      body: {
-        expression: form.headword.display
-      }
+      body
     })
 
     if (response.success) {

@@ -77,6 +77,12 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         aiInlineError.value = null
         aiLoading.value = true
         try {
+          const firstDefinition = entry.senses?.[0]?.definition?.trim()
+          const categorizeBody: any = { expression: headword }
+          if (firstDefinition) {
+            categorizeBody.context = firstDefinition
+          }
+
           const [definitionResponse, categorizeResponse] = await Promise.all([
             $fetch<{ success: boolean; data?: { definition?: string } }>('/api/ai/definitions', {
               method: 'POST',
@@ -85,7 +91,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             }),
             $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string } }>('/api/ai/categorize', {
               method: 'POST',
-              body: { expression: headword },
+              body: categorizeBody,
               signal
             }).catch(e => {
               if (e?.name === 'AbortError') throw e
@@ -230,9 +236,15 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     }
     aiLoadingFor.value = { entryKey: getEntryKey(entry), action: 'theme' }
     try {
+      const firstDefinition = entry.senses?.[0]?.definition?.trim()
+      const body: any = { expression: entry.headword.display }
+      if (firstDefinition) {
+        body.context = firstDefinition
+      }
+
       const response: any = await $fetch('/api/ai/categorize', {
         method: 'POST',
-        body: { expression: entry.headword.display }
+        body
       })
       if (response.success && response.data?.themeId) {
         const themeId = response.data.themeId
