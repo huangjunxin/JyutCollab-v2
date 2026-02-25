@@ -451,6 +451,23 @@
               :entries="getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry))"
               :is-loading="getDuplicateCheckLoading(getEntryIdString(row.entry))"
               @dismiss="dismissDuplicateCheck(row.entry)"
+              @open-reference="referenceHeadwordVisibleEntryId = getEntryIdString(row.entry)"
+            />
+            <!-- 手動輸入另一個參考詞條
+                 - 若已有詞頭重複 / 其他方言 / Jyutjyu 提示：需點擊提示裏的小按鈕才展開
+                 - 若沒有任何提示，則自動顯示，方便直接輸入參考詞頭 -->
+            <ReferenceHeadwordRow
+              v-if="
+                row.type === 'entry' &&
+                focusedCell?.rowIndex === rowIndex &&
+                referenceHeadwordVisibleEntryId === getEntryIdString(row.entry)
+              "
+              :colspan="editableColumns.length + 2"
+              :query="getReferenceSearchQuery(getEntryIdString(row.entry))"
+              :is-loading="getReferenceSearchLoading(getEntryIdString(row.entry))"
+              @update:query="(q: string) => setReferenceSearchQuery(getEntryIdString(row.entry), q)"
+              @search="(q: string) => runReferenceSearchForEntry(row.entry, q)"
+              @dismiss="referenceHeadwordVisibleEntryId = null"
             />
             <!-- 其他方言點已有該詞條（若已觸發同方言詞頭重複檢測則不再顯示，避免重複提示） -->
             <OtherDialectsRefRow
@@ -464,6 +481,7 @@
               :entries="getOtherDialectsFormatted(getEntryIdString(row.entry))"
               @dismiss="dismissDuplicateCheck(row.entry)"
               @apply-template="applyOtherDialectTemplate(row.entry, $event)"
+              @open-reference="referenceHeadwordVisibleEntryId = getEntryIdString(row.entry)"
             />
             <!-- Jyutjyu 參考（新建詞條：填寫詞頭後自動查詢） -->
             <JyutjyuRefRow
@@ -481,6 +499,7 @@
               :error-message="getJyutjyuError(getEntryIdString(row.entry))"
               @dismiss="dismissJyutjyuRef(row.entry)"
               @apply-template="applyJyutjyuTemplate(row.entry, $event)"
+              @open-reference="referenceHeadwordVisibleEntryId = getEntryIdString(row.entry)"
             />
             <!-- 行內釋義建議錯誤 + 重試 -->
             <tr
@@ -796,6 +815,7 @@ import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
 import JyutjyuRefRow from '~/components/entries/JyutjyuRefRow.vue'
 import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymonsModal.vue'
 import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
+import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 
 definePageMeta({
   layout: 'default',
@@ -1257,6 +1277,10 @@ const formatDuplicateEntries = rowHints.formatDuplicateEntries
 const formatOtherDialectsEntries = rowHints.formatOtherDialectsEntries
 const getDuplicateCheckEntriesFormatted = rowHints.getDuplicateCheckEntriesFormatted
 const getOtherDialectsFormatted = rowHints.getOtherDialectsFormatted
+const getReferenceSearchLoading = rowHints.getReferenceSearchLoading
+const getReferenceSearchQuery = rowHints.getReferenceSearchQuery
+const setReferenceSearchQuery = rowHints.setReferenceSearchQuery
+const runReferenceSearchForEntry = rowHints.runReferenceSearchForEntry
 const applyOtherDialectTemplate = rowHints.applyOtherDialectTemplate
 const applyJyutjyuTemplate = rowHints.applyJyutjyuTemplate
 const dismissDuplicateCheck = rowHints.dismissDuplicateCheck
@@ -1267,6 +1291,8 @@ const getOtherDialectsRowVisible = rowHints.getOtherDialectsRowVisible
 const acceptJyutdict = rowHints.acceptJyutdict
 const dismissJyutdict = rowHints.dismissJyutdict
 const dismissJyutjyuRef = rowHints.dismissJyutjyuRef
+
+const referenceHeadwordVisibleEntryId = ref<string | null>(null)
 
 function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
   const entryId = getEntryIdString(entry)
@@ -1284,6 +1310,11 @@ function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
   }
   if (getDuplicateCheckRowVisible(entryId)) {
     dismissDuplicateCheck(entry)
+    return true
+  }
+  // 參考詞頭輸入行：位於 DuplicateCheckRow 之後、其他參考提示之前
+  if (referenceHeadwordVisibleEntryId.value === entryId) {
+    referenceHeadwordVisibleEntryId.value = null
     return true
   }
   if (getOtherDialectsRowVisible(entryId)) {

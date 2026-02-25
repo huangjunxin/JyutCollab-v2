@@ -63,6 +63,11 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     otherDialects?: OtherDialectEntryRaw[]
   }>>(new Map())
 
+  /** 參考詞頭手動搜尋 loading 狀態（結果直接覆蓋 duplicateCheckResult / jyutjyuRefResult） */
+  const referenceSearchLoading = ref<Map<string, boolean>>(new Map())
+  /** 參考詞頭輸入框內容（不影響 Jyutjyu 展示的 query） */
+  const referenceSearchQuery = ref<Map<string, string>>(new Map())
+
   const jyutjyuRefResult = ref<Map<string, {
     loading: boolean
     q: string
@@ -228,6 +233,70 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     duplicateCheckResult.value = new Map(duplicateCheckResult.value)
   }
 
+  /**
+   * 以「另一個參考詞頭」搜尋可用作範本的詞條。
+   * - 復用 /api/entries/check-duplicate 查本數據庫，結果覆蓋 duplicateCheckResult
+   * - 同時查 /api/jyutjyu/search，結果覆蓋 jyutjyuRefResult（沿用現有 Jyutjyu 展示）
+   */
+  async function runReferenceSearchForEntry(entry: Entry, rawHeadword: string) {
+    const entryId = getEntryIdString(entry)
+    const q = rawHeadword?.trim() || ''
+    const dialect = entry.dialect?.name || ''
+    if (!entryId || !q || !dialect) return
+
+    referenceSearchLoading.value.set(entryId, true)
+    referenceSearchLoading.value = new Map(referenceSearchLoading.value)
+
+    try {
+      const [dbRes, jyutjyuRes] = await Promise.all([
+        $fetch<{ sameDialect: OtherDialectEntryRaw[]; otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
+          query: { headword: q, dialect }
+        }),
+        $fetch<any>('/api/jyutjyu/search', { query: { q } })
+      ])
+
+      const sameDialect = dbRes.sameDialect || []
+      const otherDialects = dbRes.otherDialects || []
+      const jyutjyuList = Array.isArray(jyutjyuRes?.results) ? jyutjyuRes.results : []
+
+      // 覆蓋重複檢測結果，讓現有 Duplicate / OtherDialects 提示顯示新詞頭的數據
+      duplicateCheckResult.value.set(entryId, {
+        loading: false,
+        entries: sameDialect,
+        otherDialects: otherDialects
+      })
+      duplicateCheckResult.value = new Map(duplicateCheckResult.value)
+
+      // 覆蓋 Jyutjyu 結果，讓現有 Jyutjyu 提示顯示新詞頭的數據
+      jyutjyuRefResult.value.set(entryId, {
+        loading: false,
+        q,
+        total: typeof jyutjyuRes?.total === 'number'
+          ? jyutjyuRes.total
+          : (Array.isArray(jyutjyuList) ? jyutjyuList.length : 0),
+        results: jyutjyuList,
+        errorMessage: ''
+      })
+      jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
+      jyutjyuRefVisible.value.set(entryId, true)
+      jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
+    } catch (e) {
+      duplicateCheckResult.value.set(entryId, { loading: false, entries: [], otherDialects: [] })
+      duplicateCheckResult.value = new Map(duplicateCheckResult.value)
+
+      jyutjyuRefResult.value.set(entryId, {
+        loading: false,
+        q,
+        total: null,
+        results: [],
+        errorMessage: '查詢 Jyutjyu 時出現問題，請稍後再試。'
+      })
+      jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
+    }
+    referenceSearchLoading.value.set(entryId, false)
+    referenceSearchLoading.value = new Map(referenceSearchLoading.value)
+  }
+
   function formatDuplicateEntries(list: OtherDialectEntryRaw[]): FormattedDuplicateEntry[] {
     if (!list?.length) return []
     return list.map(e => {
@@ -288,6 +357,19 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
 
   function getOtherDialectsFormatted(entryId: string) {
     return formatOtherDialectsEntries(duplicateCheckResult.value.get(entryId)?.otherDialects || [])
+  }
+
+  function getReferenceSearchLoading(entryId: string): boolean {
+    return referenceSearchLoading.value.get(entryId) || false
+  }
+
+  function getReferenceSearchQuery(entryId: string): string {
+    return referenceSearchQuery.value.get(entryId) || ''
+  }
+
+  function setReferenceSearchQuery(entryId: string, q: string) {
+    referenceSearchQuery.value.set(entryId, q)
+    referenceSearchQuery.value = new Map(referenceSearchQuery.value)
   }
 
   async function applyOtherDialectTemplate(targetEntry: Entry, sourceId: string) {
@@ -446,6 +528,12 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     formatOtherDialectsEntries,
     getDuplicateCheckEntriesFormatted,
     getOtherDialectsFormatted,
+    referenceSearchLoading,
+    referenceSearchQuery,
+    getReferenceSearchLoading,
+    getReferenceSearchQuery,
+    setReferenceSearchQuery,
+    runReferenceSearchForEntry,
     applyOtherDialectTemplate,
     applyJyutjyuTemplate,
     dismissDuplicateCheck,
