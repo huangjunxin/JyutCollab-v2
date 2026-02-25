@@ -54,9 +54,23 @@
           v-model:open="detailModalOpen"
           :entry-id="detailEntryId"
         />
-        <UButton size="xs" color="neutral" variant="ghost" class="flex-shrink-0" @mousedown.prevent="$emit('dismiss')">
-          忽略 (Esc)
-        </UButton>
+        <div class="flex flex-col items-end gap-1 flex-shrink-0">
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            @mousedown.prevent="$emit('dismiss')"
+          >
+            忽略 (Esc)
+          </UButton>
+          <button
+            type="button"
+            class="text-xs text-blue-600 dark:text-blue-300 hover:underline"
+            @click="$emit('open-reference')"
+          >
+            我要參考另一個詞條
+          </button>
+        </div>
       </div>
     </td>
   </tr>
@@ -73,6 +87,7 @@ defineProps<{
 defineEmits<{
   dismiss: []
   'apply-template': [id: string]
+  'open-reference': []
 }>()
 
 const showDetail = ref(false)

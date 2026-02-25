@@ -115,7 +115,7 @@
         </div>
         <div class="flex gap-2 flex-shrink-0">
           <UButton size="xs" color="neutral" variant="ghost" @mousedown.prevent="$emit('dismiss')">
-            忽略 (Esc)
+            關閉 (Esc)
           </UButton>
           <UButton
             size="xs"
