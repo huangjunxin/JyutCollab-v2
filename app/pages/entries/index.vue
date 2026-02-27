@@ -1123,6 +1123,22 @@ function toggleGroupExpanded(headwordNormalized: string) {
   expandedGroupKeys.value = next
 }
 
+/** 計算某個新建詞條在聚合視圖中所屬組的 key，用於自動展開 */
+function getGroupKeyForEntry(entry: any): string {
+  if (viewMode.value === 'lexeme') {
+    return entry.lexemeId || `__unassigned__:${String(getEntryKey(entry))}`
+  }
+  return entry.headword?.normalized || entry.headword?.display || entry.text || ''
+}
+
+function autoExpandGroupForEntry(entry: any) {
+  if (viewMode.value !== 'aggregated' && viewMode.value !== 'lexeme') return
+  const key = getGroupKeyForEntry(entry)
+  const next = new Set(expandedGroupKeys.value)
+  next.add(key)
+  expandedGroupKeys.value = next
+}
+
 function setViewMode(v: string) {
   const mode = v === 'aggregated' ? 'aggregated' : (v === 'lexeme' ? 'lexeme' : 'flat')
   viewMode.value = mode
@@ -1850,6 +1866,7 @@ function addNewRow() {
     _isDirty: false
   }
   entries.value.unshift(newEntry)
+  autoExpandGroupForEntry(newEntry)
 
   // 直接進入詞頭編輯（forceEdit: true），否則只會選中格、焦點仍在按鈕上，用戶按 Enter 會再次觸發「新建詞條」
   nextTick(() => {
@@ -1894,6 +1911,7 @@ function duplicateEntry(entry: Entry) {
     _isDirty: false
   }
   entries.value.unshift(newEntry)
+  autoExpandGroupForEntry(newEntry)
 
   nextTick(() => {
     handleCellClick(newEntry, 'headword', new MouseEvent('click'), 0, 0, true)
@@ -1986,7 +2004,17 @@ async function saveNewEntry(entry: Entry) {
       pagination.total++
       // 聚合／按詞語視圖下保存新條目後重新拉取，使新條目歸入對應詞形組或詞語組
       if (viewMode.value === 'aggregated' || viewMode.value === 'lexeme') {
+        // 計算保存後該詞條所屬組的 key，以便拉取後自動展開
+        const savedData = response.data as any
+        const postSaveGroupKey = viewMode.value === 'lexeme'
+          ? (savedData?.lexemeId || savedData?.headword?.normalized || savedData?.headword?.display || '')
+          : (savedData?.headword?.normalized || savedData?.headword?.display || savedData?.text || '')
         await fetchEntries()
+        if (postSaveGroupKey) {
+          const next = new Set(expandedGroupKeys.value)
+          next.add(postSaveGroupKey)
+          expandedGroupKeys.value = next
+        }
       }
     }
   } catch (error: any) {
