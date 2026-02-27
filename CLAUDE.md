@@ -26,7 +26,15 @@ Key character differences from Simplified/Standard Traditional:
 
 ## Project Overview
 
-JyutCollab v2 is a collaborative platform for creating and managing Cantonese multi-syllable expression entries. It's a full-stack Nuxt.js application with TypeScript, MongoDB, and AI integration for suggesting definitions and categorizations.
+JyutCollab v2 is a collaborative platform for creating and managing Cantonese multi-syllable expression dictionary entries. It supports 190+ dialect points across Guangdong, Guangxi, Hong Kong, Macau, and overseas Chinese communities.
+
+Key capabilities:
+- Notion-style inline editing with keyboard navigation
+- AI-powered theme classification, definition and example generation
+- Multi-dialect entry management with cross-dialect linking
+- Review workflow with approval/rejection system
+- Full edit history with revert functionality
+- Real-time duplicate checking
 
 ## Development Commands
 
@@ -34,14 +42,33 @@ JyutCollab v2 is a collaborative platform for creating and managing Cantonese mu
 npm run dev          # Start dev server on port 3100
 npm run build        # Build for production
 npm run preview      # Preview production build
+npm run postinstall  # Nuxt prepare (runs automatically)
 ```
 
 ## Environment Setup
 
 Copy `.env.example` to `.env` and configure:
-- `MONGODB_URI` - MongoDB connection string
-- `NUXT_SESSION_PASSWORD` - Session secret (32+ chars)
-- `OPENROUTER_API_KEY` - For AI features
+
+```bash
+# MongoDB Connection
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jyutcollab
+
+# Session (nuxt-auth-utils) - at least 32 characters
+NUXT_SESSION_PASSWORD=your-session-password-at-least-32-chars-long
+
+# OpenRouter API Key (for AI features)
+OPENROUTER_API_KEY=sk-or-your-api-key
+
+# Cloudinary (sense images)
+NUXT_CLOUDINARY_CLOUD_NAME=your_cloud_name
+NUXT_CLOUDINARY_API_KEY=your_api_key
+NUXT_CLOUDINARY_API_SECRET=your_api_secret
+
+# Site Configuration
+NUXT_PORT=3100
+NUXT_PUBLIC_SITE_URL=http://localhost:3100
+NUXT_PUBLIC_SITE_NAME=JyutCollab v2
+```
 
 ## Architecture
 
@@ -53,67 +80,136 @@ Copy `.env.example` to `.env` and configure:
 - **AI**: OpenRouter API (qwen/qwen3-235b-a22b-07-25 model)
 - **State**: Pinia stores
 - **Validation**: Zod schemas
+- **Image**: Cloudinary for upload and optimization
+- **Text**: opencc-js for Hong Kong Traditional Chinese conversion
 
 ### Directory Structure
 
 ```
 app/
-  pages/           # Vue pages (entries, review, histories, auth)
-  components/      # Vue components (layout/, entries/, auth/, review/, history/)
-  composables/     # useAuth.ts for authentication logic
-  stores/          # Pinia stores (sidebar.ts)
-  types/           # TypeScript interfaces (Entry, User, Theme, EditHistory)
-  middleware/      # Route guards (auth, guest, reviewer)
+  pages/              # Vue pages (entries, review, histories, auth)
+  components/         # Vue components
+    layout/           # AppHeader, AppSidebar
+    entries/          # EntryEditableCell, EntryDetailCard, EntryModal, etc.
+    auth/             # LoginForm, RegisterForm
+    review/           # Review-related components
+    history/          # History-related components
+  composables/        # Reusable composition functions
+    useAuth.ts        # Authentication logic
+    useEntriesAISuggestions.ts  # AI suggestions management
+    useEntriesTableEdit.ts      # Table editing
+    useColumnResize.ts          # Column resizing
+    useThemeData.ts             # Theme hierarchy data
+    useEntryDisplay.ts          # Entry display formatting
+    ...               # Many more composables
+  stores/             # Pinia stores (sidebar.ts)
+  types/              # TypeScript interfaces (Entry, User, Theme, EditHistory)
+  middleware/         # Route guards (auth, guest, reviewer, home-redirect)
+  utils/              # Frontend utilities (dialects, entryKey, etc.)
 
 server/
-  api/             # REST endpoints (auth, entries, reviews, ai, histories)
-  utils/           # Database models (Entry.ts, User.ts, Theme.ts, etc.)
-                   # AI service (ai.ts), text conversion (textConversion.ts)
-  middleware/      # Global auth middleware for API routes
+  api/                # REST endpoints
+    auth/             # /api/auth/register, login, logout, me
+    entries/          # /api/entries CRUD + check-duplicate, search-morphemes
+    reviews/          # /api/reviews with approve/reject
+    histories/        # /api/histories with revert
+    ai/               # /api/ai/categorize, definitions, examples
+    stats/            # /api/stats, /api/stats/mine, /api/stats/reviewer
+    upload/           # /api/upload/image
+    lexemes/          # /api/lexemes/[lexemeId]/external-etymons
+    jyutdict/         # /api/jyutdict/general, sheet
+    jyutjyu/          # /api/jyutjyu/search
+  utils/              # Server utilities
+    db.ts             # MongoDB connection with caching
+    auth.ts           # Password hashing, JWT, permission checks
+    ai.ts             # AI service (categorize, definitions, examples)
+    textConversion.ts # Hong Kong Traditional Chinese conversion
+    cloudinary.ts     # Image upload and optimization
+    validation.ts     # Zod error formatting
+    Entry.ts          # Entry model (complex nested schema)
+    User.ts           # User model with roles and dialect permissions
+    Theme.ts          # Theme model (3-level hierarchy)
+    EditHistory.ts    # Edit history with snapshots
+    Lexeme.ts         # Lexeme grouping model
+    ExternalEtymon.ts # External etymology references
+  middleware/         # Global auth middleware for API routes
+
+shared/
+  dialects.ts         # Single source of truth for 190+ dialects
 ```
 
 ### Key Data Models
 
 **Entry** (`server/utils/Entry.ts`):
-- Complex nested structure: headword, phonetic, senses (with examples, sub-senses)
-- Status workflow: draft → pending → approved/rejected
-- Tracks contributor and reviewer
+- Complex nested structure with headword, phonetic, senses (with examples, sub-senses)
+- Status workflow: draft → pending_review → approved/rejected
+- Dialect-specific with lexemeId for cross-dialect linking
+- Theme classification (3-level hierarchy, IDs 60-498)
+- Morpheme references for character/word linking
+- Unique index: (headword.display + dialect.name)
 
 **User** (`server/utils/User.ts`):
 - Role system: contributor, reviewer, admin
-- Dialect permissions array for per-dialect access
+- Dialect permissions array: [{ dialectName, role }]
+- Contribution and review counts
 
 **Theme** (`server/utils/Theme.ts`):
-- Three-level classification: Level 1 (broad) → Level 2 → Level 3 (specific)
-- 60-498 theme IDs for classification
+- Three-level classification: Level 1 (11 categories) → Level 2 → Level 3 (439 themes)
+- IDs range: 60-498
+
+**EditHistory** (`server/utils/EditHistory.ts`):
+- Full before/after snapshots
+- Change field tracking
+- Revert support
 
 ### Entry Table Architecture
 
-The entries table (`app/pages/entries/index.vue`) uses Notion-style inline editing:
+The entries table (`app/pages/entries/index.vue`) is a 2000+ line component with:
+- Three view modes: flat, aggregated (by headword), lexeme (by lexemeId)
+- Notion-style inline editing with auto-resizing textareas
 - Keyboard navigation: Arrow keys, Enter, Tab, Escape
-- Auto-resizing textareas for long content
 - AI suggestions integrated inline (Tab to accept)
-- Dirty state tracking with real-time save indication
+- Column resizing with localStorage persistence
+- Real-time save indicator and dirty state tracking
+- Batch selection with bulk delete
+- Search by headword/variants/definition
+- Filter by dialect, theme, status, entry type
 
-### Authentication Flow
+### Authentication & Authorization Flow
 
-1. `server/middleware/auth.ts` validates sessions on protected routes
-2. `app/composables/useAuth.ts` provides client-side auth state and methods
-3. Route guards in `app/middleware/` enforce role requirements
+1. **Auth Flow:**
+   - `server/middleware/auth.ts` validates sessions on protected routes
+   - `app/composables/useAuth.ts` provides client-side auth state
+   - Route guards in `app/middleware/` enforce role requirements
+
+2. **Permission System:**
+   - Role hierarchy: contributor < reviewer < admin
+   - Dialect permissions: Contributors restricted to their permitted dialects
+   - `canContributeToDialect(user, dialectName)` checks permissions
+
+3. **API Protection:**
+   - Public: auth endpoints, GET /api/entries, GET /api/stats
+   - Protected: All other routes require valid session
+   - Reviewer-only: /api/reviews/*
 
 ### AI Integration (`server/utils/ai.ts`)
 
-- Theme classification with confidence scores
-- Definition generation in HK Traditional Chinese
-- Example sentence generation
-- Uses opencc-js for text conversion to Hong Kong Traditional
+Uses OpenRouter with qwen/qwen3-235b-a22b-07-25 model:
+- **Categorization** (temp 0.2): Returns themeId (60-498), confidence, explanation
+- **Definitions** (temp 0.4): Returns definition, usageNotes, formalityLevel, frequency
+- **Examples** (temp 0.6): Returns 3 examples with sentence, explanation, scenario
 
-### API Route Protection
+Frontend integration via `useEntriesAISuggestions.ts`:
+- Debounced triggers on cell edit
+- AbortController for cancellation
+- Pending suggestions map for multi-cell workflow
 
-`server/middleware/auth.ts` defines:
-- Public routes: auth endpoints, GET requests to /api/entries
-- Protected: All other API routes require valid session
-- Admin routes: Require admin role
+### Dialect System
+
+Defined in `shared/dialects.ts` with 190+ dialect points:
+- Categories: Pearl River Delta, Wuyi, Western/Eastern/Northern Guangdong, Guangxi regions, Hong Kong, Macau, Overseas
+- Each dialect: ID, display name (HK Traditional), region code, badge color
+- Contributors restricted to their permitted dialects
 
 ## Code Patterns
 
@@ -122,6 +218,9 @@ Use H3 event handlers with typed event context:
 ```typescript
 export default defineEventHandler(async (event) => {
   const user = event.context.auth?.user
+  if (!user) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
   // ...
 })
 ```
@@ -134,7 +233,58 @@ await connectDB()
 ```
 
 ### Text Conversion
-All Chinese text should be converted to HK Traditional using:
+All Chinese text should be converted to HK Traditional:
 ```typescript
 import { convertToHongKongTraditional } from '~/server/utils/textConversion'
+const hkText = convertToHongKongTraditional('简体字')
 ```
+
+### Zod Validation
+All API routes use Zod for input validation:
+```typescript
+const schema = z.object({
+  display: z.string().min(1, '詞條不能為空'),
+  dialect: z.string().min(1, '請選擇方言點'),
+})
+const result = schema.safeParse(await readBody(event))
+if (!result.success) {
+  throw createError({ statusCode: 400, data: result.error.flatten() })
+}
+```
+
+### Composables Pattern
+Logic is extracted into focused composables:
+- `useEntriesAISuggestions.ts` - AI suggestion state and triggers
+- `useEntriesTableEdit.ts` - Cell editing coordination
+- `useColumnResize.ts` - Column width management
+- `useThemeData.ts` - Theme hierarchy fetching
+- `useEntryDisplay.ts` - Entry to display transformation
+
+### Component Organization
+Components are organized by feature:
+- `components/layout/` - AppHeader, AppSidebar
+- `components/entries/` - Entry-related (EditableCell, DetailCard, Modal, etc.)
+- Components use `<script setup lang="ts">` syntax
+
+## Important Conventions
+
+1. **Entry ID Generation**: Use `id` field (String, unique), not MongoDB `_id`
+2. **Lexeme ID**: Use `lexemeId` to group entries across dialects
+3. **Status Transitions**: draft → pending_review → approved/rejected
+4. **Edit History**: Create EditHistory record for all CRUD operations
+5. **Dialect Permissions**: Always check `canContributeToDialect()` before entry modifications
+6. **Theme IDs**: Valid range is 60-498 (Level 3 IDs)
+7. **Image Upload**: Use Cloudinary with auto-optimization (max 5MB)
+8. **Column Widths**: Persist in localStorage as `jyutcollab-column-widths`
+9. **Sidebar State**: Persist in localStorage as `sidebar-collapsed`
+
+## Testing Considerations
+
+When testing, consider:
+- Dialect permission boundaries
+- Status workflow transitions
+- AI suggestion acceptance/rejection
+- Edit history snapshot accuracy
+- Revert functionality
+- Concurrent edits
+- Keyboard navigation in entry table
