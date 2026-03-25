@@ -77,6 +77,16 @@
                   <UIcon name="i-heroicons-user-circle" class="w-4 h-4" />
                   個人資料
                 </NuxtLink>
+                <NuxtLink
+                  v-if="isAdmin"
+                  to="/admin/users"
+                  class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  role="menuitem"
+                  @click="userMenuOpen = false"
+                >
+                  <UIcon name="i-heroicons-cog-6-tooth" class="w-4 h-4" />
+                  用戶管理
+                </NuxtLink>
                 <button
                   type="button"
                   class="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -113,7 +123,7 @@
 <script setup lang="ts">
 import { useAuth } from '../../composables/useAuth'
 
-const { user, isAuthenticated, canReview, logout } = useAuth()
+const { user, isAuthenticated, canReview, isAdmin, logout } = useAuth()
 const router = useRouter()
 const $route = useRoute()
 
