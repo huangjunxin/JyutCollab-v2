@@ -65,7 +65,7 @@ export default defineNuxtConfig({
     head: {
       title: 'JyutCollab v2',
       meta: [
-        { name: 'description', content: '粵語多音節表達詞條協作編寫平台' }
+        { name: 'description', content: '粵方言詞語編纂協作平台' }
       ]
     }
   },

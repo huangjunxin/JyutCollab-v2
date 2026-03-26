@@ -17,7 +17,7 @@
         </div>
 
         <h1 class="text-4xl font-bold mb-4 text-center">JyutCollab</h1>
-        <p class="text-xl text-white/80 mb-8 text-center">粵語多音節表達詞條協作平台</p>
+        <p class="text-xl text-white/80 mb-8 text-center">粵方言詞語編纂協作平台</p>
 
         <!-- Features -->
         <div class="space-y-4 max-w-md">
