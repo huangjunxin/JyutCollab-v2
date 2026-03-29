@@ -45,8 +45,9 @@
           </UButton>
         </nav>
 
-        <!-- User menu: custom dropdown (no Teleport) to avoid parentNode null in UDropdownMenu -->
+        <!-- Theme toggle and user menu -->
         <div class="flex items-center gap-3">
+          <LayoutColorModeButton />
           <template v-if="isAuthenticated">
             <div ref="userMenuRef" class="relative inline-block">
               <UButton
