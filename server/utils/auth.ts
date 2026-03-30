@@ -21,6 +21,11 @@ async function bcryptVerify(password: string, hash: string): Promise<boolean> {
 // JWT utilities using jose
 export async function generateToken(userId: string): Promise<string> {
   const config = useRuntimeConfig()
+  
+  if (!config.jwtSecret) {
+    throw new Error('JWT_SECRET 環境變量未設定，生產環境必須配置')
+  }
+  
   const secret = new TextEncoder().encode(config.jwtSecret)
 
   return await new jose.SignJWT({ userId, type: 'access' })
@@ -33,6 +38,12 @@ export async function generateToken(userId: string): Promise<string> {
 export async function verifyToken(token: string): Promise<{ userId: string } | null> {
   try {
     const config = useRuntimeConfig()
+    
+    if (!config.jwtSecret) {
+      console.error('JWT_SECRET 環境變量未設定')
+      return null
+    }
+    
     const secret = new TextEncoder().encode(config.jwtSecret)
 
     const { payload } = await jose.jwtVerify(token, secret)
