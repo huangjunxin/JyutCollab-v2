@@ -31,7 +31,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-side only
     mongodbUri: process.env.MONGODB_URI || '',
-    jwtSecret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    // JWT Secret: 生产环境必须设置，开发环境使用默认值
+    jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? undefined : 'dev-jwt-secret-do-not-use-in-production'),
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
     cloudinaryCloudName: process.env.NUXT_CLOUDINARY_CLOUD_NAME || '',
     cloudinaryApiKey: process.env.NUXT_CLOUDINARY_API_KEY || '',
