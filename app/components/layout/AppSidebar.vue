@@ -1,32 +1,18 @@
 <template>
   <aside
-    class="border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-[calc(100vh-4rem)] transition-all duration-300 ease-in-out relative"
-    :class="[sidebarStore.width, sidebarStore.collapsed ? 'p-2' : 'p-5']"
+    class="border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-[calc(100vh-4rem)] transition-all duration-300 ease-in-out overflow-hidden relative"
+    :class="[sidebarStore.width]"
   >
-    <!-- Collapse/Expand Toggle Button -->
-    <button
-      @click="sidebarStore.toggle"
-      class="absolute -right-3 top-6 w-6 h-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors z-10"
+    <div
+      v-show="sidebarStore.isOpen"
+      class="space-y-6 p-5"
     >
-      <UIcon
-        :name="sidebarStore.collapsed ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-left'"
-        class="w-4 h-4 text-gray-500 dark:text-gray-400"
-      />
-    </button>
-
-    <div class="space-y-6">
       <!-- Quick actions -->
       <div>
-        <h3
-          v-if="!sidebarStore.collapsed"
-          class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"
-        >
+        <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
           <UIcon name="i-heroicons-bolt" class="w-4 h-4" />
           快速操作
         </h3>
-        <div v-else class="flex justify-center mb-3">
-          <UIcon name="i-heroicons-bolt" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-        </div>
         <div class="space-y-2">
           <NuxtLink
             to="/entries"
@@ -34,35 +20,23 @@
             :class="[
               $route.path === '/entries'
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
-              sidebarStore.collapsed ? 'justify-center px-2 min-w-10 w-10 h-10' : ''
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
             ]"
-            :title="sidebarStore.collapsed ? '瀏覽詞條' : ''"
           >
             <UIcon name="i-heroicons-document-text" class="w-5 h-5 shrink-0" />
-            <span v-if="!sidebarStore.collapsed" class="truncate">瀏覽詞條</span>
+            <span class="truncate">瀏覽詞條</span>
           </NuxtLink>
         </div>
       </div>
 
       <!-- My entries stats（登入後顯示） -->
       <div v-if="myStats != null" class="border-t border-gray-200 dark:border-gray-800 pt-6">
-        <h3
-          v-if="!sidebarStore.collapsed"
-          class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"
-        >
+        <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
           <UIcon name="i-heroicons-user" class="w-4 h-4" />
           我的詞條
         </h3>
-        <div v-else class="flex justify-center mb-3">
-          <UIcon name="i-heroicons-user" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-        </div>
 
-        <!-- Expanded my stats view -->
-        <div
-          v-if="!sidebarStore.collapsed"
-          class="bg-gradient-to-br from-primary-50 to-primary-100/50 dark:from-primary-900/20 dark:to-primary-800/10 rounded-xl p-4 space-y-3"
-        >
+        <div class="bg-gradient-to-br from-primary-50 to-primary-100/50 dark:from-primary-900/20 dark:to-primary-800/10 rounded-xl p-4 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-document-text" class="w-4 h-4" />
@@ -92,61 +66,16 @@
             <span class="text-lg font-bold text-red-600 dark:text-red-400">{{ myStats.rejected }}</span>
           </div>
         </div>
-
-        <!-- Collapsed my stats view -->
-        <div v-else class="flex flex-col items-center space-y-3">
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30">
-              <UIcon name="i-heroicons-document-text" class="w-5 h-5 shrink-0 text-primary-600 dark:text-primary-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              我的總數: {{ myStats.total }}
-            </div>
-          </div>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <UIcon name="i-heroicons-clock" class="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              待審核: {{ myStats.pending }}
-            </div>
-          </div>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30">
-              <UIcon name="i-heroicons-check-circle" class="w-5 h-5 shrink-0 text-green-600 dark:text-green-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              已發佈: {{ myStats.approved }}
-            </div>
-          </div>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30">
-              <UIcon name="i-heroicons-x-circle" class="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              已拒絕: {{ myStats.rejected }}
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Reviewer stats（審核員/管理員顯示） -->
       <div v-if="reviewerStats != null" class="border-t border-gray-200 dark:border-gray-800 pt-6">
-        <h3
-          v-if="!sidebarStore.collapsed"
-          class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"
-        >
+        <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
           <UIcon name="i-heroicons-clipboard-document-check" class="w-4 h-4" />
           審核數據
         </h3>
-        <div v-else class="flex justify-center mb-3">
-          <UIcon name="i-heroicons-clipboard-document-check" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-        </div>
 
-        <div
-          v-if="!sidebarStore.collapsed"
-          class="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-800/10 rounded-xl p-4 space-y-3"
-        >
+        <div class="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-800/10 rounded-xl p-4 space-y-3">
           <NuxtLink
             to="/review"
             class="flex items-center justify-between hover:opacity-80 transition-opacity"
@@ -165,45 +94,16 @@
             <span class="text-lg font-bold text-gray-900 dark:text-white">{{ reviewerStats.reviewedByMe }}</span>
           </div>
         </div>
-
-        <div v-else class="flex flex-col items-center space-y-3">
-          <NuxtLink to="/review" class="relative group block">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <UIcon name="i-heroicons-clock" class="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              待審核: {{ reviewerStats.pending }}
-            </div>
-          </NuxtLink>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800">
-              <UIcon name="i-heroicons-check-circle" class="w-5 h-5 shrink-0 text-gray-600 dark:text-gray-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              我已審核: {{ reviewerStats.reviewedByMe }}
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Stats（全站） -->
       <div v-if="stats" class="border-t border-gray-200 dark:border-gray-800 pt-6">
-        <h3
-          v-if="!sidebarStore.collapsed"
-          class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2"
-        >
+        <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
           <UIcon name="i-heroicons-chart-bar" class="w-4 h-4" />
           全站數據
         </h3>
-        <div v-else class="flex justify-center mb-3">
-          <UIcon name="i-heroicons-chart-bar" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-        </div>
 
-        <!-- Expanded stats view -->
-        <div
-          v-if="!sidebarStore.collapsed"
-          class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl p-4 space-y-3"
-        >
+        <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl p-4 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-document-text" class="w-4 h-4" />
@@ -231,42 +131,6 @@
               已拒絕
             </span>
             <span class="text-lg font-bold text-red-600 dark:text-red-400">{{ stats.rejected }}</span>
-          </div>
-        </div>
-
-        <!-- Collapsed stats view (icons only with tooltips，與「瀏覽詞條」統一使用 document-text 圖標) -->
-        <div v-else class="flex flex-col items-center space-y-3">
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800">
-              <UIcon name="i-heroicons-document-text" class="w-5 h-5 shrink-0 text-gray-600 dark:text-gray-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              總詞條: {{ stats.total }}
-            </div>
-          </div>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30">
-              <UIcon name="i-heroicons-check-circle" class="w-5 h-5 shrink-0 text-green-600 dark:text-green-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              已發佈: {{ stats.approved }}
-            </div>
-          </div>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <UIcon name="i-heroicons-clock" class="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              待審核: {{ stats.pending }}
-            </div>
-          </div>
-          <div class="relative group">
-            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30">
-              <UIcon name="i-heroicons-x-circle" class="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
-            </div>
-            <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-              已拒絕: {{ stats.rejected }}
-            </div>
           </div>
         </div>
       </div>
