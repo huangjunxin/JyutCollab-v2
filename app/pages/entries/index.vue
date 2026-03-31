@@ -53,6 +53,19 @@
       </div>
     </div>
 
+    <!-- Mobile warning banner -->
+    <UAlert
+      v-if="isMobile && !mobileWarningDismissed"
+      color="warning"
+      variant="subtle"
+      icon="i-heroicons-computer-desktop"
+      title="建議使用電腦端編輯"
+      description="詞條表格為多欄位設計，在電腦上編輯體驗更佳。手機端目前僅支援瀏覽，如需編輯請使用電腦訪問。"
+      :close-button="{ icon: 'i-heroicons-x-mark-20-solid', color: 'gray', variant: 'link' }"
+      class="mb-4"
+      @close="mobileWarningDismissed = true"
+    />
+
     <!-- Search and filters -->
     <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
       <div class="flex flex-col lg:flex-row gap-3">
@@ -1001,6 +1014,15 @@ const themeFilterOptions = [
 ]
 
 // State
+// Mobile warning
+const isMobile = ref(false)
+const mobileWarningDismissed = ref(false)
+
+onMounted(() => {
+  // Check if mobile device
+  isMobile.value = window.innerWidth < 768
+})
+
 /** 詞條 baseline（用於「取消編輯」回滾，避免刷新整個頁面誤傷其他未保存內容）。key: entry.id */
 const entryBaselineById = ref<Map<string, any>>(new Map())
 const { setBaselineForEntry, restoreEntryFromBaseline, applyDraftOntoEntry } = useEntryBaseline(entryBaselineById)
