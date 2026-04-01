@@ -58,6 +58,92 @@
         <!-- Theme toggle and user menu -->
         <div class="flex items-center gap-3">
           <LayoutColorModeButton />
+
+          <!-- Notification Bell -->
+          <template v-if="isAuthenticated">
+            <div ref="notificationRef" class="relative">
+              <UButton
+                color="gray"
+                variant="ghost"
+                icon="i-heroicons-bell"
+                class="relative"
+                @click="notificationOpen = !notificationOpen"
+              >
+                <template v-if="unreadCount > 0">
+                  <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {{ unreadCount > 9 ? '9+' : unreadCount }}
+                  </span>
+                </template>
+              </UButton>
+
+              <!-- Notification Dropdown -->
+              <div
+                v-show="notificationOpen"
+                class="absolute right-0 top-full mt-1 w-80 max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-50"
+              >
+                <div class="sticky top-0 flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+                  <span class="font-semibold text-gray-900 dark:text-white">通知</span>
+                  <button
+                    v-if="unreadCount > 0"
+                    type="button"
+                    class="text-xs text-primary hover:underline"
+                    @click="handleMarkAllRead"
+                  >
+                    全部已讀
+                  </button>
+                </div>
+
+                <div v-if="notificationsLoading" class="p-4">
+                  <USkeleton class="h-12 w-full mb-2" />
+                  <USkeleton class="h-12 w-full mb-2" />
+                  <USkeleton class="h-12 w-full" />
+                </div>
+
+                <div v-else-if="notifications.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400">
+                  暫無通知
+                </div>
+
+                <div v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <NuxtLink
+                    v-for="notification in notifications.slice(0, 5)"
+                    :key="notification.id"
+                    :to="notification.actionUrl || '#'"
+                    class="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    :class="{ 'bg-blue-50 dark:bg-blue-900/10': !notification.isRead }"
+                    @click="handleNotificationClick(notification)"
+                  >
+                    <div class="flex items-start gap-3">
+                      <UIcon
+                        :name="getNotificationIcon(notification.type)"
+                        :class="['w-5 h-5 shrink-0 mt-0.5', getNotificationColor(notification.type)]"
+                      />
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {{ notification.title }}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                          {{ notification.message }}
+                        </p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          {{ formatNotificationTime(notification.createdAt) }}
+                        </p>
+                      </div>
+                    </div>
+                  </NuxtLink>
+                </div>
+
+                <NuxtLink
+                  v-if="notifications.length > 0"
+                  to="/notifications"
+                  class="block p-2 text-center text-sm text-primary hover:bg-gray-50 dark:hover:bg-gray-800 border-t border-gray-100 dark:border-gray-800"
+                  @click="notificationOpen = false"
+                >
+                  查看全部通知
+                </NuxtLink>
+              </div>
+            </div>
+          </template>
+
           <template v-if="isAuthenticated">
             <div ref="userMenuRef" class="relative inline-block">
               <UButton
@@ -133,6 +219,7 @@
 
 <script setup lang="ts">
 import { useAuth } from '../../composables/useAuth'
+import type { Notification, NotificationType } from '../../composables/useNotifications'
 
 const { user, isAuthenticated, canReview, isAdmin, logout } = useAuth()
 const router = useRouter()
@@ -140,6 +227,80 @@ const $route = useRoute()
 
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
+
+// Notification state
+const notificationOpen = ref(false)
+const notificationRef = ref<HTMLElement | null>(null)
+const {
+  notifications,
+  unreadCount,
+  loading: notificationsLoading,
+  fetchNotifications,
+  markAsRead,
+  markAllAsRead,
+  getNotificationIcon: getIcon,
+  getNotificationColor: getColor
+} = useNotifications()
+
+// Fetch notifications on mount
+onMounted(() => {
+  if (isAuthenticated.value) {
+    fetchNotifications()
+  }
+})
+
+// Helper functions
+function getNotificationIcon(type: NotificationType): string {
+  return getIcon(type)
+}
+
+function getNotificationColor(type: NotificationType): string {
+  return getColor(type)
+}
+
+function formatNotificationTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return '剛剛'
+  if (diffMins < 60) return `${diffMins} 分鐘前`
+  if (diffHours < 24) return `${diffHours} 小時前`
+  if (diffDays < 7) return `${diffDays} 天前`
+
+  return date.toLocaleDateString('zh-HK', { month: 'short', day: 'numeric' })
+}
+
+async function handleNotificationClick(notification: Notification) {
+  if (!notification.isRead) {
+    await markAsRead(notification.id)
+  }
+  notificationOpen.value = false
+}
+
+async function handleMarkAllRead() {
+  await markAllAsRead()
+}
+
+// Close notification dropdown on outside click
+function onNotificationClickOutside(event: MouseEvent) {
+  if (notificationRef.value && !notificationRef.value.contains(event.target as Node)) {
+    notificationOpen.value = false
+  }
+}
+
+watch(notificationOpen, (open) => {
+  if (open) {
+    nextTick(() => {
+      document.addEventListener('click', onNotificationClickOutside)
+    })
+  } else {
+    document.removeEventListener('click', onNotificationClickOutside)
+  }
+})
 
 function closeUserMenu() {
   userMenuOpen.value = false
