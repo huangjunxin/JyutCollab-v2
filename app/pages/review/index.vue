@@ -37,7 +37,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="entries.length === 0" class="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div v-else-if="entryList.length === 0" class="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
         <UIcon name="i-heroicons-check-circle" class="w-10 h-10 text-green-500" />
       </div>
@@ -48,7 +48,7 @@
     <!-- Entry list (DictCard-style)，復用 EntryDetailCard -->
     <div v-else class="space-y-4">
       <div
-        v-for="entry in entries"
+        v-for="entry in entryList"
         :key="entry.id"
         class="review-dict-card bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden"
       >
@@ -144,18 +144,17 @@
 import type { Entry } from '~/types'
 import { dialectOptionsWithAll } from '~/utils/dialects'
 import { entryToDisplay } from '~/composables/useEntryDisplay'
+import { useCachedAsyncData, CACHE_TTL, clearCacheByKey } from '~/composables/useDataCache'
 
 definePageMeta({
   layout: 'default',
-  middleware: ['reviewer']
+  middleware: ['reviewer'],
+  name: 'review-index'
 })
 
-const entries = ref<Entry[]>([])
-const loading = ref(false)
 const currentPage = ref(1)
 const processing = ref<string | null>(null)
 const action = ref<string | null>(null)
-// Sentinel for "all" – ComboboxItem does not allow value to be empty string
 const ALL_DIALECT_VALUE = '__all__'
 
 const selectedDialect = ref(ALL_DIALECT_VALUE)
@@ -173,9 +172,20 @@ const rejectingEntry = ref<Entry | null>(null)
 
 const dialectOptions = dialectOptionsWithAll(ALL_DIALECT_VALUE)
 
-async function fetchEntries() {
-  loading.value = true
-  try {
+const cacheKey = computed(() => {
+  const dialect = selectedDialect.value === ALL_DIALECT_VALUE ? 'all' : selectedDialect.value
+  return `review:${currentPage.value}:${dialect}`
+})
+
+interface ReviewResponse {
+  data: Entry[]
+  total: number
+  totalPages: number
+}
+
+const { data: entries, pending: loading, refresh: refreshEntries } = useCachedAsyncData<ReviewResponse>(
+  () => cacheKey.value,
+  async () => {
     const query: Record<string, any> = {
       page: currentPage.value,
       perPage: pagination.perPage,
@@ -186,27 +196,29 @@ async function fetchEntries() {
       query.dialectName = selectedDialect.value
     }
 
-    const response = await $fetch('/api/reviews', { query })
-
-    entries.value = response.data as Entry[]
-    pagination.total = response.total
-    pagination.totalPages = response.totalPages
-
-    // 如果當前頁沒有數據但總數大於0，跳轉到第一頁
-    if (entries.value.length === 0 && pagination.total > 0 && currentPage.value > 1) {
-      currentPage.value = 1
+    return await $fetch('/api/reviews', { query })
+  },
+  {
+    ttl: CACHE_TTL.review,
+    watch: [currentPage, selectedDialect],
+    transform: (response) => {
+      pagination.total = response.total
+      pagination.totalPages = response.totalPages
+      return response
     }
-  } catch (error) {
-    console.error('Failed to fetch entries:', error)
-  } finally {
-    loading.value = false
   }
-}
+)
 
-// 切換方言篩選時重置頁碼
+const entryList = computed(() => entries.value?.data ?? [])
+
+watch(entryList, (list) => {
+  if (list.length === 0 && pagination.total > 0 && currentPage.value > 1) {
+    currentPage.value = 1
+  }
+})
+
 function handleDialectChange() {
   currentPage.value = 1
-  fetchEntries()
 }
 
 async function handleApprove(id: string) {
@@ -216,21 +228,14 @@ async function handleApprove(id: string) {
     await $fetch(`/api/reviews/${id}/approve`, {
       method: 'POST'
     })
-    // 先從列表中移除已審核的條目
-    entries.value = entries.value.filter(e => e.id !== id)
-    pagination.total--
-
-    // 如果當前頁沒有數據了，且還有其他頁，則重新獲取
-    if (entries.value.length === 0 && pagination.total > 0) {
-      await fetchEntries()
-    }
+    clearCacheByKey('review:')
+    await refreshEntries()
   } catch (error: any) {
     console.error('Failed to approve:', error)
-    // 顯示錯誤提示
     const errorMessage = error?.data?.message || error?.message || '審核操作失敗'
     alert(errorMessage)
-    // 出錯時重新獲取以確保數據一致性
-    await fetchEntries()
+    clearCacheByKey('review:')
+    await refreshEntries()
   } finally {
     processing.value = null
     action.value = null
@@ -256,31 +261,19 @@ async function handleReject() {
       }
     })
     rejectModalOpen.value = false
-    // 先從列表中移除已審核的條目
-    entries.value = entries.value.filter(e => e.id !== entryId)
-    pagination.total--
-
-    // 如果當前頁沒有數據了，且還有其他頁，則重新獲取
-    if (entries.value.length === 0 && pagination.total > 0) {
-      await fetchEntries()
-    }
-
+    clearCacheByKey('review:')
+    await refreshEntries()
     rejectingEntry.value = null
   } catch (error: any) {
     console.error('Failed to reject:', error)
-    // 顯示錯誤提示
     const errorMessage = error?.data?.message || error?.message || '審核操作失敗'
     alert(errorMessage)
-    // 出錯時重新獲取以確保數據一致性
-    await fetchEntries()
+    clearCacheByKey('review:')
+    await refreshEntries()
   } finally {
     rejecting.value = false
   }
 }
-
-watch(currentPage, fetchEntries)
-
-onMounted(fetchEntries)
 
 </script>
 

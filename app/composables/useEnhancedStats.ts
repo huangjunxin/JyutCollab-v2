@@ -1,6 +1,4 @@
-/**
- * 增強用戶統計 Composable
- */
+import { useCachedAsyncData, CACHE_TTL } from './useDataCache'
 
 export interface DialectStat {
   dialect: string
@@ -66,43 +64,62 @@ export interface EnhancedReviewerStats {
 }
 
 export const useEnhancedStats = () => {
-  const userStats = ref<EnhancedUserStats | null>(null)
-  const reviewerStats = ref<EnhancedReviewerStats | null>(null)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-
   const { isAuthenticated, canReview } = useAuth()
+
+  const userStatsAsync = useCachedAsyncData<EnhancedUserStats | null>(
+    'stats:user:enhanced',
+    () => $fetch<EnhancedUserStats>('/api/stats/mine/enhanced').catch(() => null),
+    {
+      ttl: CACHE_TTL.stats,
+      lazy: true,
+      immediate: false,
+      default: () => null
+    }
+  )
+
+  const reviewerStatsAsync = useCachedAsyncData<EnhancedReviewerStats | null>(
+    'stats:reviewer:enhanced',
+    () => $fetch<EnhancedReviewerStats>('/api/stats/reviewer/enhanced').catch(() => null),
+    {
+      ttl: CACHE_TTL.stats,
+      lazy: true,
+      immediate: false,
+      default: () => null
+    }
+  )
+
+  const loading = computed(() => 
+    (isAuthenticated.value && userStatsAsync.pending.value) ||
+    (canReview.value && reviewerStatsAsync.pending.value)
+  )
+
+  const error = ref<string | null>(null)
 
   async function fetchStats() {
     if (!isAuthenticated.value) {
-      userStats.value = null
-      reviewerStats.value = null
+      userStatsAsync.data.value = null
+      reviewerStatsAsync.data.value = null
       return
     }
 
-    loading.value = true
     error.value = null
 
     try {
-      const results = await Promise.all([
-        $fetch<EnhancedUserStats>('/api/stats/mine/enhanced').catch(() => null),
-        canReview.value ? $fetch<EnhancedReviewerStats>('/api/stats/reviewer/enhanced').catch(() => null) : Promise.resolve(null)
+      await Promise.all([
+        userStatsAsync.execute(),
+        canReview.value ? reviewerStatsAsync.execute() : Promise.resolve()
       ])
-
-      userStats.value = results[0]
-      reviewerStats.value = results[1]
     } catch (e: any) {
       error.value = e?.message || '獲取統計失敗'
-    } finally {
-      loading.value = false
     }
   }
 
   return {
-    userStats,
-    reviewerStats,
+    userStats: userStatsAsync.data,
+    reviewerStats: reviewerStatsAsync.data,
     loading,
     error,
-    fetchStats
+    fetchStats,
+    refresh: fetchStats
   }
 }
