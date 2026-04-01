@@ -10,14 +10,25 @@
           這是您的 JyutCollab 儀表板
         </p>
       </div>
-      <UButton
-        to="/entries"
-        color="primary"
-        size="lg"
-        icon="i-heroicons-plus"
-      >
-        新建詞條
-      </UButton>
+      <div class="flex gap-2">
+        <UButton
+          color="neutral"
+          variant="ghost"
+          icon="i-heroicons-arrow-path"
+          :loading="isRefreshing"
+          @click="refreshAll"
+        >
+          刷新
+        </UButton>
+        <UButton
+          to="/entries"
+          color="primary"
+          size="lg"
+          icon="i-heroicons-plus"
+        >
+          新建詞條
+        </UButton>
+      </div>
     </div>
 
     <!-- Quick Actions Grid -->
@@ -489,6 +500,10 @@
 import type { EditHistory, EditHistoryAction } from '~/types'
 import { getDialectLabel } from '~shared/dialects'
 
+definePageMeta({
+  name: 'index'
+})
+
 const { user, isAuthenticated, canReview } = useAuth()
 const { siteStats, userStats, reviewerStats, loading: statsLoading, fetchStats } = useStats()
 
@@ -525,6 +540,23 @@ const welcomeTitle = computed(() => {
   const displayName = user.value?.displayName || user.value?.username
   return displayName ? `歡迎回來，${displayName}` : '歡迎回來'
 })
+
+const isRefreshing = ref(false)
+
+async function refreshAll() {
+  isRefreshing.value = true
+  try {
+    await Promise.all([
+      fetchStats(),
+      fetchCoverage(),
+      fetchEnhancedStats(),
+      fetchMyActivities(),
+      canReview.value ? fetchAllActivities() : Promise.resolve()
+    ])
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
 function getActionIcon(action: EditHistoryAction): string {
   const icons: Record<EditHistoryAction, string> = {

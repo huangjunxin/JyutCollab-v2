@@ -1,46 +1,52 @@
 import type { EditHistory } from '~/types'
+import { useCachedAsyncData, CACHE_TTL } from './useDataCache'
 
 export const useRecentActivities = (limit: number = 5, scope: 'mine' | 'all' = 'mine') => {
-  const activities = ref<EditHistory[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-
   const { isAuthenticated } = useAuth()
+  
+  const cacheKey = `activities:${scope}:${limit}`
 
-  async function fetchActivities() {
-    if (!isAuthenticated.value) {
-      activities.value = []
-      return
-    }
+  const result = useCachedAsyncData<EditHistory[]>(
+    cacheKey,
+    async () => {
+      if (!isAuthenticated.value) {
+        return []
+      }
 
-    loading.value = true
-    error.value = null
-    try {
       const query: Record<string, any> = {
         perPage: limit,
         page: 1
       }
 
-      // 'mine' scope: only current user's activities
-      // 'all' scope: all activities (for reviewer/admin)
       if (scope === 'mine') {
         query.userId = 'me'
       }
 
       const response = await $fetch<{ data: EditHistory[] }>('/api/histories', { query })
-      activities.value = response.data || []
-    } catch (e: any) {
-      error.value = e?.message || '獲取活動記錄失敗'
-      activities.value = []
-    } finally {
-      loading.value = false
+      return response.data || []
+    },
+    {
+      ttl: CACHE_TTL.histories,
+      lazy: true,
+      immediate: false,
+      default: () => [],
+      watch: [isAuthenticated]
     }
+  )
+
+  const activities = computed(() => result.data.value ?? [])
+  const loading = computed(() => result.pending.value)
+  const error = computed(() => result.error.value?.message || null)
+
+  async function fetchActivities() {
+    await result.execute()
   }
 
   return {
     activities,
     loading,
     error,
-    fetchActivities
+    fetchActivities,
+    refresh: fetchActivities
   }
 }

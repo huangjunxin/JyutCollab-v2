@@ -1,7 +1,7 @@
 <template>
   <UApp>
     <NuxtLayout>
-      <NuxtPage />
+      <NuxtPage :keepalive="{ include: cacheablePages }" />
     </NuxtLayout>
   </UApp>
 </template>
@@ -11,7 +11,13 @@ import { useAuth } from './composables/useAuth'
 
 const { initAuth } = useAuth()
 
-// Initialize auth on app load
+const cacheablePages = [
+  'index',
+  'entries-index',
+  'review-index',
+  'histories-index'
+]
+
 onMounted(() => {
   initAuth()
 })

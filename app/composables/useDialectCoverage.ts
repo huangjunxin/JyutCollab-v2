@@ -1,6 +1,4 @@
-/**
- * 方言覆蓋度統計 Composable
- */
+import { useCachedAsyncData, CACHE_TTL } from './useDataCache'
 
 export interface DialectCoverage {
   id: string
@@ -28,28 +26,28 @@ export interface DialectCoverageData {
 }
 
 export const useDialectCoverage = () => {
-  const data = ref<DialectCoverageData | null>(null)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
+  const result = useCachedAsyncData<DialectCoverageData>(
+    'stats:dialects',
+    () => $fetch<DialectCoverageData>('/api/stats/dialects'),
+    {
+      ttl: CACHE_TTL.dialects,
+      lazy: true,
+      immediate: false
+    }
+  )
+
+  const loading = computed(() => result.pending.value)
+  const error = computed(() => result.error.value?.message || null)
 
   async function fetchCoverage() {
-    loading.value = true
-    error.value = null
-
-    try {
-      const result = await $fetch<DialectCoverageData>('/api/stats/dialects')
-      data.value = result
-    } catch (e: any) {
-      error.value = e?.message || '獲取方言統計失敗'
-    } finally {
-      loading.value = false
-    }
+    await result.execute()
   }
 
   return {
-    data,
+    data: result.data,
     loading,
     error,
-    fetchCoverage
+    fetchCoverage,
+    refresh: fetchCoverage
   }
 }

@@ -863,7 +863,8 @@ import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 
 definePageMeta({
   layout: 'default',
-  middleware: ['auth']
+  middleware: ['auth'],
+  name: 'entries-index'
 })
 
 const { isAuthenticated, user } = useAuth()
@@ -1059,11 +1060,6 @@ const themeFilterOptions = [
 const isMobile = ref(false)
 const mobileWarningDismissed = ref(false)
 
-onMounted(() => {
-  // Check if mobile device
-  isMobile.value = window.innerWidth < 768
-})
-
 /** 詞條 baseline（用於「取消編輯」回滾，避免刷新整個頁面誤傷其他未保存內容）。key: entry.id */
 const entryBaselineById = ref<Map<string, any>>(new Map())
 const { setBaselineForEntry, restoreEntryFromBaseline, applyDraftOntoEntry } = useEntryBaseline(entryBaselineById)
@@ -1079,14 +1075,8 @@ const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const { entries, aggregatedGroups, lexemeGroups, loading, currentPage, pagination, fetchEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
 
-// Handle URL parameters on initial load
+// Handle URL parameters - will be processed in onMounted before fetchEntries
 const route = useRoute()
-if (route.query.filter === 'mine' && user.value?.id) {
-  filters.createdBy = user.value.id
-}
-if (route.query.search && typeof route.query.search === 'string') {
-  searchQuery.value = route.query.search
-}
 
 // 頁面跳轉輸入
 const jumpToPageInput = ref<string>('')
@@ -2280,16 +2270,58 @@ async function deleteEntry(entry: Entry) {
   }
 }
 
+// Flag to skip watch during initialization
+const isInitializing = ref(true)
+
+// Extract URL parameter handling into a function
+function applyUrlParams(): boolean {
+  const query = route.query
+  let changed = false
+
+  // Handle search parameter
+  const newSearch = typeof query.search === 'string' ? query.search : ''
+  if (newSearch !== searchQuery.value) {
+    searchQuery.value = newSearch
+    changed = true
+  }
+
+  // Handle filter=mine parameter
+  const shouldFilterMine = query.filter === 'mine' && user.value?.id
+  const newCreatedBy = shouldFilterMine ? user.value.id : undefined
+  if (newCreatedBy !== filters.createdBy) {
+    filters.createdBy = newCreatedBy
+    changed = true
+  }
+
+  return changed
+}
+
 // Watch for page changes
 watch(currentPage, () => {
+  if (isInitializing.value) return
   fetchEntries()
 })
 
 // Watch for filter changes (sidebar or page dropdowns) - reset to page 1 and fetch
 watch([() => filters.region, () => filters.status, () => filters.theme, () => filters.createdBy], () => {
+  if (isInitializing.value) return
   currentPage.value = 1
   fetchEntries()
 })
+
+// Watch for route.query changes (handles navigation from homepage with search/filter params)
+watch(
+  () => route.query,
+  () => {
+    if (isInitializing.value) return
+    const changed = applyUrlParams()
+    if (changed) {
+      currentPage.value = 1
+      fetchEntries()
+    }
+  },
+  { deep: true }
+)
 
 // 監聽 entries / 聚合 groups 變化，即時保存到本地儲存
 watch(
@@ -2328,8 +2360,19 @@ watch(
   { deep: true }
 )
 
-// Initial fetch
-onMounted(fetchEntries)
+// Initial fetch - process URL params first, then fetch
+onMounted(async () => {
+  // Check if mobile device
+  isMobile.value = window.innerWidth < 768
+
+  // Apply URL parameters (search, filter=mine)
+  applyUrlParams()
+
+  await fetchEntries()
+
+  // Mark initialization complete so watches can trigger normally
+  isInitializing.value = false
+})
 </script>
 
 <style scoped>

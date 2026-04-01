@@ -57,7 +57,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="histories.length === 0" class="text-center py-12">
+    <div v-else-if="historyList.length === 0" class="text-center py-12">
       <UIcon name="i-heroicons-clock" class="w-16 h-16 mx-auto text-gray-400" />
       <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">暫無歷史記錄</h3>
     </div>
@@ -65,7 +65,7 @@
     <!-- History timeline -->
     <div v-else class="space-y-3">
       <UCard
-        v-for="history in histories"
+        v-for="history in historyList"
         :key="history.id"
         class="hover:shadow-md transition-shadow cursor-pointer"
         @click="showDiff(history)"
@@ -389,14 +389,13 @@
 import type { EditHistory, PaginatedResponse } from '~/types'
 
 definePageMeta({
-  layout: 'default'
+  layout: 'default',
+  name: 'histories-index'
 })
 
 const toast = useToast()
 const { user, isReviewer } = useAuth()
 
-const histories = ref<EditHistory[]>([])
-const loading = ref(false)
 const currentPage = ref(1)
 const searchEntryId = ref('')
 const filterAction = ref<string | undefined>(undefined)
@@ -405,16 +404,61 @@ let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const canViewAllHistories = computed(() => isReviewer.value)
 
-const userFilterOptions = [
-  { value: undefined, label: '全部歷史' },
-  { value: 'me', label: '我的歷史' }
-]
-
 const pagination = reactive({
   total: 0,
   perPage: 20,
   totalPages: 0
 })
+
+const cacheKey = computed(() => {
+  const entryId = searchEntryId.value.trim() || 'all'
+  const action = filterAction.value || 'all'
+  const userId = filterUser.value || 'all'
+  return `histories:${currentPage.value}:${entryId}:${action}:${userId}`
+})
+
+const { data: histories, pending: loading, refresh: refreshHistories } = useCachedAsyncData<EditHistory[]>(
+  cacheKey.value,
+  async () => {
+    const query: Record<string, any> = {
+      page: currentPage.value,
+      perPage: pagination.perPage
+    }
+
+    if (searchEntryId.value.trim()) {
+      query.entryId = searchEntryId.value.trim()
+    }
+
+    if (filterAction.value) {
+      query.action = filterAction.value
+    }
+
+    if (filterUser.value) {
+      query.userId = filterUser.value
+    }
+
+    const response = await $fetch<PaginatedResponse<EditHistory>>('/api/histories', {
+      query
+    })
+
+    pagination.total = response.total
+    pagination.totalPages = response.totalPages
+
+    return response.data
+  },
+  {
+    ttl: CACHE_TTL.histories,
+    watch: [cacheKey],
+    default: () => []
+  }
+)
+
+const historyList = computed(() => histories.value ?? [])
+
+const userFilterOptions = [
+  { value: undefined, label: '全部歷史' },
+  { value: 'me', label: '我的歷史' }
+]
 
 const diffModalOpen = ref(false)
 const selectedHistory = ref<EditHistory | null>(null)
@@ -585,42 +629,6 @@ const actionOptions = [
   { label: '狀態變更', value: 'status_change' }
 ]
 
-async function fetchHistories() {
-  loading.value = true
-  try {
-    const query: Record<string, any> = {
-      page: currentPage.value,
-      perPage: pagination.perPage
-    }
-
-    if (searchEntryId.value.trim()) {
-      query.entryId = searchEntryId.value.trim()
-    }
-
-    if (filterAction.value) {
-      query.action = filterAction.value
-    }
-
-    if (filterUser.value) {
-      query.userId = filterUser.value
-    }
-
-    const response = await $fetch<PaginatedResponse<EditHistory>>('/api/histories', {
-      query
-    })
-
-    histories.value = response.data
-    pagination.total = response.total
-    pagination.totalPages = response.totalPages
-  } catch (error) {
-    console.error('Failed to fetch histories:', error)
-    histories.value = []
-    pagination.total = 0
-  } finally {
-    loading.value = false
-  }
-}
-
 function showDiff(history: EditHistory) {
   selectedHistory.value = history
   diffModalOpen.value = true
@@ -648,7 +656,8 @@ async function confirmRevert() {
     revertConfirmOpen.value = false
     diffModalOpen.value = false
     selectedHistory.value = null
-    await fetchHistories()
+    clearCacheByKey('histories')
+    await refreshHistories()
   } catch (error: any) {
     console.error('Failed to revert:', error)
     const message = error?.data?.message || '撤銷失敗'
@@ -692,18 +701,18 @@ watch(searchEntryId, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     currentPage.value = 1
-    fetchHistories()
   }, 300)
 })
 
-watch([currentPage, filterAction, filterUser], fetchHistories)
+watch(currentPage, () => {
+  clearCacheByKey('histories')
+})
 
 onMounted(() => {
   const route = useRoute()
   if (route.query.entryId) {
     searchEntryId.value = route.query.entryId as string
   }
-  fetchHistories()
 })
 
 // Helpers
