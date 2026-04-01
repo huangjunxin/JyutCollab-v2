@@ -31,6 +31,15 @@
         </div>
         <div class="flex gap-2">
           <USelectMenu
+            v-if="canViewAllHistories"
+            v-model="filterUser"
+            :items="userFilterOptions"
+            value-key="value"
+            placeholder="篩選"
+            size="sm"
+            class="w-32"
+          />
+          <USelectMenu
             v-model="filterAction"
             :items="actionOptions"
             value-key="value"
@@ -384,13 +393,22 @@ definePageMeta({
 })
 
 const toast = useToast()
+const { user, isReviewer } = useAuth()
 
 const histories = ref<EditHistory[]>([])
 const loading = ref(false)
 const currentPage = ref(1)
 const searchEntryId = ref('')
 const filterAction = ref<string | undefined>(undefined)
+const filterUser = ref<string | undefined>(undefined)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+const canViewAllHistories = computed(() => isReviewer.value)
+
+const userFilterOptions = [
+  { value: undefined, label: '全部歷史' },
+  { value: 'me', label: '我的歷史' }
+]
 
 const pagination = reactive({
   total: 0,
@@ -583,6 +601,10 @@ async function fetchHistories() {
       query.action = filterAction.value
     }
 
+    if (filterUser.value) {
+      query.userId = filterUser.value
+    }
+
     const response = await $fetch<PaginatedResponse<EditHistory>>('/api/histories', {
       query
     })
@@ -674,9 +696,15 @@ watch(searchEntryId, () => {
   }, 300)
 })
 
-watch([currentPage, filterAction], fetchHistories)
+watch([currentPage, filterAction, filterUser], fetchHistories)
 
-onMounted(fetchHistories)
+onMounted(() => {
+  const route = useRoute()
+  if (route.query.entryId) {
+    searchEntryId.value = route.query.entryId as string
+  }
+  fetchHistories()
+})
 
 // Helpers
 function getActionColor(action: string) {

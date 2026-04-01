@@ -3,21 +3,7 @@
     <div class="w-full px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between items-center h-16">
         <div class="flex items-center gap-3">
-          <!-- Sidebar Toggle Button -->
-          <UButton
-            variant="ghost"
-            color="gray"
-            class="transition-transform duration-200 hover:scale-105 active:scale-95"
-            @click="sidebarStore.toggle"
-          >
-            <UIcon 
-              :name="sidebarStore.isCollapsed ? 'i-heroicons-bars-3' : 'i-heroicons-x-mark'" 
-              class="w-5 h-5" 
-            />
-          </UButton>
-
-          <!-- Logo -->
-          <NuxtLink to="/entries" class="flex items-center gap-3 group">
+          <NuxtLink to="/" class="flex items-center gap-3 group">
             <div class="w-10 h-10 aspect-square flex items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:shadow-green-500/40 transition-shadow">
               <UIcon name="i-heroicons-book-open" class="w-6 h-6 text-white" />
             </div>
@@ -31,11 +17,20 @@
         <!-- Navigation -->
         <nav class="hidden md:flex items-center gap-1">
           <UButton
+            to="/"
+            variant="ghost"
+            color="gray"
+            icon="i-heroicons-home"
+            :class="[$route.path === '/' ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+          >
+            首頁
+          </UButton>
+          <UButton
             to="/entries"
             variant="ghost"
             color="gray"
             icon="i-heroicons-document-text"
-            :class="[$route.path === '/entries' ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+            :class="[$route.path.startsWith('/entries') ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
           >
             詞條列表
           </UButton>
@@ -138,10 +133,8 @@
 
 <script setup lang="ts">
 import { useAuth } from '../../composables/useAuth'
-import { useSidebarStore } from '~/stores/sidebar'
 
 const { user, isAuthenticated, canReview, isAdmin, logout } = useAuth()
-const sidebarStore = useSidebarStore()
 const router = useRouter()
 const $route = useRoute()
 

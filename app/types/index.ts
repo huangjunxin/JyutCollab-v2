@@ -239,5 +239,24 @@ export interface PaginatedResponse<T> {
   totalPages: number
 }
 
+export interface SiteStats {
+  total: number
+  approved: number
+  pending: number
+  rejected: number
+}
+
+export interface UserStats {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+}
+
+export interface ReviewerStats {
+  pending: number
+  reviewedByMe: number
+}
+
 // Re-export jyutdict types
 export * from './jyutdict'

@@ -81,6 +81,14 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <USelectMenu
+            v-model="filterUser"
+            :items="userFilterOptions"
+            value-key="value"
+            placeholder="篩選"
+            size="sm"
+            class="w-28"
+          />
+          <USelectMenu
             v-model="filterRegion"
             :items="dialectOptions"
             value-key="value"
@@ -1014,7 +1022,7 @@ const themeOptions = getFlatThemeList().map(t => ({
 
 // Sentinel for "all" – ComboboxItem does not allow value to be empty string
 // Local filters managed by this page (right sidebar filters)
-const filters = reactive({ region: ALL_FILTER_VALUE, status: ALL_FILTER_VALUE, theme: ALL_FILTER_VALUE })
+const filters = reactive({ region: ALL_FILTER_VALUE, status: ALL_FILTER_VALUE, theme: ALL_FILTER_VALUE, createdBy: '' as string | undefined })
 
 // Normalize empty string to sentinel so USelectMenu/ComboboxItem never receives value=""
 const filterRegion = computed({
@@ -1029,6 +1037,16 @@ const filterTheme = computed({
   get: () => filters.theme ?? ALL_FILTER_VALUE,
   set: (v) => { filters.theme = (v === '' || v == null || v === ALL_FILTER_VALUE) ? ALL_FILTER_VALUE : v }
 })
+
+const filterUser = computed({
+  get: () => filters.createdBy ? 'mine' : undefined,
+  set: (v) => { filters.createdBy = v === 'mine' ? user.value?.id : undefined }
+})
+
+const userFilterOptions = [
+  { value: undefined, label: '全部詞條' },
+  { value: 'mine', label: '我的詞條' }
+]
 
 // 頂部篩選用：全部分類 + 扁平化主題列表（與表格分類列同款，單一可搜尋下拉不佔三欄）
 const themeFilterOptions = [
@@ -1061,6 +1079,15 @@ const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const { entries, aggregatedGroups, lexemeGroups, loading, currentPage, pagination, fetchEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
 
+// Handle URL parameters on initial load
+const route = useRoute()
+if (route.query.filter === 'mine' && user.value?.id) {
+  filters.createdBy = user.value.id
+}
+if (route.query.search && typeof route.query.search === 'string') {
+  searchQuery.value = route.query.search
+}
+
 // 頁面跳轉輸入
 const jumpToPageInput = ref<string>('')
 
@@ -1075,6 +1102,7 @@ function handleJumpToPage() {
     alert(`請輸入有效頁碼（1-${totalPages}）`)
   }
 }
+
 /** API 僅支援以下欄位排序 */
 
 // Inline editing state
@@ -2258,7 +2286,7 @@ watch(currentPage, () => {
 })
 
 // Watch for filter changes (sidebar or page dropdowns) - reset to page 1 and fetch
-watch([() => filters.region, () => filters.status, () => filters.theme], () => {
+watch([() => filters.region, () => filters.status, () => filters.theme, () => filters.createdBy], () => {
   currentPage.value = 1
   fetchEntries()
 })

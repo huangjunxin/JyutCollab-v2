@@ -8,7 +8,7 @@ import type { EntryBaselineSnapshot } from '~/composables/useEntryBaseline'
 export function useEntriesList(
   viewMode: Ref<string>,
   searchQuery: Ref<string>,
-  filters: Reactive<{ region: string; status: string; theme: string }>,
+  filters: Reactive<{ region: string; status: string; theme: string; createdBy?: string }>,
   sortBy: Ref<string>,
   sortOrder: Ref<'asc' | 'desc'>,
   entryBaselineById: Ref<Map<string, any>>,
@@ -41,6 +41,7 @@ export function useEntriesList(
       if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
       if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
       if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
+      if (filters.createdBy) query.createdBy = filters.createdBy
 
       if (viewMode.value === 'aggregated') query.groupBy = 'headword'
       if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'

@@ -15,6 +15,7 @@ export default defineEventHandler(async (event): Promise<PaginatedResponse<EditH
     const perPage = parseInt(getQuery(event).perPage as string) || 20
     const entryId = getQuery(event).entryId as string | undefined
     const action = getQuery(event).action as string | undefined
+    const userIdParam = getQuery(event).userId as string | undefined
     const userRole = event.context.auth.role
     const userId = event.context.auth.id
 
@@ -25,9 +26,13 @@ export default defineEventHandler(async (event): Promise<PaginatedResponse<EditH
     if (action && ['create', 'update', 'delete', 'status_change'].includes(action)) {
       filter.action = action
     }
-    // 貢獻者只能看見自己的編輯歷史；審核員/管理員可看見全部
+    // 貢獻者只能看見自己的編輯歷史；審核員/管理員可看見全部或篩選特定用戶
     if (userRole === 'contributor') {
       filter.userId = userId
+    } else if (userIdParam === 'me') {
+      filter.userId = userId
+    } else if (userIdParam) {
+      filter.userId = userIdParam
     }
 
     const skip = (page - 1) * perPage
