@@ -693,16 +693,39 @@
       </div>
 
       <!-- Pagination -->
-      <div class="flex-shrink-0 px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50">
+      <div class="flex-shrink-0 px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4 bg-gray-50 dark:bg-gray-900/50">
         <div class="text-sm text-gray-500 dark:text-gray-400">
           {{ (pagination.page - 1) * pagination.perPage + 1 }}-{{ Math.min(pagination.page * pagination.perPage, pagination.total) }} / {{ pagination.total }}
         </div>
-        <UPagination
-          v-model:page="currentPage"
-          :total="pagination.total"
-          :items-per-page="pagination.perPage"
-          size="sm"
-        />
+        <div class="flex items-center gap-3">
+          <UPagination
+            v-model:page="currentPage"
+            :total="pagination.total"
+            :items-per-page="pagination.perPage"
+            size="sm"
+          />
+          <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-3">
+            <span class="text-sm text-gray-500 dark:text-gray-400">跳至</span>
+            <UInput
+              v-model="jumpToPageInput"
+              type="number"
+              size="sm"
+              class="w-16"
+              :min="1"
+              :max="pagination.totalPages || 1"
+              @keyup.enter="handleJumpToPage"
+            />
+            <span class="text-sm text-gray-500 dark:text-gray-400">頁</span>
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="soft"
+              @click="handleJumpToPage"
+            >
+              跳轉
+            </UButton>
+          </div>
+        </div>
       </div>
     </div>
     </div>
@@ -1037,6 +1060,21 @@ const searchQuery = ref('')
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const { entries, aggregatedGroups, lexemeGroups, loading, currentPage, pagination, fetchEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
+
+// 頁面跳轉輸入
+const jumpToPageInput = ref<string>('')
+
+function handleJumpToPage() {
+  const pageNum = parseInt(jumpToPageInput.value, 10)
+  const totalPages = pagination.totalPages || 1
+  
+  if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+    currentPage.value = pageNum
+    jumpToPageInput.value = ''
+  } else {
+    alert(`請輸入有效頁碼（1-${totalPages}）`)
+  }
+}
 /** API 僅支援以下欄位排序 */
 
 // Inline editing state
