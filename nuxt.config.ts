@@ -34,6 +34,7 @@ export default defineNuxtConfig({
     // JWT Secret: 生产环境必须设置，开发环境使用默认值
     jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? undefined : 'dev-jwt-secret-do-not-use-in-production'),
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
+    openrouterModel: process.env.OPENROUTER_MODEL || 'qwen/qwen3-235b-a22b-07-25',
     cloudinaryCloudName: process.env.NUXT_CLOUDINARY_CLOUD_NAME || '',
     cloudinaryApiKey: process.env.NUXT_CLOUDINARY_API_KEY || '',
     cloudinaryApiSecret: process.env.NUXT_CLOUDINARY_API_SECRET || '',

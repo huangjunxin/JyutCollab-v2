@@ -25,6 +25,11 @@ const getOpenAIClient = () => {
 // Unified model
 const DEFAULT_MODEL = 'qwen/qwen3-235b-a22b-07-25'
 
+const getLLMModel = () => {
+  const config = useRuntimeConfig()
+  return config.openrouterModel || DEFAULT_MODEL
+}
+
 // Zod validation schemas
 const ThemeSchema = z.object({
   theme_id: z.number().min(60).max(498),
@@ -271,7 +276,7 @@ ${context ? `語境：${context}` : ''}${referenceText}
 ${THEME_LIST}`
 
     const completion = await openai.chat.completions.create({
-      model: DEFAULT_MODEL,
+      model: getLLMModel(),
       messages: [
         {
           role: 'system',
@@ -358,7 +363,7 @@ ${context ? `語境：${context}` : ''}${referenceText}
 請返回JSON格式。`
 
     const completion = await openai.chat.completions.create({
-      model: DEFAULT_MODEL,
+      model: getLLMModel(),
       messages: [
         {
           role: 'system',
@@ -424,7 +429,7 @@ export async function generateExamples(
 請返回JSON格式。`
 
     const completion = await openai.chat.completions.create({
-      model: DEFAULT_MODEL,
+      model: getLLMModel(),
       messages: [
         {
           role: 'system',
