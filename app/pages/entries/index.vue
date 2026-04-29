@@ -34,7 +34,9 @@
             color="warning"
             variant="soft"
             size="md"
-            :loading="saving"
+            type="button"
+            :loading="savingAll"
+            :disabled="isAnyEntrySaving"
             @click="saveAllChanges"
           >
             保存全部
@@ -427,6 +429,7 @@
                 :can-edit="canEditEntry(row.entry)"
                 :show-lexeme-actions="viewMode === 'lexeme' && canEditExternalEtymons"
                 :is-morpheme-refs-expanded="expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
+                :is-saving="isEntrySaving(row.entry)"
                 @save="(row.entry as any)._isNew ? saveNewEntry(row.entry) : saveEntryChanges(row.entry)"
                 @duplicate="duplicateEntry(row.entry)"
                 @delete="deleteEntry(row.entry)"
@@ -1069,7 +1072,9 @@ const viewMode = ref<'flat' | 'aggregated' | 'lexeme'>('flat')
 const viewModeEntityLabel = computed(() => ({ flat: '詞條', aggregated: '詞形', lexeme: '詞語' }[viewMode.value] ?? '詞條'))
 /** 聚合視圖下已展開的詞形（headwordNormalized），用 Set 便於切換 */
 const expandedGroupKeys = ref<Set<string>>(new Set())
-const saving = ref(false)
+const savingAll = ref(false)
+const savingEntryKeys = ref<Set<string>>(new Set())
+const isAnyEntrySaving = computed(() => savingEntryKeys.value.size > 0)
 const searchQuery = ref('')
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
@@ -1430,6 +1435,24 @@ const hasUnsavedChanges = computed(() => {
 // Helper functions
 function isEditing(entryId: string | number, field: string) {
   return editingCell.value != null && String(editingCell.value.entryId) === String(entryId) && editingCell.value.field === field
+}
+
+function getEntrySavingKey(entry: Entry): string {
+  return String((entry as any)._tempId || entry.id || getEntryKey(entry) || '')
+}
+
+function isEntrySaving(entry: Entry): boolean {
+  const key = getEntrySavingKey(entry)
+  return !!key && savingEntryKeys.value.has(key)
+}
+
+function setEntrySaving(entry: Entry, value: boolean) {
+  const key = getEntrySavingKey(entry)
+  if (!key) return
+  const next = new Set(savingEntryKeys.value)
+  if (value) next.add(key)
+  else next.delete(key)
+  savingEntryKeys.value = next
 }
 
 function setInputRef(el: any, entryId: string, field: string) {
@@ -2002,7 +2025,8 @@ async function saveNewEntry(entry: Entry) {
     return
   }
 
-  saving.value = true
+  if (isEntrySaving(entry)) return
+  setEntrySaving(entry, true)
   try {
     // 審核員/管理員新建即為已發佈；貢獻者新建為待審核
     const role = user.value?.role
@@ -2101,12 +2125,13 @@ async function saveNewEntry(entry: Entry) {
     const is409 = error.statusCode === 409 || error.data?.statusCode === 409
     alert(is409 ? '該方言下已有相同詞頭，請修改詞頭或方言後再保存' : (msg || '保存失敗'))
   } finally {
-    saving.value = false
+    setEntrySaving(entry, false)
   }
 }
 
 async function saveAllChanges() {
-  saving.value = true
+  if (savingAll.value || isAnyEntrySaving.value) return
+  savingAll.value = true
   const dirtyEntries = currentPageEntries.value.filter(e => e._isDirty && !(e as any)._isNew)
 
   try {
@@ -2147,7 +2172,7 @@ async function saveAllChanges() {
     console.error('Failed to save changes:', error)
     alert(error?.data?.message || '保存失敗，請重試')
   } finally {
-    saving.value = false
+    savingAll.value = false
   }
 }
 
@@ -2164,7 +2189,8 @@ function getStatusForSave(entry: Entry): Entry['status'] {
 }
 
 async function saveEntryChanges(entry: Entry) {
-  saving.value = true
+  if (isEntrySaving(entry)) return
+  setEntrySaving(entry, true)
   const statusToSave = getStatusForSave(entry)
   // 先更新本地狀態（如審核員保存→已發佈），再發送請求，避免保存後比對仍顯示「有修改」
   entry.status = statusToSave
@@ -2205,7 +2231,7 @@ async function saveEntryChanges(entry: Entry) {
     console.error('Failed to save entry changes:', error)
     alert(error?.data?.message || '保存失敗')
   } finally {
-    saving.value = false
+    setEntrySaving(entry, false)
   }
 }
 
