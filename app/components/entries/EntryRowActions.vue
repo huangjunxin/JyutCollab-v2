@@ -8,6 +8,9 @@
         variant="ghost"
         size="xs"
         icon="i-heroicons-check"
+        type="button"
+        :loading="isSaving"
+        :disabled="isSaving"
         :title="entry._isNew ? '保存新詞條' : '保存更改'"
         :ui="{ base: 'hover:bg-success-500/10 dark:hover:bg-success-500/20' }"
         @click.stop="$emit('save')"
@@ -89,6 +92,7 @@ defineProps<{
   showLexemeActions?: boolean
   /** 詞素引用是否已展開 */
   isMorphemeRefsExpanded?: boolean
+  isSaving?: boolean
 }>()
 
 defineEmits<{
