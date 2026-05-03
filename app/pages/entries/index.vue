@@ -842,6 +842,7 @@ import { useColumnResize } from '~/composables/useColumnResize'
 import { deepCopy, getEntryIdKey, makeBaselineSnapshot, useEntryBaseline } from '~/composables/useEntryBaseline'
 import { ensureSensesStructure, addSense, removeSense, addExample, removeExample, addSubSense, removeSubSense, addSubSenseExample, removeSubSenseExample } from '~/composables/useEntrySenses'
 import { useEntriesList } from '~/composables/useEntriesList'
+import { useEntriesAdvancedFilters } from '~/composables/useEntriesAdvancedFilters'
 import { useEntriesSelection } from '~/composables/useEntriesSelection'
 import { useNewEntryDialect } from '~/composables/useNewEntryDialect'
 import { useEntryMorphemeRefs } from '~/composables/useEntryMorphemeRefs'
@@ -1122,8 +1123,8 @@ const expandedThemeEntryId = ref<string | null>(null)
 // 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
 const displayGroups = computed(() => {
   if (viewMode.value !== 'aggregated' && viewMode.value !== 'lexeme') return []
-  const base = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
-  const newOnes = entries.value
+  const base = viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
+  const newOnes = filteredEntries.value
     .filter(e => (e as any)._isNew)
     .map(e => ({
       headwordDisplay: e.headword?.display || e.text || '',
@@ -1140,7 +1141,7 @@ const displayGroups = computed(() => {
 type TableRow = { type: 'group'; group: { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }; groupIndex: number } | { type: 'entry'; entry: Entry; groupIndex: number; entryIndexInGroup?: number }
 const tableRows = computed((): TableRow[] => {
   if (viewMode.value === 'flat') {
-    return entries.value.map(entry => ({ type: 'entry' as const, entry, groupIndex: -1 }))
+    return filteredEntries.value.map(entry => ({ type: 'entry' as const, entry, groupIndex: -1 }))
   }
   const rows: TableRow[] = []
   displayGroups.value.forEach((group, groupIndex) => {
@@ -1154,7 +1155,7 @@ const tableRows = computed((): TableRow[] => {
 
 /** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
 const currentPageEntries = computed(() => {
-  if (viewMode.value === 'flat') return entries.value
+  if (viewMode.value === 'flat') return filteredEntries.value
   return displayGroups.value.flatMap(g => g.entries)
 })
 
@@ -1230,9 +1231,10 @@ function setViewMode(v: string) {
 }
 
 const isEmpty = computed(() => {
-  if (viewMode.value === 'flat') return entries.value.length === 0
-  const base = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
-  return base.length === 0 && !entries.value.some(e => (e as any)._isNew)
+  if (advancedEmptyStateActive.value) return true
+  if (viewMode.value === 'flat') return filteredEntries.value.length === 0
+  const base = viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
+  return base.length === 0 && !filteredEntries.value.some(e => (e as any)._isNew)
 })
 
 // Notion 風格：所有列在瀏覽態自動換行顯示（Wrap column），最多 4 行
@@ -1346,6 +1348,22 @@ const getCellDisplay = tableEdit.getCellDisplay as (entry: Entry, col: { key: st
 const getCellClass = tableEdit.getCellClass
 const getColumnOptions = tableEdit.getColumnOptions as (col: { getOptions?: () => unknown[]; options?: unknown[] }) => Array<{ value: string; label: string }>
 const resizeTextarea = tableEdit.resizeTextarea
+
+const advancedFilters = useEntriesAdvancedFilters({
+  entries,
+  aggregatedGroups,
+  lexemeGroups,
+  viewMode,
+  editableColumns,
+  getCellDisplay: tableEdit.getCellDisplay
+})
+const filteredEntries = advancedFilters.filteredEntries
+const filteredAggregatedGroups = advancedFilters.filteredAggregatedGroups
+const filteredLexemeGroups = advancedFilters.filteredLexemeGroups
+const hasActiveAdvancedFilters = advancedFilters.hasActiveAdvancedFilters
+const advancedEmptyStateActive = advancedFilters.advancedEmptyStateActive
+const visibleEntryCount = advancedFilters.visibleEntryCount
+const loadedEntryCount = advancedFilters.loadedEntryCount
 
 const rowHints = useEntriesRowHints({ editableColumns, editingCell, editValue })
 const jyutdictData = rowHints.jyutdictData
