@@ -28,4 +28,22 @@ describe('EntriesRuleOverlayPanel', () => {
   it('keeps the component presentational and free from entry mutations', () => {
     expect(source).not.toMatch(/\$fetch|save|delete|review|bulk|col\.set|_isDirty/)
   })
+
+  it('renders draft controls, supported fields, and validation alert affordances', () => {
+    expect(source).toContain('新增規則')
+    expect(source).toContain('規則名稱')
+    expect(source).toContain('規則類型')
+    expect(source).toContain('條件格式')
+    expect(source).toContain('驗證警告')
+    expect(source).toContain('條件模式')
+    expect(source).toContain('公式')
+    expect(source).toContain('正則表達式')
+    expect(source).toContain('目標欄位')
+    expect(source).toContain('任何欄位')
+    expect(source).toContain('套用規則')
+    expect(source).toContain('清除規則')
+    expect(source).toContain('此規則只會標示目前已載入的詞條，不會修改資料。')
+    expect(source).toContain('role="alert"')
+    expect(source).toMatch(/headword|dialect|phonetic|entryType|theme|definition|register|status/)
+  })
 })
