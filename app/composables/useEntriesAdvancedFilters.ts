@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import type { Entry } from '~/types'
 import type { EditableColumnDef } from '~/composables/useEntriesTableColumns'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
-import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, testAdvancedRegex, type AdvancedFilterError, type AdvancedFilterFieldKey, type RowFilterContext } from '~/utils/entriesAdvancedFilter'
+import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, parseAdvancedFormula, testAdvancedRegex, type AdvancedFilterError, type AdvancedFilterFieldKey, type RowFilterContext } from '~/utils/entriesAdvancedFilter'
 
 type EntryGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type ViewModeRef = Ref<string> | ComputedRef<string>
@@ -121,6 +121,84 @@ export function useEntriesAdvancedFilters(args: {
   })
   const advancedEmptyStateActive = computed(() => hasActiveAdvancedFilters.value && loadedEntryCount.value > 0 && visibleEntryCount.value === 0)
 
+  function clearAdvancedFilterErrors() {
+    advancedFilterErrors.formula = null
+    advancedFilterErrors.globalRegex = null
+    advancedFilterErrors.columnRegex = null
+  }
+
+  function validateAdvancedFilterInputs(): boolean {
+    let valid = true
+
+    if (formulaInput.value.trim().length > 0) {
+      const parsed = parseAdvancedFormula(formulaInput.value)
+      if (!parsed.ok) {
+        advancedFilterErrors.formula = parsed.error
+        valid = false
+      } else {
+        const preview = evaluateAdvancedFormula(formulaInput.value, createEmptyRowContext())
+        if (!preview.ok && preview.error.code !== 'evaluation_error') {
+          advancedFilterErrors.formula = preview.error
+          valid = false
+        }
+      }
+    }
+
+    if (globalRegexEnabled.value && globalRegexInput.value.trim().length > 0) {
+      const compiled = compileAdvancedRegex(globalRegexInput.value, globalRegexFlags.value)
+      if (!compiled.ok) {
+        advancedFilterErrors.globalRegex = compiled.error
+        valid = false
+      }
+    }
+
+    if (columnRegex.pattern.trim().length > 0) {
+      if (!columnRegex.field) {
+        advancedFilterErrors.columnRegex = {
+          code: 'empty_pattern',
+          message: '請先選擇欄位，再套用欄位正則篩選。'
+        }
+        valid = false
+      } else {
+        const compiled = compileAdvancedRegex(columnRegex.pattern, columnRegex.flags)
+        if (!compiled.ok) {
+          advancedFilterErrors.columnRegex = compiled.error
+          valid = false
+        }
+      }
+    }
+
+    return valid
+  }
+
+  function applyAdvancedFilters(): boolean {
+    clearAdvancedFilterErrors()
+    if (!validateAdvancedFilterInputs()) return false
+
+    appliedFormula.value = formulaInput.value
+    appliedGlobalRegex.value = globalRegexInput.value
+    appliedColumnRegex.field = columnRegex.field
+    appliedColumnRegex.pattern = columnRegex.pattern
+    appliedColumnRegex.flags = columnRegex.flags
+    return true
+  }
+
+  function clearAdvancedFilters() {
+    formulaInput.value = ''
+    appliedFormula.value = ''
+    globalRegexEnabled.value = false
+    globalRegexInput.value = ''
+    appliedGlobalRegex.value = ''
+    globalRegexFlags.value = 'i'
+    columnRegex.field = ''
+    columnRegex.pattern = ''
+    columnRegex.flags = 'i'
+    appliedColumnRegex.field = ''
+    appliedColumnRegex.pattern = ''
+    appliedColumnRegex.flags = 'i'
+    clearAdvancedFilterErrors()
+  }
+
   return {
     advancedFilterExpanded,
     formulaInput,
@@ -142,6 +220,9 @@ export function useEntriesAdvancedFilters(args: {
     filteredLexemeGroups,
     visibleEntryCount,
     advancedEmptyStateActive,
-    buildRowContext
+    buildRowContext,
+    applyAdvancedFilters,
+    clearAdvancedFilters,
+    clearAdvancedFilterErrors
   }
 }
