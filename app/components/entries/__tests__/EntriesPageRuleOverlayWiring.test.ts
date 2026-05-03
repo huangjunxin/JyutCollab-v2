@@ -27,7 +27,7 @@ describe('entries page rule overlay wiring', () => {
   })
 
   it('passes per-cell overlay metadata without rule persistence or data mutation coupling', () => {
-    expect(source).toContain(':cell-meta="ruleOverlays.getCellOverlayMeta')
+    expect(source).toContain(':cell-meta="isAdvancedFilterFieldKey(col.key) ? ruleOverlays.getCellOverlayMeta')
     expect(source).toContain('isAdvancedFilterFieldKey')
     expect(source).not.toMatch(/localStorage.*rule|\$fetch.*rule|save.*rule|delete.*rule|review.*rule|bulk.*rule/i)
   })

@@ -141,6 +141,20 @@
             @apply="advancedFilters.applyAdvancedFilters"
             @clear="advancedFilters.clearAdvancedFilters"
           />
+          <EntriesRuleOverlayPanel
+            v-model:expanded="ruleOverlays.ruleOverlayExpanded.value"
+            v-model:draft-rule="ruleOverlays.draftRule"
+            teleport-to="#entries-rule-overlay-host"
+            :rules="ruleOverlays.rules.value"
+            :errors="ruleOverlays.ruleOverlayErrors"
+            :active-rule-count="ruleOverlays.activeRuleCount.value"
+            :field-options="advancedFilterFieldOptions"
+            @apply="ruleOverlays.addRuleFromDraft"
+            @clear="ruleOverlays.clearRules"
+            @toggle-rule="ruleOverlays.toggleRule"
+            @remove-rule="ruleOverlays.removeRule"
+            @move-rule="ruleOverlays.moveRule"
+          />
           <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-2">
             <span class="text-sm text-gray-500 dark:text-gray-400">視圖</span>
             <USelectMenu
@@ -179,6 +193,7 @@
         </div>
       </div>
       <div id="entries-advanced-filter-host" class="w-full" />
+      <div id="entries-rule-overlay-host" class="w-full" />
     </div>
 
     <!-- Loading state -->
@@ -428,6 +443,7 @@
                 v-model:edit-value="editValue"
                 :display-text="getCellDisplay(row.entry, col)"
                 :cell-class="getCellClass(row.entry, col.key).join(' ')"
+                :cell-meta="isAdvancedFilterFieldKey(col.key) ? ruleOverlays.getCellOverlayMeta(row.entry, col.key) : undefined"
                 :wrap="useWrapForField(col.key)"
                 :is-selected="isSelected(rowIndex, colIndex)"
                 :column-options="getColumnOptions(col)"
@@ -865,7 +881,7 @@ import { useAuth, useProfileUpdatedUser } from '~/composables/useAuth'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
 import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
-import { ALL_FILTER_VALUE, SORTABLE_COLUMN_KEYS, STATUS_LABELS, ENTRY_TYPE_LABELS, ADVANCED_FILTER_FIELD_LABELS } from '~/utils/entriesTableConstants'
+import { ALL_FILTER_VALUE, SORTABLE_COLUMN_KEYS, STATUS_LABELS, ENTRY_TYPE_LABELS, ADVANCED_FILTER_FIELD_LABELS, ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
 import { getGroupPhonetic, getGroupEntryType, getGroupTheme, getGroupRegister, getGroupStatus } from '~/composables/useEntryGroupDisplay'
 import { useEntriesTableColumns } from '~/composables/useEntriesTableColumns'
 import { useColumnResize } from '~/composables/useColumnResize'
@@ -873,6 +889,7 @@ import { deepCopy, getEntryIdKey, makeBaselineSnapshot, useEntryBaseline } from 
 import { ensureSensesStructure, addSense, removeSense, addExample, removeExample, addSubSense, removeSubSense, addSubSenseExample, removeSubSenseExample } from '~/composables/useEntrySenses'
 import { useEntriesList } from '~/composables/useEntriesList'
 import { useEntriesAdvancedFilters } from '~/composables/useEntriesAdvancedFilters'
+import { useEntriesRuleOverlays } from '~/composables/useEntriesRuleOverlays'
 import { useEntriesSelection } from '~/composables/useEntriesSelection'
 import { useNewEntryDialect } from '~/composables/useNewEntryDialect'
 import { useEntryMorphemeRefs } from '~/composables/useEntryMorphemeRefs'
@@ -882,6 +899,7 @@ import { useEntriesRowHints } from '~/composables/useEntriesRowHints'
 import type { DialectId } from '~shared/dialects'
 import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
 import type { Entry, Register } from '~/types'
+import type { AdvancedFilterFieldKey } from '~/utils/entriesAdvancedFilter'
 import AISuggestionRow from '~/components/entries/AISuggestionRow.vue'
 import JyutdictSuggestionRow from '~/components/entries/JyutdictSuggestionRow.vue'
 import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
@@ -895,6 +913,7 @@ import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymo
 import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
 import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 import EntriesAdvancedFilterPanel from '~/components/entries/EntriesAdvancedFilterPanel.vue'
+import EntriesRuleOverlayPanel from '~/components/entries/EntriesRuleOverlayPanel.vue'
 
 definePageMeta({
   layout: 'default',
@@ -1091,8 +1110,12 @@ const themeFilterOptions = [
 ]
 
 const advancedFilterFieldOptions = computed(() =>
-  Object.entries(ADVANCED_FILTER_FIELD_LABELS).map(([value, label]) => ({ value, label: `${label} (${value})` }))
+  Object.entries(ADVANCED_FILTER_FIELD_LABELS).map(([value, label]) => ({ value: value as AdvancedFilterFieldKey, label: `${label} (${value})` }))
 )
+
+function isAdvancedFilterFieldKey(field: string): field is AdvancedFilterFieldKey {
+  return ADVANCED_FILTER_FIELDS.includes(field as AdvancedFilterFieldKey)
+}
 
 // State
 // Mobile warning
@@ -1354,6 +1377,11 @@ const tableRows = computed((): TableRow[] => {
 })
 const visibleEntryRows = computed(() => tableRows.value.filter((row): row is Extract<TableRow, { type: 'entry' }> => row.type === 'entry'))
 const visibleKeyboardEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
+const visibleRuleOverlayEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
+const ruleOverlays = useEntriesRuleOverlays({
+  visibleEntries: visibleRuleOverlayEntries,
+  buildRowContext: advancedFilters.buildRowContext
+})
 
 /** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
 const currentPageEntries = computed(() => {
