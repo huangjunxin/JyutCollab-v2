@@ -1152,6 +1152,8 @@ const tableRows = computed((): TableRow[] => {
   })
   return rows
 })
+const visibleEntryRows = computed(() => tableRows.value.filter((row): row is Extract<TableRow, { type: 'entry' }> => row.type === 'entry'))
+const visibleKeyboardEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
 
 /** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
 const currentPageEntries = computed(() => {
@@ -1873,7 +1875,7 @@ function handleTableKeydown(event: KeyboardEvent) {
     return
   }
   if (editingCell.value) return
-  const rows = entries.value.length
+  const rows = visibleKeyboardEntries.value.length
   const cols = editableColumns.value.length
   if (rows === 0 || cols === 0) return
 
@@ -1887,7 +1889,7 @@ function handleTableKeydown(event: KeyboardEvent) {
   }
 
   const { rowIndex, colIndex } = focusedCell.value
-  const currentEntry = entries.value[rowIndex]
+  const currentEntry = visibleKeyboardEntries.value[rowIndex]
   const entryKeyForTheme = currentEntry ? String(currentEntry.id ?? (currentEntry as any)._tempId ?? '') : ''
   let nextRow = rowIndex
   let nextCol = colIndex
@@ -1928,7 +1930,7 @@ function handleTableKeydown(event: KeyboardEvent) {
           nextRow = Math.min(rows - 1, rowIndex + 1)
         }
       }
-      const tabEntry = entries.value[nextRow]
+      const tabEntry = visibleKeyboardEntries.value[nextRow]
       const tabColDef = editableColumns.value[nextCol]
       if (tabEntry && tabColDef) {
         handleCellClick(tabEntry, tabColDef.key, event, nextRow, nextCol, true)
@@ -1943,7 +1945,7 @@ function handleTableKeydown(event: KeyboardEvent) {
       return
     case 'Enter':
       event.preventDefault()
-      const entry = entries.value[rowIndex]
+      const entry = visibleKeyboardEntries.value[rowIndex]
       const colDef = editableColumns.value[colIndex]
       if (entry && colDef) {
         handleCellClick(entry, colDef.key, event, rowIndex, colIndex, true)
@@ -1952,7 +1954,7 @@ function handleTableKeydown(event: KeyboardEvent) {
     default:
       // Notion: 直接輸入字符激活當前選中格進入編輯，並把該字符填入
       if (focusedCell.value && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        const typableEntry = entries.value[focusedCell.value.rowIndex]
+        const typableEntry = visibleKeyboardEntries.value[focusedCell.value.rowIndex]
         const typableCol = editableColumns.value[focusedCell.value.colIndex]
         if (typableEntry && typableCol) {
           event.preventDefault()
