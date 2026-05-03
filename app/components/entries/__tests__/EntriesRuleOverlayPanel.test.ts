@@ -46,4 +46,16 @@ describe('EntriesRuleOverlayPanel', () => {
     expect(source).toContain('role="alert"')
     expect(source).toMatch(/headword|dialect|phonetic|entryType|theme|definition|register|status/)
   })
+
+  it('renders local rule list management controls and validation warning treatment', () => {
+    expect(source).toContain('已啟用')
+    expect(source).toContain('已停用')
+    expect(source).toContain('上移')
+    expect(source).toContain('下移')
+    expect(source).toContain('移除')
+    expect(source).toContain('i-heroicons-exclamation-triangle')
+    expect(source).toContain("emit('toggle-rule'")
+    expect(source).toContain("emit('move-rule'")
+    expect(source).toContain("emit('remove-rule'")
+  })
 })
