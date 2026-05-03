@@ -2,8 +2,9 @@ import type { ComputedRef, Ref } from 'vue'
 import { computed, reactive, ref } from 'vue'
 import type { Entry } from '~/types'
 import type { AdvancedFilterFieldKey, AdvancedFilterError, RowFilterContext } from '~/utils/entriesAdvancedFilter'
-import { compileAdvancedRegex, parseAdvancedFormula } from '~/utils/entriesAdvancedFilter'
+import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, parseAdvancedFormula, testAdvancedRegex } from '~/utils/entriesAdvancedFilter'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
+import { getEntryIdString } from '~/utils/entryKey'
 
 export type OverlayRuleKind = 'formatting' | 'validation'
 export type OverlayConditionKind = 'formula' | 'regex'
@@ -57,6 +58,15 @@ export interface EntriesRuleOverlayErrors {
 
 const DEFAULT_RULE_NAME = '新規則'
 const DEFAULT_STYLE_PRESET: OverlayStylePreset = 'green'
+
+const FORMATTING_CLASS_PRESETS: Record<OverlayStylePreset, string[]> = {
+  green: ['bg-green-50', 'ring-1', 'ring-green-200'],
+  blue: ['bg-blue-50', 'ring-1', 'ring-blue-200'],
+  purple: ['bg-purple-50', 'ring-1', 'ring-purple-200'],
+  amber: ['bg-amber-50', 'ring-1', 'ring-amber-200']
+}
+
+const VALIDATION_CLASS_NAMES = ['bg-amber-50', 'ring-1', 'ring-amber-300', 'text-amber-950']
 
 function createRuleApplicationError(ruleKind: OverlayRuleKind, error: AdvancedFilterError): AdvancedFilterError {
   const prefix = ruleKind === 'formatting' ? '條件格式無法套用' : '驗證警告無法套用'
@@ -121,6 +131,54 @@ function cloneDraftRule(draft: EntriesRuleDraft): EntriesRuleDraft {
   }
 }
 
+function createCellRuleMatch(rule: EntriesRuleOverlay): CellRuleMatch {
+  return {
+    ruleId: rule.id,
+    ruleName: rule.name,
+    ruleKind: rule.kind,
+    stylePreset: rule.stylePreset
+  }
+}
+
+function createCellOverlayMeta(formattingMatches: CellRuleMatch[], validationMatches: CellRuleMatch[]): EntryCellOverlayMeta {
+  const classNameSet = new Set<string>()
+  for (const match of formattingMatches) {
+    for (const className of FORMATTING_CLASS_PRESETS[match.stylePreset]) classNameSet.add(className)
+  }
+  if (validationMatches.length > 0) {
+    for (const className of VALIDATION_CLASS_NAMES) classNameSet.add(className)
+  }
+
+  const formattingTooltipText = formattingMatches.map(match => `格式：${match.ruleName}`).join('\n')
+  const validationTooltipText = validationMatches.map(match => `警告：${match.ruleName}`).join('\n')
+  const tooltipText = [formattingTooltipText, validationTooltipText].filter(Boolean).join('\n')
+
+  return {
+    formattingMatches,
+    validationMatches,
+    classNames: [...classNameSet],
+    tooltipText,
+    formattingTooltipText,
+    validationTooltipText
+  }
+}
+
+function ruleMatchesContext(rule: EntriesRuleOverlay, context: RowFilterContext): boolean {
+  if (!rule.enabled || rule.targetFields.length === 0) return false
+
+  if (rule.condition.kind === 'formula') {
+    const result = evaluateAdvancedFormula(rule.condition.formula, context)
+    return result.ok ? result.value : false
+  }
+
+  const compiled = compileAdvancedRegex(rule.condition.regex.pattern, rule.condition.regex.flags)
+  if (!compiled.ok) return false
+  const value = rule.condition.regex.field === 'any'
+    ? buildSearchableRowText(context)
+    : context[rule.condition.regex.field]
+  return testAdvancedRegex(compiled.regex, value)
+}
+
 export function createEmptyCellOverlayMeta(): EntryCellOverlayMeta {
   return {
     formattingMatches: [],
@@ -147,6 +205,36 @@ export function useEntriesRuleOverlays(args: {
   })
 
   const activeRuleCount = computed(() => rules.value.filter(rule => rule.enabled).length)
+
+  const cellOverlayMetaByEntryKey = computed(() => {
+    const metaByEntryKey = new Map<string, Map<AdvancedFilterFieldKey, EntryCellOverlayMeta>>()
+
+    for (const entry of args.visibleEntries.value) {
+      const context = args.buildRowContext(entry)
+      const matchesByField = new Map<AdvancedFilterFieldKey, { formatting: CellRuleMatch[]; validation: CellRuleMatch[] }>()
+
+      for (const rule of rules.value) {
+        if (!ruleMatchesContext(rule, context)) continue
+        const match = createCellRuleMatch(rule)
+        for (const field of rule.targetFields) {
+          if (!isAdvancedFilterField(field)) continue
+          const fieldMatches = matchesByField.get(field) ?? { formatting: [], validation: [] }
+          if (rule.kind === 'formatting') fieldMatches.formatting.push(match)
+          else fieldMatches.validation.push(match)
+          matchesByField.set(field, fieldMatches)
+        }
+      }
+
+      if (matchesByField.size === 0) continue
+      const fieldMetaMap = new Map<AdvancedFilterFieldKey, EntryCellOverlayMeta>()
+      for (const [field, matches] of matchesByField) {
+        fieldMetaMap.set(field, createCellOverlayMeta(matches.formatting, matches.validation))
+      }
+      metaByEntryKey.set(getEntryIdString(entry), fieldMetaMap)
+    }
+
+    return metaByEntryKey
+  })
 
   function resetDraftRule() {
     Object.assign(draftRule, createDefaultDraftRule())
@@ -233,18 +321,25 @@ export function useEntriesRuleOverlays(args: {
     clearRuleOverlayErrors()
   }
 
+  function getCellOverlayMeta(entry: Entry, field: AdvancedFilterFieldKey): EntryCellOverlayMeta {
+    if (!isAdvancedFilterField(field)) return createEmptyCellOverlayMeta()
+    return cellOverlayMetaByEntryKey.value.get(getEntryIdString(entry))?.get(field) ?? createEmptyCellOverlayMeta()
+  }
+
   return {
     ruleOverlayExpanded,
     rules,
     draftRule,
     ruleOverlayErrors,
     activeRuleCount,
+    cellOverlayMetaByEntryKey,
     resetDraftRule,
     addRuleFromDraft,
     toggleRule,
     removeRule,
     moveRule,
     clearRuleOverlayErrors,
-    clearRules
+    clearRules,
+    getCellOverlayMeta
   }
 }
