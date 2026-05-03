@@ -6,6 +6,20 @@ export const ALL_FILTER_VALUE = '__all__'
 
 export const SORTABLE_COLUMN_KEYS = ['createdAt', 'updatedAt', 'viewCount', 'likeCount', 'headword'] as const
 
+/** 進階篩選可引用的欄位鍵 */
+export const ADVANCED_FILTER_FIELDS = ['headword', 'dialect', 'phonetic', 'entryType', 'theme', 'definition', 'register', 'status'] as const
+
+export const ADVANCED_FILTER_FIELD_LABELS: Record<(typeof ADVANCED_FILTER_FIELDS)[number], string> = {
+  headword: '詞頭',
+  dialect: '方言',
+  phonetic: '粵拼',
+  entryType: '類型',
+  theme: '分類',
+  definition: '釋義',
+  register: '語域',
+  status: '狀態'
+}
+
 export const DEFINITION_SUMMARY_MAX_LEN = 50
 
 export const MAX_TEXTAREA_HEIGHT_PX = 240
