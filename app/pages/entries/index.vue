@@ -81,7 +81,7 @@
             @keyup.enter="handleSearch"
           />
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-start gap-2">
           <USelectMenu
             v-model="filterUser"
             :items="userFilterOptions"
@@ -123,6 +123,24 @@
           >
             搜索
           </UButton>
+          <EntriesAdvancedFilterPanel
+            v-model:expanded="advancedFilters.advancedFilterExpanded.value"
+            v-model:formula-input="advancedFilters.formulaInput.value"
+            v-model:global-regex-enabled="advancedFilters.globalRegexEnabled.value"
+            v-model:global-regex-input="advancedFilters.globalRegexInput.value"
+            v-model:column-regex-field="advancedFilters.columnRegex.field"
+            v-model:column-regex-pattern="advancedFilters.columnRegex.pattern"
+            teleport-to="#entries-advanced-filter-host"
+            :field-options="advancedFilterFieldOptions"
+            :formula-error="advancedFilters.advancedFilterErrors.formula?.message || ''"
+            :global-regex-error="advancedFilters.advancedFilterErrors.globalRegex?.message || ''"
+            :column-regex-error="advancedFilters.advancedFilterErrors.columnRegex?.message || ''"
+            :has-active-advanced-filters="advancedFilters.hasActiveAdvancedFilters.value"
+            :visible-count="advancedFilters.visibleEntryCount.value"
+            :loaded-count="advancedFilters.loadedEntryCount.value"
+            @apply="advancedFilters.applyAdvancedFilters"
+            @clear="advancedFilters.clearAdvancedFilters"
+          />
           <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-2">
             <span class="text-sm text-gray-500 dark:text-gray-400">視圖</span>
             <USelectMenu
@@ -160,24 +178,7 @@
           </div>
         </div>
       </div>
-
-      <EntriesAdvancedFilterPanel
-        v-model:expanded="advancedFilters.advancedFilterExpanded.value"
-        v-model:formula-input="advancedFilters.formulaInput.value"
-        v-model:global-regex-enabled="advancedFilters.globalRegexEnabled.value"
-        v-model:global-regex-input="advancedFilters.globalRegexInput.value"
-        v-model:column-regex-field="advancedFilters.columnRegex.field"
-        v-model:column-regex-pattern="advancedFilters.columnRegex.pattern"
-        :field-options="advancedFilterFieldOptions"
-        :formula-error="advancedFilters.advancedFilterErrors.formula?.message || ''"
-        :global-regex-error="advancedFilters.advancedFilterErrors.globalRegex?.message || ''"
-        :column-regex-error="advancedFilters.advancedFilterErrors.columnRegex?.message || ''"
-        :has-active-advanced-filters="advancedFilters.hasActiveAdvancedFilters.value"
-        :visible-count="advancedFilters.visibleEntryCount.value"
-        :loaded-count="advancedFilters.loadedEntryCount.value"
-        @apply="advancedFilters.applyAdvancedFilters"
-        @clear="advancedFilters.clearAdvancedFilters"
-      />
+      <div id="entries-advanced-filter-host" class="w-full" />
     </div>
 
     <!-- Loading state -->
@@ -1154,88 +1155,6 @@ const expandedMorphemeRefsEntryId = ref<string | null>(null)
 // 主題展開狀態
 const expandedThemeEntryId = ref<string | null>(null)
 
-// 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
-const displayGroups = computed(() => {
-  if (viewMode.value !== 'aggregated' && viewMode.value !== 'lexeme') return []
-  const base = viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
-  const newOnes = filteredEntries.value
-    .filter(e => (e as any)._isNew)
-    .map(e => ({
-      headwordDisplay: e.headword?.display || e.text || '',
-      headwordNormalized:
-        viewMode.value === 'lexeme'
-          ? ((e as any).lexemeId || `__unassigned__:${String(getEntryKey(e))}`)
-          : (e.headword?.normalized || e.headword?.display || e.text || ''),
-      entries: [e]
-    }))
-  return [...newOnes, ...base]
-})
-
-/** 表格行：平鋪時為 entry 行，聚合時為 group 行 + 展開的 entry 行（entry 帶 entryIndexInGroup 用於組內序號） */
-type TableRow = { type: 'group'; group: { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }; groupIndex: number } | { type: 'entry'; entry: Entry; groupIndex: number; entryIndexInGroup?: number }
-const tableRows = computed((): TableRow[] => {
-  if (viewMode.value === 'flat') {
-    return filteredEntries.value.map(entry => ({ type: 'entry' as const, entry, groupIndex: -1 }))
-  }
-  const rows: TableRow[] = []
-  displayGroups.value.forEach((group, groupIndex) => {
-    rows.push({ type: 'group', group, groupIndex })
-    if (expandedGroupKeys.value.has(group.headwordNormalized)) {
-      group.entries.forEach((entry, entryIndexInGroup) => rows.push({ type: 'entry', entry, groupIndex, entryIndexInGroup }))
-    }
-  })
-  return rows
-})
-const visibleEntryRows = computed(() => tableRows.value.filter((row): row is Extract<TableRow, { type: 'entry' }> => row.type === 'entry'))
-const visibleKeyboardEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
-
-/** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
-const currentPageEntries = computed(() => {
-  if (viewMode.value === 'flat') return filteredEntries.value
-  return displayGroups.value.flatMap(g => g.entries)
-})
-
-const {
-  selectedEntryIds,
-  selectAllChecked,
-  selectAllIndeterminate,
-  selectedCount,
-  selectedSavedEntries,
-  isEntrySelected,
-  toggleSelectEntry,
-  toggleSelectAll,
-  clearSelection,
-  batchDeleting,
-  batchDeleteSelected,
-  headerCheckboxRef
-} = useEntriesSelection(currentPageEntries, fetchEntries)
-
-const {
-  aiSuggestion,
-  aiSuggestionForField,
-  pendingAISuggestions,
-  themeAISuggestions,
-  definitionAISuggestions,
-  aiLoadingFor,
-  aiLoading,
-  aiLoadingInlineFor,
-  aiInlineError,
-  formatThemeSuggestion,
-  triggerAISuggestion,
-  generateAIExamples,
-  generateAIDefinition,
-  generateAICategorization,
-  clearPendingSuggestionForCurrentCell,
-  retryInlineAISuggestion,
-  acceptAISuggestion,
-  dismissAISuggestion,
-  acceptThemeAI,
-  dismissThemeAI,
-  clearThemeSuggestionForEntry,
-  acceptDefinitionAI,
-  dismissDefinitionAI
-} = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
-
 function toggleGroupExpanded(headwordNormalized: string) {
   const next = new Set(expandedGroupKeys.value)
   if (next.has(headwordNormalized)) next.delete(headwordNormalized)
@@ -1400,6 +1319,88 @@ const hasActiveAdvancedFilters = advancedFilters.hasActiveAdvancedFilters
 const advancedEmptyStateActive = advancedFilters.advancedEmptyStateActive
 const visibleEntryCount = advancedFilters.visibleEntryCount
 const loadedEntryCount = advancedFilters.loadedEntryCount
+
+// 聚合視圖下用於展示的組列表（含新建未保存的「單條組」）— 須在 currentPageEntries 之前定義
+const displayGroups = computed(() => {
+  if (viewMode.value !== 'aggregated' && viewMode.value !== 'lexeme') return []
+  const base = viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
+  const newOnes = filteredEntries.value
+    .filter(e => (e as any)._isNew)
+    .map(e => ({
+      headwordDisplay: e.headword?.display || e.text || '',
+      headwordNormalized:
+        viewMode.value === 'lexeme'
+          ? ((e as any).lexemeId || `__unassigned__:${String(getEntryKey(e))}`)
+          : (e.headword?.normalized || e.headword?.display || e.text || ''),
+      entries: [e]
+    }))
+  return [...newOnes, ...base]
+})
+
+/** 表格行：平鋪時為 entry 行，聚合時為 group 行 + 展開的 entry 行（entry 帶 entryIndexInGroup 用於組內序號） */
+type TableRow = { type: 'group'; group: { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }; groupIndex: number } | { type: 'entry'; entry: Entry; groupIndex: number; entryIndexInGroup?: number }
+const tableRows = computed((): TableRow[] => {
+  if (viewMode.value === 'flat') {
+    return filteredEntries.value.map(entry => ({ type: 'entry' as const, entry, groupIndex: -1 }))
+  }
+  const rows: TableRow[] = []
+  displayGroups.value.forEach((group, groupIndex) => {
+    rows.push({ type: 'group', group, groupIndex })
+    if (expandedGroupKeys.value.has(group.headwordNormalized)) {
+      group.entries.forEach((entry, entryIndexInGroup) => rows.push({ type: 'entry', entry, groupIndex, entryIndexInGroup }))
+    }
+  })
+  return rows
+})
+const visibleEntryRows = computed(() => tableRows.value.filter((row): row is Extract<TableRow, { type: 'entry' }> => row.type === 'entry'))
+const visibleKeyboardEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
+
+/** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
+const currentPageEntries = computed(() => {
+  if (viewMode.value === 'flat') return filteredEntries.value
+  return displayGroups.value.flatMap(g => g.entries)
+})
+
+const {
+  selectedEntryIds,
+  selectAllChecked,
+  selectAllIndeterminate,
+  selectedCount,
+  selectedSavedEntries,
+  isEntrySelected,
+  toggleSelectEntry,
+  toggleSelectAll,
+  clearSelection,
+  batchDeleting,
+  batchDeleteSelected,
+  headerCheckboxRef
+} = useEntriesSelection(currentPageEntries, fetchEntries)
+
+const {
+  aiSuggestion,
+  aiSuggestionForField,
+  pendingAISuggestions,
+  themeAISuggestions,
+  definitionAISuggestions,
+  aiLoadingFor,
+  aiLoading,
+  aiLoadingInlineFor,
+  aiInlineError,
+  formatThemeSuggestion,
+  triggerAISuggestion,
+  generateAIExamples,
+  generateAIDefinition,
+  generateAICategorization,
+  clearPendingSuggestionForCurrentCell,
+  retryInlineAISuggestion,
+  acceptAISuggestion,
+  dismissAISuggestion,
+  acceptThemeAI,
+  dismissThemeAI,
+  clearThemeSuggestionForEntry,
+  acceptDefinitionAI,
+  dismissDefinitionAI
+} = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
 
 const rowHints = useEntriesRowHints({ editableColumns, editingCell, editValue })
 const jyutdictData = rowHints.jyutdictData
