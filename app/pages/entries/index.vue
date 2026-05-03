@@ -160,6 +160,24 @@
           </div>
         </div>
       </div>
+
+      <EntriesAdvancedFilterPanel
+        v-model:expanded="advancedFilters.advancedFilterExpanded.value"
+        v-model:formula-input="advancedFilters.formulaInput.value"
+        v-model:global-regex-enabled="advancedFilters.globalRegexEnabled.value"
+        v-model:global-regex-input="advancedFilters.globalRegexInput.value"
+        v-model:column-regex-field="advancedFilters.columnRegex.field"
+        v-model:column-regex-pattern="advancedFilters.columnRegex.pattern"
+        :field-options="advancedFilterFieldOptions"
+        :formula-error="advancedFilters.advancedFilterErrors.formula?.message || ''"
+        :global-regex-error="advancedFilters.advancedFilterErrors.globalRegex?.message || ''"
+        :column-regex-error="advancedFilters.advancedFilterErrors.columnRegex?.message || ''"
+        :has-active-advanced-filters="advancedFilters.hasActiveAdvancedFilters.value"
+        :visible-count="advancedFilters.visibleEntryCount.value"
+        :loaded-count="advancedFilters.loadedEntryCount.value"
+        @apply="advancedFilters.applyAdvancedFilters"
+        @clear="advancedFilters.clearAdvancedFilters"
+      />
     </div>
 
     <!-- Loading state -->
@@ -835,7 +853,7 @@ import { useAuth, useProfileUpdatedUser } from '~/composables/useAuth'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
 import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
-import { ALL_FILTER_VALUE, SORTABLE_COLUMN_KEYS, STATUS_LABELS, ENTRY_TYPE_LABELS } from '~/utils/entriesTableConstants'
+import { ALL_FILTER_VALUE, SORTABLE_COLUMN_KEYS, STATUS_LABELS, ENTRY_TYPE_LABELS, ADVANCED_FILTER_FIELD_LABELS } from '~/utils/entriesTableConstants'
 import { getGroupPhonetic, getGroupEntryType, getGroupTheme, getGroupRegister, getGroupStatus } from '~/composables/useEntryGroupDisplay'
 import { useEntriesTableColumns } from '~/composables/useEntriesTableColumns'
 import { useColumnResize } from '~/composables/useColumnResize'
@@ -864,6 +882,7 @@ import JyutjyuRefRow from '~/components/entries/JyutjyuRefRow.vue'
 import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymonsModal.vue'
 import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
 import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
+import EntriesAdvancedFilterPanel from '~/components/entries/EntriesAdvancedFilterPanel.vue'
 
 definePageMeta({
   layout: 'default',
@@ -1058,6 +1077,10 @@ const themeFilterOptions = [
   { value: ALL_FILTER_VALUE, label: '全部分類' },
   ...themeOptions
 ]
+
+const advancedFilterFieldOptions = computed(() =>
+  Object.entries(ADVANCED_FILTER_FIELD_LABELS).map(([value, label]) => ({ value, label: `${label} (${value})` }))
+)
 
 // State
 // Mobile warning
