@@ -22,6 +22,8 @@ export interface AdvancedFilterError {
 
 export type RegexCompileResult = { ok: true; regex: RegExp } | { ok: false; error: AdvancedFilterError }
 export type FormulaParseResult = { ok: true; ast: FormulaNode } | { ok: false; error: AdvancedFilterError }
+type FormulaValue = string | number | boolean
+export type FormulaEvaluationResult = { ok: true; value: boolean } | { ok: false; error: AdvancedFilterError }
 
 type Token =
   | { type: 'identifier'; value: string }
@@ -294,4 +296,113 @@ export function parseAdvancedFormula(input: string): FormulaParseResult {
   const tokenized = tokenizeFormula(normalized)
   if (!tokenized.ok) return tokenized
   return new FormulaParser(tokenized.tokens).parse()
+}
+
+function evaluateNode(node: FormulaNode, context: RowFilterContext): { ok: true; value: FormulaValue } | { ok: false; error: AdvancedFilterError } {
+  switch (node.type) {
+    case 'literal':
+      return { ok: true, value: node.value }
+    case 'field':
+      return { ok: true, value: context[node.key] ?? '' }
+    case 'comparison':
+      return evaluateComparison(node, context)
+    case 'call':
+      return evaluateCall(node, context)
+  }
+}
+
+function evaluateComparison(node: Extract<FormulaNode, { type: 'comparison' }>, context: RowFilterContext): { ok: true; value: boolean } | { ok: false; error: AdvancedFilterError } {
+  const left = evaluateNode(node.left, context)
+  if (!left.ok) return left
+  const right = evaluateNode(node.right, context)
+  if (!right.ok) return right
+
+  if (node.operator === '=') return { ok: true, value: String(left.value).toLowerCase() === String(right.value).toLowerCase() }
+  if (node.operator === '<>') return { ok: true, value: String(left.value).toLowerCase() !== String(right.value).toLowerCase() }
+
+  const leftNumber = Number(left.value)
+  const rightNumber = Number(right.value)
+  const useNumericComparison = Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && String(left.value).trim() !== '' && String(right.value).trim() !== ''
+  const leftComparable = useNumericComparison ? leftNumber : String(left.value).toLowerCase()
+  const rightComparable = useNumericComparison ? rightNumber : String(right.value).toLowerCase()
+
+  switch (node.operator) {
+    case '>':
+      return { ok: true, value: leftComparable > rightComparable }
+    case '>=':
+      return { ok: true, value: leftComparable >= rightComparable }
+    case '<':
+      return { ok: true, value: leftComparable < rightComparable }
+    case '<=':
+      return { ok: true, value: leftComparable <= rightComparable }
+  }
+}
+
+function evaluateCall(node: Extract<FormulaNode, { type: 'call' }>, context: RowFilterContext): { ok: true; value: FormulaValue } | { ok: false; error: AdvancedFilterError } {
+  const args: FormulaValue[] = []
+  for (const argNode of node.args) {
+    const arg = evaluateNode(argNode, context)
+    if (!arg.ok) return arg
+    args.push(arg.value)
+  }
+
+  switch (node.name) {
+    case 'AND':
+      return evaluateBooleanArgs(args, values => values.every(Boolean))
+    case 'OR':
+      return evaluateBooleanArgs(args, values => values.some(Boolean))
+    case 'NOT':
+      return evaluateBooleanArgs(args, values => !values[0])
+    case 'LEN':
+      return { ok: true, value: String(args[0] ?? '').length }
+    case 'ISBLANK':
+      return { ok: true, value: isBlankFormulaValue(args[0]) }
+    case 'REGEXMATCH': {
+      const [value, pattern, flags] = args
+      const compiled = compileAdvancedRegex(String(pattern), flags ? String(flags) : 'i')
+      if (!compiled.ok) return compiled
+      return { ok: true, value: testAdvancedRegex(compiled.regex, String(value ?? '')) }
+    }
+    case 'CONTAINS':
+      return { ok: true, value: normalizeText(args[0]).includes(normalizeText(args[1])) }
+    case 'STARTSWITH':
+      return { ok: true, value: normalizeText(args[0]).startsWith(normalizeText(args[1])) }
+    case 'ENDSWITH':
+      return { ok: true, value: normalizeText(args[0]).endsWith(normalizeText(args[1])) }
+  }
+}
+
+function evaluateBooleanArgs(args: FormulaValue[], evaluate: (values: boolean[]) => boolean): { ok: true; value: boolean } | { ok: false; error: AdvancedFilterError } {
+  if (!args.every(arg => typeof arg === 'boolean')) return { ok: false, error: createAdvancedFilterError('evaluation_error') }
+  return { ok: true, value: evaluate(args as boolean[]) }
+}
+
+function normalizeText(value: FormulaValue | undefined): string {
+  return String(value ?? '').toLowerCase()
+}
+
+function isBlankFormulaValue(value: FormulaValue | undefined): boolean {
+  const normalized = String(value ?? '').trim()
+  return normalized === '' || normalized === '-' || normalized === '選擇分類' || normalized === '__none__'
+}
+
+export function evaluateAdvancedFormulaAst(ast: FormulaNode, context: RowFilterContext): FormulaEvaluationResult {
+  try {
+    const result = evaluateNode(ast, context)
+    if (!result.ok) return result
+    if (typeof result.value !== 'boolean') return { ok: false, error: createAdvancedFilterError('non_boolean_result') }
+    return { ok: true, value: result.value }
+  } catch {
+    return { ok: false, error: createAdvancedFilterError('evaluation_error') }
+  }
+}
+
+export function evaluateAdvancedFormula(input: string, context: RowFilterContext): FormulaEvaluationResult {
+  const parsed = parseAdvancedFormula(input)
+  if (!parsed.ok) return parsed
+  return evaluateAdvancedFormulaAst(parsed.ast, context)
+}
+
+export function buildSearchableRowText(context: RowFilterContext): string {
+  return ADVANCED_FILTER_FIELDS.map(key => context[key] || '').join(' ')
 }
