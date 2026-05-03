@@ -59,6 +59,68 @@ export function useEntriesAdvancedFilters(args: {
     return context
   }
 
+  const hasAppliedFormula = computed(() => appliedFormula.value.trim().length > 0)
+  const hasAppliedGlobalRegex = computed(() => globalRegexEnabled.value && appliedGlobalRegex.value.trim().length > 0)
+  const hasAppliedColumnRegex = computed(() => !!appliedColumnRegex.field && appliedColumnRegex.pattern.trim().length > 0)
+  const hasActiveAdvancedFilters = computed(() => hasAppliedFormula.value || hasAppliedGlobalRegex.value || hasAppliedColumnRegex.value)
+  const loadedEntryCount = computed(() => {
+    if (args.viewMode.value === 'flat') return args.entries.value.length
+    const groups = args.viewMode.value === 'lexeme' ? args.lexemeGroups.value : args.aggregatedGroups.value
+    return groups.reduce((sum, group) => sum + group.entries.length, 0)
+  })
+
+  function matchEntry(entry: Entry): boolean {
+    const context = buildRowContext(entry)
+
+    if (hasAppliedFormula.value) {
+      const result = evaluateAdvancedFormula(appliedFormula.value, context)
+      if (!result.ok) {
+        advancedFilterErrors.formula = result.error
+      } else if (!result.value) {
+        return false
+      }
+    }
+
+    if (hasAppliedGlobalRegex.value) {
+      const compiled = compileAdvancedRegex(appliedGlobalRegex.value, globalRegexFlags.value)
+      if (!compiled.ok) {
+        advancedFilterErrors.globalRegex = compiled.error
+      } else if (!testAdvancedRegex(compiled.regex, buildSearchableRowText(context))) {
+        return false
+      }
+    }
+
+    if (hasAppliedColumnRegex.value && appliedColumnRegex.field) {
+      const compiled = compileAdvancedRegex(appliedColumnRegex.pattern, appliedColumnRegex.flags)
+      if (!compiled.ok) {
+        advancedFilterErrors.columnRegex = compiled.error
+      } else if (!testAdvancedRegex(compiled.regex, context[appliedColumnRegex.field])) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  function filterGroups(groups: EntryGroup[], matcher: (entry: Entry) => boolean): EntryGroup[] {
+    return groups
+      .map(group => ({
+        ...group,
+        entries: group.entries.filter(matcher)
+      }))
+      .filter(group => group.entries.length > 0)
+  }
+
+  const filteredEntries = computed(() => hasActiveAdvancedFilters.value ? args.entries.value.filter(matchEntry) : args.entries.value)
+  const filteredAggregatedGroups = computed(() => hasActiveAdvancedFilters.value ? filterGroups(args.aggregatedGroups.value, matchEntry) : args.aggregatedGroups.value)
+  const filteredLexemeGroups = computed(() => hasActiveAdvancedFilters.value ? filterGroups(args.lexemeGroups.value, matchEntry) : args.lexemeGroups.value)
+  const visibleEntryCount = computed(() => {
+    if (args.viewMode.value === 'flat') return filteredEntries.value.length
+    const groups = args.viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
+    return groups.reduce((sum, group) => sum + group.entries.length, 0)
+  })
+  const advancedEmptyStateActive = computed(() => hasActiveAdvancedFilters.value && loadedEntryCount.value > 0 && visibleEntryCount.value === 0)
+
   return {
     advancedFilterExpanded,
     formulaInput,
@@ -70,6 +132,16 @@ export function useEntriesAdvancedFilters(args: {
     columnRegex,
     appliedColumnRegex,
     advancedFilterErrors,
+    hasAppliedFormula,
+    hasAppliedGlobalRegex,
+    hasAppliedColumnRegex,
+    hasActiveAdvancedFilters,
+    loadedEntryCount,
+    filteredEntries,
+    filteredAggregatedGroups,
+    filteredLexemeGroups,
+    visibleEntryCount,
+    advancedEmptyStateActive,
     buildRowContext
   }
 }
