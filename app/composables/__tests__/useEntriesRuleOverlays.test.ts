@@ -31,6 +31,63 @@ function createEntry(id: string): Entry {
   }
 }
 
+describe('useEntriesRuleOverlays metadata', () => {
+  it('derives read-only per-cell formatting and validation metadata', () => {
+    const entry = createEntry('entry-1')
+    const overlay = useEntriesRuleOverlays({
+      visibleEntries: computed(() => [entry]),
+      buildRowContext: () => createContext({ definition: '缺少例句，需要檢查', headword: '測試詞' })
+    })
+
+    overlay.draftRule.name = '缺少例句'
+    overlay.draftRule.kind = 'formatting'
+    overlay.draftRule.stylePreset = 'amber'
+    overlay.draftRule.targetFields = ['definition']
+    overlay.draftRule.condition.kind = 'formula'
+    overlay.draftRule.condition.formula = '=CONTAINS(definition, "缺少")'
+    expect(overlay.addRuleFromDraft()).toBe(true)
+
+    overlay.draftRule.name = '詞頭警告'
+    overlay.draftRule.kind = 'validation'
+    overlay.draftRule.targetFields = ['headword']
+    overlay.draftRule.condition.kind = 'regex'
+    overlay.draftRule.condition.regex.field = 'headword'
+    overlay.draftRule.condition.regex.pattern = '測試'
+    expect(overlay.addRuleFromDraft()).toBe(true)
+
+    const definitionMeta = overlay.getCellOverlayMeta(entry, 'definition')
+    expect(definitionMeta.formattingMatches.map(match => match.ruleName)).toEqual(['缺少例句'])
+    expect(definitionMeta.validationMatches).toHaveLength(0)
+    expect(definitionMeta.classNames).toContain('bg-amber-50')
+    expect(definitionMeta.tooltipText).toContain('缺少例句')
+
+    const headwordMeta = overlay.getCellOverlayMeta(entry, 'headword')
+    expect(headwordMeta.validationMatches.map(match => match.ruleName)).toEqual(['詞頭警告'])
+    expect(headwordMeta.formattingMatches).toHaveLength(0)
+    expect(headwordMeta.classNames).toContain('ring-amber-300')
+    expect(entry).not.toHaveProperty('__ruleOverlayMeta')
+    expect(entry._isDirty).toBeUndefined()
+  })
+
+  it('ignores disabled rules, unsupported fields, and non-target cells', () => {
+    const entry = createEntry('entry-2')
+    const overlay = useEntriesRuleOverlays({
+      visibleEntries: computed(() => [entry]),
+      buildRowContext: () => createContext({ definition: '需要檢查' })
+    })
+
+    overlay.draftRule.name = '停用規則'
+    overlay.draftRule.targetFields = ['definition']
+    overlay.draftRule.condition.formula = '=TRUE'
+    expect(overlay.addRuleFromDraft()).toBe(true)
+    overlay.toggleRule(overlay.rules.value[0].id, false)
+
+    expect(overlay.getCellOverlayMeta(entry, 'definition')).toEqual(createEmptyCellOverlayMeta())
+    expect(overlay.getCellOverlayMeta(entry, 'status')).toEqual(createEmptyCellOverlayMeta())
+    expect(overlay.cellOverlayMetaByEntryKey.value.size).toBe(0)
+  })
+})
+
 describe('useEntriesRuleOverlays validation', () => {
   it('rejects invalid drafts with fail-closed HK Traditional errors', () => {
     const overlay = useEntriesRuleOverlays({
