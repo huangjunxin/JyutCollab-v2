@@ -16,8 +16,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Regex Filtering
 
-- [ ] **REGX-01**: User can enable regex mode in global search to match searchable entry text fields.
-- [ ] **REGX-02**: User can apply a regex filter to a single table column without affecting other column filters.
+- [x] **REGX-01
+**: User can enable regex mode in global search to match searchable entry text fields.
+- [x] **REGX-02
+**: User can apply a regex filter to a single table column without affecting other column filters.
 - [x] **REGX-03**: User sees clear validation feedback when a regex pattern is invalid.
 - [x] **REGX-04**: Regex matching works consistently for formula filtering, column filtering, conditional formatting, and validation rules.
 
@@ -90,8 +92,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FORM-02 | Phase 1 | Complete |
 | FORM-03 | Phase 1 | Complete |
 | FORM-04 | Phase 1 | Complete |
-| REGX-01 | Phase 1 | Pending |
-| REGX-02 | Phase 1 | Pending |
+| REGX-01 | Phase 1 | Complete |
+| REGX-02 | Phase 1 | Complete |
 | REGX-03 | Phase 1 | Complete |
 | REGX-04 | Phase 1 | Complete |
 | COND-01 | Phase 2 | Pending |

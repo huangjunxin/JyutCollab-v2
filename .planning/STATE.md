@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-03T10:28:16.330Z"
+last_updated: "2026-05-03T10:42:30.000Z"
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # GSD State
@@ -49,10 +49,16 @@ See: .planning/PROJECT.md (updated 2026-05-03)
 
 ## Latest Event
 
-2026-05-03 — Project initialized from `/gsd-new-project` for adding Excel-like conditional formatting, formula filters, regex functionality, validation checks, and shareable views to the entries table page.
+2026-05-03 — Completed Phase 01 Plan 02: advanced filter composable and derived entries table flow. Summary: .planning/phases/01-safe-formula-and-regex-filtering-foundation/02-SUMMARY.md
+
+## Decisions
+
+- Kept formula and regex filtering entirely client-side over data returned by useEntriesList.
+- Preserved Entry object identity in filtered arrays so editing, selection, AI suggestions, and dirty-state tracking continue to operate on source objects.
+- Left localStorage draft persistence watching source entries/groups instead of advanced-filtered collections.
 
 ## Next Command
 
-`/gsd-discuss-phase 1`
+`/gsd-execute-phase 01`
 
 **Planned Phase:** 1 (Safe Formula and Regex Filtering Foundation) — 3 plans — 2026-05-03T10:13:30.737Z
