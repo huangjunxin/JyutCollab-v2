@@ -195,21 +195,32 @@
         <UIcon name="i-heroicons-table-cells" class="w-10 h-10 text-gray-400" />
       </div>
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {{ viewMode === 'aggregated' ? '暫無詞形' : (viewMode === 'lexeme' ? '暫無詞語' : '暫無詞條') }}
+        {{ advancedFilters.advancedEmptyStateActive.value ? '進階篩選沒有匹配結果' : (viewMode === 'aggregated' ? '暫無詞形' : (viewMode === 'lexeme' ? '暫無詞語' : '暫無詞條')) }}
       </h3>
       <p class="text-gray-500 dark:text-gray-400 mb-4 max-w-md mx-auto">
         {{
-          searchQuery
-            ? (viewMode === 'aggregated'
-              ? '沒有找到匹配的詞形'
-              : (viewMode === 'lexeme' ? '沒有找到匹配的詞語' : '沒有找到匹配的詞條，請嘗試其他關鍵詞'))
-            : (viewMode === 'aggregated'
-              ? '可切換為平鋪視圖或點擊上方按鈕新建詞條'
-              : (viewMode === 'lexeme' ? '可切換為平鋪/按詞形聚合視圖或點擊上方按鈕新建詞條' : '點擊上方按鈕開始創建第一個詞條'))
+          advancedFilters.advancedEmptyStateActive.value
+            ? '沒有詞條符合目前公式或正則條件。請調整條件，或清除進階篩選返回原本結果。'
+            : (searchQuery
+              ? (viewMode === 'aggregated'
+                ? '沒有找到匹配的詞形'
+                : (viewMode === 'lexeme' ? '沒有找到匹配的詞語' : '沒有找到匹配的詞條，請嘗試其他關鍵詞'))
+              : (viewMode === 'aggregated'
+                ? '可切換為平鋪視圖或點擊上方按鈕新建詞條'
+                : (viewMode === 'lexeme' ? '可切換為平鋪/按詞形聚合視圖或點擊上方按鈕新建詞條' : '點擊上方按鈕開始創建第一個詞條')))
         }}
       </p>
       <UButton
-        v-if="isAuthenticated && !searchQuery"
+        v-if="advancedFilters.advancedEmptyStateActive.value"
+        size="sm"
+        color="neutral"
+        variant="soft"
+        @click="advancedFilters.clearAdvancedFilters"
+      >
+        清除進階篩選
+      </UButton>
+      <UButton
+        v-else-if="isAuthenticated && !searchQuery"
         size="lg"
         color="primary"
         icon="i-heroicons-plus"
