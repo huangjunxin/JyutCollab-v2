@@ -31,6 +31,55 @@ function createEntry(id: string): Entry {
   }
 }
 
+describe('useEntriesRuleOverlays validation', () => {
+  it('rejects invalid drafts with fail-closed HK Traditional errors', () => {
+    const overlay = useEntriesRuleOverlays({
+      visibleEntries: computed(() => []),
+      buildRowContext: () => createContext()
+    })
+
+    overlay.draftRule.name = '   '
+    expect(overlay.addRuleFromDraft()).toBe(false)
+    expect(overlay.ruleOverlayErrors.name).toBe('請輸入規則名稱。')
+    expect(overlay.rules.value).toHaveLength(0)
+
+    overlay.draftRule.name = '無目標欄位'
+    overlay.draftRule.targetFields = []
+    expect(overlay.addRuleFromDraft()).toBe(false)
+    expect(overlay.ruleOverlayErrors.targetFields).toBe('請至少選擇一個目標欄位。')
+
+    overlay.draftRule.targetFields = ['definition']
+    overlay.draftRule.kind = 'formatting'
+    overlay.draftRule.condition.kind = 'formula'
+    overlay.draftRule.condition.formula = '=UNKNOWN(definition)'
+    expect(overlay.addRuleFromDraft()).toBe(false)
+    expect(overlay.ruleOverlayErrors.formula?.message).toContain('條件格式無法套用')
+
+    overlay.draftRule.kind = 'validation'
+    overlay.draftRule.condition.kind = 'regex'
+    overlay.draftRule.condition.regex.pattern = '('
+    expect(overlay.addRuleFromDraft()).toBe(false)
+    expect(overlay.ruleOverlayErrors.regex?.message).toContain('正則表達式無法套用')
+  })
+
+  it('keeps formula target fields separate from regex input fields', () => {
+    const overlay = useEntriesRuleOverlays({
+      visibleEntries: computed(() => [createEntry('entry-1')]),
+      buildRowContext: () => createContext({ headword: '測試詞', definition: '釋義' })
+    })
+
+    overlay.draftRule.name = '詞頭檢查'
+    overlay.draftRule.kind = 'validation'
+    overlay.draftRule.targetFields = ['definition']
+    overlay.draftRule.condition.kind = 'regex'
+    overlay.draftRule.condition.regex.field = 'headword'
+    overlay.draftRule.condition.regex.pattern = '測試'
+    expect(overlay.addRuleFromDraft()).toBe(true)
+    expect(overlay.rules.value[0].targetFields).toEqual(['definition'])
+    expect(overlay.rules.value[0].condition.regex.field).toBe('headword')
+  })
+})
+
 describe('useEntriesRuleOverlays local draft state', () => {
   it('creates enabled local rules with HK Traditional defaults and no entry mutation API', () => {
     const entries = computed(() => [createEntry('entry-1')])
