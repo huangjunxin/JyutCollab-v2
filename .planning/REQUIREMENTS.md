@@ -9,17 +9,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Formula Filtering
 
-- [ ] **FORM-01**: User can enter an Excel-style formula that filters visible entries by evaluating each row to true or false.
-- [ ] **FORM-02**: User sees clear validation feedback when a formula has unsupported syntax, unsupported functions, or evaluation errors.
-- [ ] **FORM-03**: Formula evaluation only supports a documented whitelist of functions and operators and never executes arbitrary JavaScript.
-- [ ] **FORM-04**: User can reference supported entry fields in formulas using stable field names documented in the UI.
+- [x] **FORM-01**: User can enter an Excel-style formula that filters visible entries by evaluating each row to true or false.
+- [x] **FORM-02**: User sees clear validation feedback when a formula has unsupported syntax, unsupported functions, or evaluation errors.
+- [x] **FORM-03**: Formula evaluation only supports a documented whitelist of functions and operators and never executes arbitrary JavaScript.
+- [x] **FORM-04**: User can reference supported entry fields in formulas using stable field names documented in the UI.
 
 ### Regex Filtering
 
 - [ ] **REGX-01**: User can enable regex mode in global search to match searchable entry text fields.
 - [ ] **REGX-02**: User can apply a regex filter to a single table column without affecting other column filters.
-- [ ] **REGX-03**: User sees clear validation feedback when a regex pattern is invalid.
-- [ ] **REGX-04**: Regex matching works consistently for formula filtering, column filtering, conditional formatting, and validation rules.
+- [x] **REGX-03**: User sees clear validation feedback when a regex pattern is invalid.
+- [x] **REGX-04**: Regex matching works consistently for formula filtering, column filtering, conditional formatting, and validation rules.
 
 ### Conditional Formatting
 
@@ -86,14 +86,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FORM-01 | Phase 1 | Pending |
-| FORM-02 | Phase 1 | Pending |
-| FORM-03 | Phase 1 | Pending |
-| FORM-04 | Phase 1 | Pending |
+| FORM-01 | Phase 1 | Complete |
+| FORM-02 | Phase 1 | Complete |
+| FORM-03 | Phase 1 | Complete |
+| FORM-04 | Phase 1 | Complete |
 | REGX-01 | Phase 1 | Pending |
 | REGX-02 | Phase 1 | Pending |
-| REGX-03 | Phase 1 | Pending |
-| REGX-04 | Phase 1 | Pending |
+| REGX-03 | Phase 1 | Complete |
+| REGX-04 | Phase 1 | Complete |
 | COND-01 | Phase 2 | Pending |
 | COND-02 | Phase 2 | Pending |
 | COND-03 | Phase 2 | Pending |
