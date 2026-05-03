@@ -201,6 +201,48 @@
           <button type="button" :class="secondaryButtonClass" @click="emit('clear')">清除規則</button>
         </div>
       </form>
+
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">已建立規則</h3>
+          <span v-if="rules.length > 0" class="text-xs text-gray-500 dark:text-gray-400">{{ rules.length }} 項</span>
+        </div>
+        <p
+          v-if="rules.length === 0"
+          class="rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
+        >
+          尚未建立規則。
+        </p>
+        <div v-else class="grid gap-2">
+          <article
+            v-for="(rule, index) in rules"
+            :key="rule.id"
+            class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+          >
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0 space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span v-if="rule.kind === 'validation'" class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                    <span class="i-heroicons-exclamation-triangle h-4 w-4" aria-hidden="true" />
+                    <span class="sr-only">驗證警告</span>
+                  </span>
+                  <strong class="break-words text-sm text-gray-900 dark:text-gray-100">{{ rule.name }}</strong>
+                  <span :class="rule.kind === 'validation' ? warningBadgeClass : neutralBadgeClass">{{ ruleKindLabel(rule.kind) }}</span>
+                  <span :class="rule.enabled ? enabledBadgeClass : disabledBadgeClass">{{ rule.enabled ? '已啟用' : '已停用' }}</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-300">目標欄位：{{ ruleTargetSummary(rule) }}</p>
+                <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ conditionSummary(rule) }}</p>
+              </div>
+              <div class="flex flex-wrap gap-2 sm:justify-end">
+                <button type="button" :class="secondaryButtonClass" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</button>
+                <button type="button" :class="secondaryButtonClass" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</button>
+                <button type="button" :class="secondaryButtonClass" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</button>
+                <button type="button" :class="dangerButtonClass" @click="emit('remove-rule', rule.id)">移除</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
     </div>
   </Teleport>
 
@@ -383,6 +425,48 @@
         <button type="button" :class="secondaryButtonClass" @click="emit('clear')">清除規則</button>
       </div>
     </form>
+
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">已建立規則</h3>
+        <span v-if="rules.length > 0" class="text-xs text-gray-500 dark:text-gray-400">{{ rules.length }} 項</span>
+      </div>
+      <p
+        v-if="rules.length === 0"
+        class="rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
+      >
+        尚未建立規則。
+      </p>
+      <div v-else class="grid gap-2">
+        <article
+          v-for="(rule, index) in rules"
+          :key="rule.id"
+          class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+        >
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0 space-y-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span v-if="rule.kind === 'validation'" class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                  <span class="i-heroicons-exclamation-triangle h-4 w-4" aria-hidden="true" />
+                  <span class="sr-only">驗證警告</span>
+                </span>
+                <strong class="break-words text-sm text-gray-900 dark:text-gray-100">{{ rule.name }}</strong>
+                <span :class="rule.kind === 'validation' ? warningBadgeClass : neutralBadgeClass">{{ ruleKindLabel(rule.kind) }}</span>
+                <span :class="rule.enabled ? enabledBadgeClass : disabledBadgeClass">{{ rule.enabled ? '已啟用' : '已停用' }}</span>
+              </div>
+              <p class="text-sm text-gray-600 dark:text-gray-300">目標欄位：{{ ruleTargetSummary(rule) }}</p>
+              <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ conditionSummary(rule) }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 sm:justify-end">
+              <button type="button" :class="secondaryButtonClass" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</button>
+              <button type="button" :class="secondaryButtonClass" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</button>
+              <button type="button" :class="secondaryButtonClass" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</button>
+              <button type="button" :class="dangerButtonClass" @click="emit('remove-rule', rule.id)">移除</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -481,6 +565,11 @@ const activeChoiceClass = 'rounded-md bg-primary-50 px-3 py-2 text-sm font-mediu
 const inactiveChoiceClass = 'rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-800'
 const primaryButtonClass = 'rounded-md bg-primary-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
 const secondaryButtonClass = 'rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+const dangerButtonClass = 'rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/60'
+const neutralBadgeClass = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200'
+const warningBadgeClass = 'rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
+const enabledBadgeClass = 'rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950/50 dark:text-green-200'
+const disabledBadgeClass = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400'
 
 function updateDraft(patch: Partial<EntriesRuleDraft>) {
   emit('update:draftRule', {
@@ -526,6 +615,25 @@ function toggleTargetField(field: AdvancedFilterFieldKey) {
     ? props.draftRule.targetFields.filter(value => value !== field)
     : [...props.draftRule.targetFields, field]
   updateDraft({ targetFields })
+}
+
+function fieldLabel(field: AdvancedFilterFieldKey | 'any') {
+  if (field === 'any') return '任何欄位'
+  return ADVANCED_FILTER_FIELD_LABELS[field]
+}
+
+function ruleKindLabel(kind: OverlayRuleKind) {
+  return kind === 'formatting' ? '條件格式' : '驗證警告'
+}
+
+function conditionSummary(rule: EntriesRuleOverlay) {
+  if (rule.condition.kind === 'formula') return `公式：${rule.condition.formula || '未填寫'}`
+  const field = fieldLabel(rule.condition.regex.field)
+  return `正則表達式：${field} /${rule.condition.regex.pattern || '未填寫'}/${rule.condition.regex.flags}`
+}
+
+function ruleTargetSummary(rule: EntriesRuleOverlay) {
+  return rule.targetFields.map(field => fieldLabel(field)).join('、')
 }
 
 onMounted(() => {
