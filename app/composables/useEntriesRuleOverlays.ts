@@ -2,6 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { computed, reactive, ref } from 'vue'
 import type { Entry } from '~/types'
 import type { AdvancedFilterFieldKey, AdvancedFilterError, RowFilterContext } from '~/utils/entriesAdvancedFilter'
+import { compileAdvancedRegex, parseAdvancedFormula } from '~/utils/entriesAdvancedFilter'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
 
 export type OverlayRuleKind = 'formatting' | 'validation'
@@ -56,6 +57,21 @@ export interface EntriesRuleOverlayErrors {
 
 const DEFAULT_RULE_NAME = '新規則'
 const DEFAULT_STYLE_PRESET: OverlayStylePreset = 'green'
+
+function createRuleApplicationError(ruleKind: OverlayRuleKind, error: AdvancedFilterError): AdvancedFilterError {
+  const prefix = ruleKind === 'formatting' ? '條件格式無法套用' : '驗證警告無法套用'
+  return {
+    ...error,
+    message: `${prefix}：${error.message}`
+  }
+}
+
+function createRegexApplicationError(error: AdvancedFilterError): AdvancedFilterError {
+  return {
+    ...error,
+    message: `正則表達式無法套用：${error.message}`
+  }
+}
 
 function createLocalRuleId(): string {
   const cryptoApi = globalThis.crypto
@@ -143,22 +159,52 @@ export function useEntriesRuleOverlays(args: {
     ruleOverlayErrors.regex = null
   }
 
-  function addRuleFromDraft(): boolean {
-    clearRuleOverlayErrors()
+  function validateDraftRule(): EntriesRuleDraft | null {
     if (!draftRule.name.trim()) {
       ruleOverlayErrors.name = '請輸入規則名稱。'
-      return false
+      return null
     }
 
-    const targetFields = draftRule.targetFields.filter(isAdvancedFilterField)
+    const targetFields = [...new Set(draftRule.targetFields.filter(isAdvancedFilterField))]
     if (targetFields.length === 0) {
       ruleOverlayErrors.targetFields = '請至少選擇一個目標欄位。'
-      return false
+      return null
     }
 
     const nextRule = cloneDraftRule(draftRule)
     nextRule.name = nextRule.name.trim()
-    nextRule.targetFields = [...new Set(targetFields)]
+    nextRule.targetFields = targetFields
+
+    if (nextRule.condition.kind === 'formula') {
+      const parsed = parseAdvancedFormula(nextRule.condition.formula)
+      if (!parsed.ok) {
+        ruleOverlayErrors.formula = createRuleApplicationError(nextRule.kind, parsed.error)
+        return null
+      }
+    } else {
+      const regexField = nextRule.condition.regex.field
+      if (regexField !== 'any' && !isAdvancedFilterField(regexField)) {
+        ruleOverlayErrors.regex = createRegexApplicationError({
+          code: 'invalid_pattern',
+          message: '正則表達式欄位無效。'
+        })
+        return null
+      }
+
+      const compiled = compileAdvancedRegex(nextRule.condition.regex.pattern, nextRule.condition.regex.flags)
+      if (!compiled.ok) {
+        ruleOverlayErrors.regex = createRegexApplicationError(compiled.error)
+        return null
+      }
+    }
+
+    return nextRule
+  }
+
+  function addRuleFromDraft(): boolean {
+    clearRuleOverlayErrors()
+    const nextRule = validateDraftRule()
+    if (!nextRule) return false
     rules.value = [...rules.value, { ...nextRule, id: createLocalRuleId() }]
     resetDraftRule()
     return true
