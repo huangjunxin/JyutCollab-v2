@@ -4,7 +4,8 @@
     :class="[
       isSelected && !isEditing && 'ring-2 ring-primary/60 ring-inset',
       wrap && 'cell-td-wrap',
-      !canEdit && 'cursor-default'
+      !canEdit && 'cursor-default',
+      hasValidationMatches && !isEditing && 'cell-has-validation-warning'
     ]"
     :style="cellStyle"
     @click="$emit('click', $event)"
@@ -135,8 +136,10 @@
                 class="flex-1 px-2 py-1 text-sm min-h-[24px] cursor-text rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors overflow-hidden"
                 :class="[
                   cellClass,
+                  overlayClassNames,
                   wrap ? 'cell-display-wrap whitespace-pre-wrap break-words line-clamp-4' : 'truncate'
                 ]"
+                :title="overlayTitle"
               >
                 {{ displayText }}
               </div>
@@ -154,13 +157,27 @@
             class="flex-1 px-2 py-1 text-sm min-h-[24px] cursor-text rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
             :class="[
               cellClass,
+              overlayClassNames,
               wrap ? 'cell-display-wrap whitespace-pre-wrap break-words line-clamp-4' : 'truncate'
             ]"
+            :title="overlayTitle"
           >
             {{ displayText }}
           </div>
           <!-- 按鈕區 -->
           <div class="flex items-center gap-1 flex-shrink-0" @click.stop>
+            <UTooltip
+              v-if="hasValidationMatches"
+              :text="validationOverlayTitle"
+              :ui="{ content: 'max-w-xs whitespace-pre-wrap' }"
+            >
+              <UIcon
+                name="i-heroicons-exclamation-triangle"
+                class="w-4 h-4 text-amber-600 dark:text-amber-300 cursor-help flex-shrink-0"
+                aria-label="驗證警告"
+                :title="validationOverlayTitle"
+              />
+            </UTooltip>
             <UTooltip
               v-if="reviewNotes"
               :text="reviewNotes"
@@ -257,6 +274,7 @@
 </template>
 
 <script setup lang="ts">
+import type { EntryCellOverlayMeta } from '~/composables/useEntriesRuleOverlays'
 import { getThemePathById } from '~/composables/useThemeData'
 
 const MAX_TEXTAREA_HEIGHT_PX = 240
@@ -297,6 +315,8 @@ const props = withDefaults(
     isThemeExpanded?: boolean
     /** 主題 AI 建議提示文字 */
     themeExpandHint?: string
+    /** 只讀規則覆蓋 metadata，用於條件格式及驗證警告 */
+    cellMeta?: EntryCellOverlayMeta
   }>(),
   {
     canEdit: true,
@@ -331,6 +351,11 @@ const cellStyle = computed(() => {
   const w = props.col.width
   return w ? { minWidth: w, maxWidth: w } : {}
 })
+
+const overlayClassNames = computed(() => props.cellMeta?.classNames ?? [])
+const overlayTitle = computed(() => props.cellMeta?.tooltipText || undefined)
+const validationOverlayTitle = computed(() => props.cellMeta?.validationTooltipText || props.cellMeta?.tooltipText || '驗證警告')
+const hasValidationMatches = computed(() => (props.cellMeta?.validationMatches.length ?? 0) > 0)
 
 // 主題完整路徑（用於 tooltip）
 const themePath = computed(() => {
