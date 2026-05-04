@@ -5,13 +5,12 @@
       color="neutral"
       variant="soft"
       icon="i-heroicons-swatch"
+      class="h-8 w-8 justify-center p-0"
       aria-label="規則"
       :aria-expanded="expanded"
       :aria-controls="panelId"
       @click="emit('update:expanded', !expanded)"
-    >
-      規則
-    </UButton>
+    />
     <UBadge
       v-if="activeRuleCount > 0"
       color="primary"
@@ -25,7 +24,7 @@
   <Teleport v-if="expanded && teleportTo && canTeleport" :to="teleportTo">
     <div
       :id="panelId"
-      class="w-full flex flex-col gap-4 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2"
+      class="w-full flex flex-col gap-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2"
     >
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">新增規則</h3>
@@ -34,16 +33,17 @@
         </p>
       </div>
 
-      <form class="flex flex-col gap-4" @submit.prevent="emit('apply')">
+      <form class="flex flex-col gap-3" @submit.prevent="emit('apply')">
         <div class="grid gap-3 lg:grid-cols-3">
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
             規則名稱
-            <input
+            <UInput
               v-model="draftName"
-              class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              size="sm"
+              class="w-full"
               placeholder="新增規則"
               :aria-describedby="errors.name ? 'entries-rule-name-error' : undefined"
-            >
+            />
             <span
               v-if="errors.name"
               id="entries-rule-name-error"
@@ -57,63 +57,71 @@
           <fieldset class="flex flex-col gap-2">
             <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">規則類型</legend>
             <div class="flex flex-wrap gap-2">
-              <button
+              <UButton
                 type="button"
-                :class="draftKind === 'formatting' ? activeChoiceClass : inactiveChoiceClass"
+                size="sm"
+                :color="draftKind === 'formatting' ? 'primary' : 'neutral'"
+                :variant="draftKind === 'formatting' ? 'soft' : 'outline'"
                 :aria-pressed="draftKind === 'formatting'"
                 @click="draftKind = 'formatting'"
               >
                 條件格式
-              </button>
-              <button
+              </UButton>
+              <UButton
                 type="button"
-                :class="draftKind === 'validation' ? activeChoiceClass : inactiveChoiceClass"
+                size="sm"
+                :color="draftKind === 'validation' ? 'primary' : 'neutral'"
+                :variant="draftKind === 'validation' ? 'soft' : 'outline'"
                 :aria-pressed="draftKind === 'validation'"
                 @click="draftKind = 'validation'"
               >
                 驗證警告
-              </button>
+              </UButton>
             </div>
           </fieldset>
 
           <fieldset class="flex flex-col gap-2">
             <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">條件模式</legend>
             <div class="flex flex-wrap gap-2">
-              <button
+              <UButton
                 type="button"
-                :class="draftConditionKind === 'formula' ? activeChoiceClass : inactiveChoiceClass"
+                size="sm"
+                :color="draftConditionKind === 'formula' ? 'primary' : 'neutral'"
+                :variant="draftConditionKind === 'formula' ? 'soft' : 'outline'"
                 :aria-pressed="draftConditionKind === 'formula'"
                 @click="draftConditionKind = 'formula'"
               >
                 公式
-              </button>
-              <button
+              </UButton>
+              <UButton
                 type="button"
-                :class="draftConditionKind === 'regex' ? activeChoiceClass : inactiveChoiceClass"
+                size="sm"
+                :color="draftConditionKind === 'regex' ? 'primary' : 'neutral'"
+                :variant="draftConditionKind === 'regex' ? 'soft' : 'outline'"
                 :aria-pressed="draftConditionKind === 'regex'"
                 @click="draftConditionKind = 'regex'"
               >
                 正則表達式
-              </button>
+              </UButton>
             </div>
           </fieldset>
         </div>
 
         <fieldset class="flex flex-col gap-2">
           <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">目標欄位</legend>
-          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <label
+          <div class="flex flex-wrap gap-2">
+            <UButton
               v-for="option in normalizedFieldOptions"
               :key="option.value"
-              class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200"
+              type="button"
+              size="sm"
+              :color="draftRule.targetFields.includes(option.value) ? 'primary' : 'neutral'"
+              :variant="draftRule.targetFields.includes(option.value) ? 'soft' : 'outline'"
+              :aria-pressed="draftRule.targetFields.includes(option.value)"
+              @click="toggleTargetField(option.value)"
             >
-              <input
-                type="checkbox"
-                :checked="draftRule.targetFields.includes(option.value)"
-                @change="toggleTargetField(option.value)"
-              >
               {{ option.label }}
-            </label>
+            </UButton>
           </div>
           <p
             v-if="errors.targetFields"
@@ -130,12 +138,13 @@
           class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200"
         >
           公式
-          <input
+          <UInput
             v-model="draftFormula"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            size="sm"
+            class="w-full"
             placeholder="例如：=AND(status = &quot;草稿&quot;, ISBLANK(definition))"
             :aria-describedby="errors.formula ? 'entries-rule-formula-error entries-rule-readonly-helper' : 'entries-rule-readonly-helper'"
-          >
+          />
           <span
             v-if="errors.formula"
             id="entries-rule-formula-error"
@@ -149,20 +158,24 @@
         <div v-else class="grid gap-3 lg:grid-cols-[14rem_1fr_8rem]">
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
             正則表達式欄位
-            <select v-model="draftRegexField" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-              <option v-for="option in regexFieldOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
+            <USelectMenu
+              v-model="draftRegexField"
+              :items="regexFieldOptions"
+              value-key="value"
+              size="sm"
+              class="w-full"
+              aria-label="正則表達式欄位"
+            />
           </label>
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
             正則表達式
-            <input
+            <UInput
               v-model="draftRegexPattern"
-              class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              size="sm"
+              class="w-full"
               placeholder="輸入正則表達式"
               :aria-describedby="errors.regex ? 'entries-rule-regex-error entries-rule-readonly-helper' : 'entries-rule-readonly-helper'"
-            >
+            />
             <span
               v-if="errors.regex"
               id="entries-rule-regex-error"
@@ -174,31 +187,58 @@
           </label>
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
             旗標
-            <input
+            <UInput
               v-model="draftRegexFlags"
-              class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              size="sm"
+              class="w-full"
               placeholder="i"
-            >
+            />
           </label>
         </div>
 
-        <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200 sm:w-56">
-          格式樣式
-          <select
-            v-model="draftStylePreset"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            :disabled="draftKind !== 'formatting'"
-          >
-            <option value="green">綠色</option>
-            <option value="blue">藍色</option>
-            <option value="purple">紫色</option>
-            <option value="amber">琥珀色</option>
-          </select>
-        </label>
+        <div class="grid gap-3 sm:grid-cols-[14rem_1fr]">
+          <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+            格式樣式
+            <USelectMenu
+              v-model="draftStylePreset"
+              :items="stylePresetOptions"
+              value-key="value"
+              size="sm"
+              class="w-full"
+              :disabled="draftKind !== 'formatting'"
+              aria-label="格式樣式"
+            />
+          </label>
+          <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+            自訂顏色
+            <UPopover :content="{ side: 'bottom', sideOffset: 8 }">
+              <UButton
+                type="button"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                class="justify-start"
+                :disabled="draftKind !== 'formatting'"
+              >
+                <span class="h-4 w-4 rounded border border-gray-300" :style="{ backgroundColor: draftColorHex }" />
+                {{ draftColorHex }}
+              </UButton>
+              <template #content>
+                <div class="p-3">
+                  <UColorPicker
+                    v-model="draftColorHex"
+                    format="hex"
+                    size="sm"
+                  />
+                </div>
+              </template>
+            </UPopover>
+          </label>
+        </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button type="submit" :class="primaryButtonClass">套用規則</button>
-          <button type="button" :class="secondaryButtonClass" @click="emit('clear')">清除規則</button>
+          <UButton type="submit" color="primary" variant="solid" size="sm">套用規則</UButton>
+          <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('clear')">清除規則</UButton>
         </div>
       </form>
 
@@ -232,12 +272,34 @@
                 </div>
                 <p class="text-sm text-gray-600 dark:text-gray-300">目標欄位：{{ ruleTargetSummary(rule) }}</p>
                 <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ conditionSummary(rule) }}</p>
+                <UPopover v-if="rule.kind === 'formatting'" :content="{ side: 'bottom', sideOffset: 8 }">
+                  <UButton
+                    type="button"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    class="mt-1 justify-start"
+                  >
+                    <span class="h-4 w-4 rounded border border-gray-300" :style="{ backgroundColor: rule.colorHex }" />
+                    修改顏色
+                  </UButton>
+                  <template #content>
+                    <div class="p-3">
+                      <UColorPicker
+                        :model-value="rule.colorHex"
+                        format="hex"
+                        size="sm"
+                        @update:model-value="updateRuleColor(rule.id, $event)"
+                      />
+                    </div>
+                  </template>
+                </UPopover>
               </div>
               <div class="flex flex-wrap gap-2 sm:justify-end">
-                <button type="button" :class="secondaryButtonClass" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</button>
-                <button type="button" :class="secondaryButtonClass" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</button>
-                <button type="button" :class="secondaryButtonClass" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</button>
-                <button type="button" :class="dangerButtonClass" @click="emit('remove-rule', rule.id)">移除</button>
+                <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</UButton>
+                <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</UButton>
+                <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</UButton>
+                <UButton type="button" color="error" variant="soft" size="sm" @click="emit('remove-rule', rule.id)">移除</UButton>
               </div>
             </div>
           </article>
@@ -249,7 +311,7 @@
   <div
     v-else-if="expanded"
     :id="panelId"
-    class="w-full flex flex-col gap-4 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2"
+    class="w-full flex flex-col gap-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2"
   >
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">新增規則</h3>
@@ -258,16 +320,17 @@
       </p>
     </div>
 
-    <form class="flex flex-col gap-4" @submit.prevent="emit('apply')">
+    <form class="flex flex-col gap-3" @submit.prevent="emit('apply')">
       <div class="grid gap-3 lg:grid-cols-3">
         <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
           規則名稱
-          <input
+          <UInput
             v-model="draftName"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            size="sm"
+            class="w-full"
             placeholder="新增規則"
             :aria-describedby="errors.name ? 'entries-rule-name-error' : undefined"
-          >
+          />
           <span
             v-if="errors.name"
             id="entries-rule-name-error"
@@ -281,63 +344,71 @@
         <fieldset class="flex flex-col gap-2">
           <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">規則類型</legend>
           <div class="flex flex-wrap gap-2">
-            <button
+            <UButton
               type="button"
-              :class="draftKind === 'formatting' ? activeChoiceClass : inactiveChoiceClass"
+              size="sm"
+              :color="draftKind === 'formatting' ? 'primary' : 'neutral'"
+              :variant="draftKind === 'formatting' ? 'soft' : 'outline'"
               :aria-pressed="draftKind === 'formatting'"
               @click="draftKind = 'formatting'"
             >
               條件格式
-            </button>
-            <button
+            </UButton>
+            <UButton
               type="button"
-              :class="draftKind === 'validation' ? activeChoiceClass : inactiveChoiceClass"
+              size="sm"
+              :color="draftKind === 'validation' ? 'primary' : 'neutral'"
+              :variant="draftKind === 'validation' ? 'soft' : 'outline'"
               :aria-pressed="draftKind === 'validation'"
               @click="draftKind = 'validation'"
             >
               驗證警告
-            </button>
+            </UButton>
           </div>
         </fieldset>
 
         <fieldset class="flex flex-col gap-2">
           <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">條件模式</legend>
           <div class="flex flex-wrap gap-2">
-            <button
+            <UButton
               type="button"
-              :class="draftConditionKind === 'formula' ? activeChoiceClass : inactiveChoiceClass"
+              size="sm"
+              :color="draftConditionKind === 'formula' ? 'primary' : 'neutral'"
+              :variant="draftConditionKind === 'formula' ? 'soft' : 'outline'"
               :aria-pressed="draftConditionKind === 'formula'"
               @click="draftConditionKind = 'formula'"
             >
               公式
-            </button>
-            <button
+            </UButton>
+            <UButton
               type="button"
-              :class="draftConditionKind === 'regex' ? activeChoiceClass : inactiveChoiceClass"
+              size="sm"
+              :color="draftConditionKind === 'regex' ? 'primary' : 'neutral'"
+              :variant="draftConditionKind === 'regex' ? 'soft' : 'outline'"
               :aria-pressed="draftConditionKind === 'regex'"
               @click="draftConditionKind = 'regex'"
             >
               正則表達式
-            </button>
+            </UButton>
           </div>
         </fieldset>
       </div>
 
       <fieldset class="flex flex-col gap-2">
         <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">目標欄位</legend>
-        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <label
+        <div class="flex flex-wrap gap-2">
+          <UButton
             v-for="option in normalizedFieldOptions"
             :key="option.value"
-            class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200"
+            type="button"
+            size="sm"
+            :color="draftRule.targetFields.includes(option.value) ? 'primary' : 'neutral'"
+            :variant="draftRule.targetFields.includes(option.value) ? 'soft' : 'outline'"
+            :aria-pressed="draftRule.targetFields.includes(option.value)"
+            @click="toggleTargetField(option.value)"
           >
-            <input
-              type="checkbox"
-              :checked="draftRule.targetFields.includes(option.value)"
-              @change="toggleTargetField(option.value)"
-            >
             {{ option.label }}
-          </label>
+          </UButton>
         </div>
         <p
           v-if="errors.targetFields"
@@ -354,12 +425,13 @@
         class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200"
       >
         公式
-        <input
+        <UInput
           v-model="draftFormula"
-          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          size="sm"
+          class="w-full"
           placeholder="例如：=AND(status = &quot;草稿&quot;, ISBLANK(definition))"
           :aria-describedby="errors.formula ? 'entries-rule-formula-error entries-rule-readonly-helper' : 'entries-rule-readonly-helper'"
-        >
+        />
         <span
           v-if="errors.formula"
           id="entries-rule-formula-error"
@@ -373,20 +445,24 @@
       <div v-else class="grid gap-3 lg:grid-cols-[14rem_1fr_8rem]">
         <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
           正則表達式欄位
-          <select v-model="draftRegexField" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-            <option v-for="option in regexFieldOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
+          <USelectMenu
+            v-model="draftRegexField"
+            :items="regexFieldOptions"
+            value-key="value"
+            size="sm"
+            class="w-full"
+            aria-label="正則表達式欄位"
+          />
         </label>
         <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
           正則表達式
-          <input
+          <UInput
             v-model="draftRegexPattern"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            size="sm"
+            class="w-full"
             placeholder="輸入正則表達式"
             :aria-describedby="errors.regex ? 'entries-rule-regex-error entries-rule-readonly-helper' : 'entries-rule-readonly-helper'"
-          >
+          />
           <span
             v-if="errors.regex"
             id="entries-rule-regex-error"
@@ -398,31 +474,58 @@
         </label>
         <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
           旗標
-          <input
+          <UInput
             v-model="draftRegexFlags"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            size="sm"
+            class="w-full"
             placeholder="i"
-          >
+          />
         </label>
       </div>
 
-      <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200 sm:w-56">
-        格式樣式
-        <select
-          v-model="draftStylePreset"
-          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          :disabled="draftKind !== 'formatting'"
-        >
-          <option value="green">綠色</option>
-          <option value="blue">藍色</option>
-          <option value="purple">紫色</option>
-          <option value="amber">琥珀色</option>
-        </select>
-      </label>
+      <div class="grid gap-3 sm:grid-cols-[14rem_1fr]">
+        <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+          格式樣式
+          <USelectMenu
+            v-model="draftStylePreset"
+            :items="stylePresetOptions"
+            value-key="value"
+            size="sm"
+            class="w-full"
+            :disabled="draftKind !== 'formatting'"
+            aria-label="格式樣式"
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+          自訂顏色
+          <UPopover :content="{ side: 'bottom', sideOffset: 8 }">
+            <UButton
+              type="button"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              class="justify-start"
+              :disabled="draftKind !== 'formatting'"
+            >
+              <span class="h-4 w-4 rounded border border-gray-300" :style="{ backgroundColor: draftColorHex }" />
+              {{ draftColorHex }}
+            </UButton>
+            <template #content>
+              <div class="p-3">
+                <UColorPicker
+                  v-model="draftColorHex"
+                  format="hex"
+                  size="sm"
+                />
+              </div>
+            </template>
+          </UPopover>
+        </label>
+      </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <button type="submit" :class="primaryButtonClass">套用規則</button>
-        <button type="button" :class="secondaryButtonClass" @click="emit('clear')">清除規則</button>
+        <UButton type="submit" color="primary" variant="solid" size="sm">套用規則</UButton>
+        <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('clear')">清除規則</UButton>
       </div>
     </form>
 
@@ -456,12 +559,34 @@
               </div>
               <p class="text-sm text-gray-600 dark:text-gray-300">目標欄位：{{ ruleTargetSummary(rule) }}</p>
               <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ conditionSummary(rule) }}</p>
+              <UPopover v-if="rule.kind === 'formatting'" :content="{ side: 'bottom', sideOffset: 8 }">
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  class="mt-1 justify-start"
+                >
+                  <span class="h-4 w-4 rounded border border-gray-300" :style="{ backgroundColor: rule.colorHex }" />
+                  修改顏色
+                </UButton>
+                <template #content>
+                  <div class="p-3">
+                    <UColorPicker
+                      :model-value="rule.colorHex"
+                      format="hex"
+                      size="sm"
+                      @update:model-value="updateRuleColor(rule.id, $event)"
+                    />
+                  </div>
+                </template>
+              </UPopover>
             </div>
             <div class="flex flex-wrap gap-2 sm:justify-end">
-              <button type="button" :class="secondaryButtonClass" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</button>
-              <button type="button" :class="secondaryButtonClass" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</button>
-              <button type="button" :class="secondaryButtonClass" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</button>
-              <button type="button" :class="dangerButtonClass" @click="emit('remove-rule', rule.id)">移除</button>
+              <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</UButton>
+              <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</UButton>
+              <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</UButton>
+              <UButton type="button" color="error" variant="soft" size="sm" @click="emit('remove-rule', rule.id)">移除</UButton>
             </div>
           </div>
         </article>
@@ -487,6 +612,7 @@ const panelId = 'entries-rule-overlay-panel'
 
 type FieldOption = { value: AdvancedFilterFieldKey; label?: string }
 type RegexFieldOption = { value: AdvancedFilterFieldKey | 'any'; label: string }
+type StylePresetOption = { value: OverlayStylePreset; label: string; colorHex: string }
 type RuleMoveDirection = -1 | 1
 
 const emit = defineEmits<{
@@ -497,6 +623,7 @@ const emit = defineEmits<{
   'toggle-rule': [ruleId: string]
   'remove-rule': [ruleId: string]
   'move-rule': [ruleId: string, direction: RuleMoveDirection]
+  'update-rule-color': [ruleId: string, colorHex: string]
 }>()
 
 const props = defineProps<{
@@ -520,6 +647,13 @@ const regexFieldOptions = computed<RegexFieldOption[]>(() => [
   { value: 'any', label: '任何欄位' },
   ...normalizedFieldOptions.value
 ])
+
+const stylePresetOptions: StylePresetOption[] = [
+  { value: 'green', label: '綠色', colorHex: '#22c55e' },
+  { value: 'blue', label: '藍色', colorHex: '#3b82f6' },
+  { value: 'purple', label: '紫色', colorHex: '#a855f7' },
+  { value: 'amber', label: '琥珀色', colorHex: '#f59e0b' }
+]
 
 const draftName = computed({
   get: () => props.draftRule.name,
@@ -558,30 +692,45 @@ const draftRegexFlags = computed({
 
 const draftStylePreset = computed({
   get: () => props.draftRule.stylePreset,
-  set: value => updateDraft({ stylePreset: value as OverlayStylePreset })
+  set: value => {
+    const stylePreset = value as OverlayStylePreset
+    updateDraft({
+      stylePreset,
+      colorHex: stylePresetOptions.find(option => option.value === stylePreset)?.colorHex ?? props.draftRule.colorHex
+    })
+  }
 })
 
-const activeChoiceClass = 'rounded-md bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 ring-1 ring-primary-200 dark:bg-primary-950/40 dark:text-primary-200 dark:ring-primary-800'
-const inactiveChoiceClass = 'rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-800'
-const primaryButtonClass = 'rounded-md bg-primary-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
-const secondaryButtonClass = 'rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
-const dangerButtonClass = 'rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/60'
+const draftColorHex = computed({
+  get: () => props.draftRule.colorHex,
+  set: value => updateDraft({ colorHex: value })
+})
+
 const neutralBadgeClass = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200'
 const warningBadgeClass = 'rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
 const enabledBadgeClass = 'rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950/50 dark:text-green-200'
 const disabledBadgeClass = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400'
 
 function updateDraft(patch: Partial<EntriesRuleDraft>) {
+  const condition = patch.condition
+    ? { ...patch.condition, regex: { ...patch.condition.regex } }
+    : {
+        kind: props.draftRule.condition.kind,
+        formula: props.draftRule.condition.formula,
+        regex: { ...props.draftRule.condition.regex }
+      }
+
   emit('update:draftRule', {
     ...props.draftRule,
     ...patch,
-    targetFields: [...props.draftRule.targetFields],
-    condition: {
-      kind: props.draftRule.condition.kind,
-      formula: props.draftRule.condition.formula,
-      regex: { ...props.draftRule.condition.regex }
-    }
+    targetFields: [...(patch.targetFields ?? props.draftRule.targetFields)],
+    condition
   })
+}
+
+function updateRuleColor(ruleId: string, colorHex: string | undefined) {
+  if (!colorHex) return
+  emit('update-rule-color', ruleId, colorHex)
 }
 
 function updateDraftCondition(patch: Partial<EntriesRuleDraft['condition']>) {
