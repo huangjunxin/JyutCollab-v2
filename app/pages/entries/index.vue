@@ -1599,6 +1599,84 @@ function setInputRef(el: any, entryId: string, field: string) {
   }
 }
 
+function renameInputRefsEntryId(prevId: string, nextId: string) {
+  const nextRefs = new Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>()
+  inputRefs.value.forEach((el, key) => {
+    if (key.startsWith(`${prevId}-`)) {
+      nextRefs.set(`${nextId}-${key.slice(prevId.length + 1)}`, el)
+    } else {
+      nextRefs.set(key, el)
+    }
+  })
+  inputRefs.value = nextRefs
+}
+
+function renamePendingAISuggestionsEntryId(prevId: string, nextId: string) {
+  const nextPending = new Map<string, { entryId: string; field: string; text: string }>()
+  pendingAISuggestions.value.forEach((suggestion, key) => {
+    if (key.startsWith(`${prevId}-`)) {
+      nextPending.set(`${nextId}-${key.slice(prevId.length + 1)}`, { ...suggestion, entryId: nextId })
+    } else {
+      nextPending.set(key, suggestion)
+    }
+  })
+  pendingAISuggestions.value = nextPending
+}
+
+function migrateSavedEntryTransientState(prevId: string, nextId: string) {
+  if (editingCell.value?.entryId === prevId) editingCell.value = { ...editingCell.value, entryId: nextId }
+  if (expandedEntryId.value === prevId) expandedEntryId.value = nextId
+  if (expandedMorphemeRefsEntryId.value === prevId) expandedMorphemeRefsEntryId.value = nextId
+  if (expandedThemeEntryId.value === prevId) expandedThemeEntryId.value = nextId
+  if (referenceHeadwordVisibleEntryId.value === prevId) referenceHeadwordVisibleEntryId.value = nextId
+  if (aiLoadingInlineFor.value?.entryId === prevId) aiLoadingInlineFor.value = { ...aiLoadingInlineFor.value, entryId: nextId }
+  if (aiInlineError.value?.entryId === prevId) aiInlineError.value = { ...aiInlineError.value, entryId: nextId }
+
+  renameInputRefsEntryId(prevId, nextId)
+  renamePendingAISuggestionsEntryId(prevId, nextId)
+
+  const themeSuggestion = themeAISuggestions.value.get(prevId)
+  if (themeSuggestion) {
+    themeAISuggestions.value.set(nextId, themeSuggestion)
+    themeAISuggestions.value.delete(prevId)
+    themeAISuggestions.value = new Map(themeAISuggestions.value)
+  }
+
+  const definitionSuggestion = definitionAISuggestions.value.get(prevId)
+  if (definitionSuggestion) {
+    definitionAISuggestions.value.set(nextId, definitionSuggestion)
+    definitionAISuggestions.value.delete(prevId)
+    definitionAISuggestions.value = new Map(definitionAISuggestions.value)
+  }
+
+  if (jyutdictHandled.value.has(prevId)) {
+    jyutdictHandled.value.add(nextId)
+    jyutdictHandled.value.delete(prevId)
+    jyutdictHandled.value = new Set(jyutdictHandled.value)
+  }
+
+  const prevJyutjyuState = jyutjyuRefResult.value.get(prevId)
+  if (prevJyutjyuState) {
+    jyutjyuRefResult.value.set(nextId, prevJyutjyuState)
+    jyutjyuRefResult.value.delete(prevId)
+    jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
+  }
+
+  const prevVisible = jyutjyuRefVisible.value.get(prevId)
+  if (prevVisible !== undefined) {
+    jyutjyuRefVisible.value.set(nextId, prevVisible)
+    jyutjyuRefVisible.value.delete(prevId)
+    jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
+  }
+
+  const nextHandled = new Set<string>()
+  jyutjyuRefHandled.value.forEach((key) => {
+    if (key.startsWith(`${prevId}::`)) nextHandled.add(key.replace(`${prevId}::`, `${nextId}::`))
+    else nextHandled.add(key)
+  })
+  jyutjyuRefHandled.value = nextHandled
+}
+
 /** 釋義列展開區旁的數量提示：多義項或例句時顯示「N義項 · M例」 */
 function getDefinitionExpandHint(entry: Entry): string {
   const senses = entry.senses ?? []
@@ -2199,46 +2277,17 @@ async function saveNewEntry(entry: Entry) {
     })
 
     if (response.success) {
-      // Replace temp entry with real one; preserve _tempId so v-for key stays stable and Vue doesn't remount the row (avoids parentNode null during patch)
+      // Replace temp entry with real one and migrate transient UI state from temp id to server id.
       const index = entries.value.findIndex(e => e.id === entry.id || (e as any)._tempId === (entry as any)._tempId)
       if (index !== -1) {
         const prev = entries.value[index] as any
         const saved = { ...response.data, _isNew: false, _isDirty: false } as unknown as Entry
-        if (prev?._tempId) (saved as any)._tempId = prev._tempId
+        const prevTempId = prev?._tempId ? String(prev._tempId) : ''
+        const savedId = String(saved.id || '')
+        if (prevTempId && savedId) {
+          migrateSavedEntryTransientState(prevTempId, savedId)
+        }
         entries.value[index] = saved
-        // 泛粵典「已採納/忽略」是用 entryId 記的；保存後 entryId 從 _tempId 變為真實 id，需遷移否則會重複彈出
-        if (prev?._tempId && jyutdictHandled.value.has(String(prev._tempId))) {
-          jyutdictHandled.value.add(String(saved.id))
-          jyutdictHandled.value.delete(String(prev._tempId))
-          jyutdictHandled.value = new Set(jyutdictHandled.value)
-        }
-        // Jyutjyu 參考：狀態以 entryId 存 Map；保存後 entryId 從 _tempId 變為真實 id，需遷移避免提示狀態丟失/重複
-        if (prev?._tempId) {
-          const prevId = String(prev._tempId)
-          const nextId = String(saved.id)
-
-          const prevJyutjyuState = jyutjyuRefResult.value.get(prevId)
-          if (prevJyutjyuState) {
-            jyutjyuRefResult.value.set(nextId, prevJyutjyuState)
-            jyutjyuRefResult.value.delete(prevId)
-            jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
-          }
-
-          const prevVisible = jyutjyuRefVisible.value.get(prevId)
-          if (prevVisible !== undefined) {
-            jyutjyuRefVisible.value.set(nextId, prevVisible)
-            jyutjyuRefVisible.value.delete(prevId)
-            jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
-          }
-
-          // 遷移已忽略 key（`${entryId}::${q}`）
-          const nextHandled = new Set<string>()
-          jyutjyuRefHandled.value.forEach((k) => {
-            if (k.startsWith(`${prevId}::`)) nextHandled.add(k.replace(`${prevId}::`, `${nextId}::`))
-            else nextHandled.add(k)
-          })
-          jyutjyuRefHandled.value = nextHandled
-        }
         // 從本地儲存中移除已保存嘅詞條
         removeEntryFromLocalStorage(prev?._tempId || entry.id || '')
         // 更新 baseline（之後「取消編輯」應回滾到最新已保存狀態）
