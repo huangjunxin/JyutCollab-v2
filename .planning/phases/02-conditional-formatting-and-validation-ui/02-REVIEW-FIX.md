@@ -1,53 +1,47 @@
 ---
 phase: 02-conditional-formatting-and-validation-ui
-fixed_at: 2026-05-04T05:25:10Z
+fixed_at: 2026-05-04T07:20:00Z
 review_path: .planning/phases/02-conditional-formatting-and-validation-ui/02-REVIEW.md
 iteration: 1
-findings_in_scope: 4
-fixed: 4
+findings_in_scope: 3
+fixed: 3
 skipped: 0
 status: all_fixed
 ---
 
 # Phase 02: Code Review Fix Report
 
-**Fixed at:** 2026-05-04T05:25:10Z
+**Fixed at:** 2026-05-04T07:20:00Z
 **Source review:** .planning/phases/02-conditional-formatting-and-validation-ui/02-REVIEW.md
 **Iteration:** 1
 
 **Summary:**
-- Findings in scope: 4
-- Fixed: 4
+- Findings in scope: 3
+- Fixed: 3
 - Skipped: 0
 
 ## Fixed Issues
 
-### WR-01: Grouped-view keyboard focus uses entry indices as table row indices
+### CR-01: Saved entries keep `_tempId`, breaking later edits and Save All
 
 **Files modified:** `app/pages/entries/index.vue`
-**Commit:** 6696fbb
-**Applied fix:** Kept keyboard focus coordinates aligned with rendered table rows, added helpers to resolve entry rows, and skipped group header rows during arrow/tab navigation and cell activation.
+**Commit:** e2f36f6
+**Applied fix:** Removed `_tempId` preservation for newly saved entries and migrated temp-id keyed transient UI state, input refs, pending suggestions, and hint maps to the server id before replacing the row. Status: fixed; requires human verification for the entry-identity state migration logic.
 
-### WR-02: Advanced filters can hide dirty rows from unsaved-change detection and Save All
+### WR-01: Invalid applied filter errors remain visible after disabling or clearing the invalid filter
 
-**Files modified:** `app/pages/entries/index.vue`
-**Commit:** a9db220
-**Applied fix:** Split visible filtered entries from persistence state and made unsaved-change detection plus Save All scan all loaded page entries, including rows hidden by advanced filters.
+**Files modified:** `app/composables/useEntriesAdvancedFilters.ts`
+**Commit:** 0d52f3d
+**Applied fix:** Added cleanup for inactive applied filter error slots during filter application and computed matching, and cleared stale runtime errors after successful formula/regex evaluation.
 
-### WR-03: Unsaved rows can be duplicated in grouped views and are excluded from filter counts
+### WR-02: `updateDraft()` silently discards patched nested conditions
 
-**Files modified:** `app/pages/entries/index.vue`, `app/composables/useEntriesAdvancedFilters.ts`
-**Commit:** c619a5c
-**Applied fix:** De-duplicated local new rows against grouped entries before rendering standalone groups and updated grouped advanced-filter counts to include the same ungrouped new rows rendered by the table.
-
-### WR-04: Rule overlay metadata is keyed only by entry id and can collide for local rows
-
-**Files modified:** `app/pages/entries/index.vue`, `app/composables/useEntriesRuleOverlays.ts`
-**Commit:** 17c2051
-**Applied fix:** Generated collision-resistant local entry ids with `crypto.randomUUID()` fallback and keyed overlay metadata with the shared entry key helper instead of an id-only path.
+**Files modified:** `app/components/entries/EntriesRuleOverlayPanel.vue`
+**Commit:** 25ae443
+**Applied fix:** Updated `updateDraft()` to preserve patched `condition` values while cloning nested regex state, falling back to the current draft condition only when no condition patch is supplied.
 
 ---
 
-_Fixed: 2026-05-04T05:25:10Z_
+_Fixed: 2026-05-04T07:20:00Z_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
