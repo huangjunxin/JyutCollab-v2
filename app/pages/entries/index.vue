@@ -143,8 +143,9 @@
           />
           <EntriesRuleOverlayPanel
             v-model:expanded="ruleOverlays.ruleOverlayExpanded.value"
-            v-model:draft-rule="ruleOverlays.draftRule"
+            :draft-rule="ruleOverlays.draftRule"
             teleport-to="#entries-rule-overlay-host"
+            @update:draft-rule="updateRuleOverlayDraft"
             :rules="ruleOverlays.rules.value"
             :errors="ruleOverlays.ruleOverlayErrors"
             :active-rule-count="ruleOverlays.activeRuleCount.value"
@@ -154,6 +155,7 @@
             @toggle-rule="ruleOverlays.toggleRule"
             @remove-rule="ruleOverlays.removeRule"
             @move-rule="ruleOverlays.moveRule"
+            @update-rule-color="ruleOverlays.updateRuleColor"
           />
           <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-2">
             <span class="text-sm text-gray-500 dark:text-gray-400">視圖</span>
@@ -890,6 +892,7 @@ import { ensureSensesStructure, addSense, removeSense, addExample, removeExample
 import { useEntriesList } from '~/composables/useEntriesList'
 import { useEntriesAdvancedFilters } from '~/composables/useEntriesAdvancedFilters'
 import { useEntriesRuleOverlays } from '~/composables/useEntriesRuleOverlays'
+import type { EntriesRuleDraft } from '~/composables/useEntriesRuleOverlays'
 import { useEntriesSelection } from '~/composables/useEntriesSelection'
 import { useNewEntryDialect } from '~/composables/useNewEntryDialect'
 import { useEntryMorphemeRefs } from '~/composables/useEntryMorphemeRefs'
@@ -1375,13 +1378,44 @@ const tableRows = computed((): TableRow[] => {
   })
   return rows
 })
-const visibleEntryRows = computed(() => tableRows.value.filter((row): row is Extract<TableRow, { type: 'entry' }> => row.type === 'entry'))
-const visibleKeyboardEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
-const visibleRuleOverlayEntries = computed(() => visibleEntryRows.value.map(row => row.entry))
+const visibleRuleOverlayEntries = computed(() => tableRows.value
+  .filter((row): row is Extract<TableRow, { type: 'entry' }> => row.type === 'entry')
+  .map(row => row.entry))
+
+function getEntryAtTableRow(rowIndex: number): Entry | null {
+  const row = tableRows.value[rowIndex]
+  return row?.type === 'entry' ? row.entry : null
+}
+
+function findNextEntryTableRow(startIndex: number, direction: -1 | 1): number {
+  let nextIndex = startIndex
+  while (nextIndex + direction >= 0 && nextIndex + direction < tableRows.value.length) {
+    nextIndex += direction
+    if (tableRows.value[nextIndex]?.type === 'entry') return nextIndex
+  }
+  return startIndex
+}
+
+function findFirstEntryTableRow(): number {
+  return tableRows.value.findIndex(row => row.type === 'entry')
+}
 const ruleOverlays = useEntriesRuleOverlays({
   visibleEntries: visibleRuleOverlayEntries,
   buildRowContext: advancedFilters.buildRowContext
 })
+
+function updateRuleOverlayDraft(nextDraft: EntriesRuleDraft) {
+  Object.assign(ruleOverlays.draftRule, {
+    ...nextDraft,
+    targetFields: [...nextDraft.targetFields],
+    condition: {
+      kind: nextDraft.condition.kind,
+      formula: nextDraft.condition.formula,
+      regex: { ...nextDraft.condition.regex }
+    },
+    colorHex: nextDraft.colorHex
+  })
+}
 
 /** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
 const currentPageEntries = computed(() => {
@@ -1938,21 +1972,23 @@ function handleTableKeydown(event: KeyboardEvent) {
     return
   }
   if (editingCell.value) return
-  const rows = visibleKeyboardEntries.value.length
+  const rows = tableRows.value.length
   const cols = editableColumns.value.length
   if (rows === 0 || cols === 0) return
 
-  // 尚無焦點格時，用方向鍵/Enter/Tab 從 (0,0) 開始
+  // 尚無焦點格時，用方向鍵/Enter/Tab 從第一個 entry 行開始
   if (!focusedCell.value) {
     if (event.key === 'Enter' || event.key.startsWith('Arrow') || event.key === 'Tab') {
-      focusedCell.value = { rowIndex: 0, colIndex: 0 }
+      const firstEntryRow = findFirstEntryTableRow()
+      if (firstEntryRow < 0) return
+      focusedCell.value = { rowIndex: firstEntryRow, colIndex: 0 }
     } else {
       return
     }
   }
 
   const { rowIndex, colIndex } = focusedCell.value
-  const currentEntry = visibleKeyboardEntries.value[rowIndex]
+  const currentEntry = getEntryAtTableRow(rowIndex)
   const entryKeyForTheme = currentEntry ? String(currentEntry.id ?? (currentEntry as any)._tempId ?? '') : ''
   let nextRow = rowIndex
   let nextCol = colIndex
@@ -1960,11 +1996,11 @@ function handleTableKeydown(event: KeyboardEvent) {
   switch (event.key) {
     case 'ArrowUp':
       event.preventDefault()
-      nextRow = Math.max(0, rowIndex - 1)
+      nextRow = findNextEntryTableRow(rowIndex, -1)
       break
     case 'ArrowDown':
       event.preventDefault()
-      nextRow = Math.min(rows - 1, rowIndex + 1)
+      nextRow = findNextEntryTableRow(rowIndex, 1)
       break
     case 'ArrowLeft':
       event.preventDefault()
@@ -1984,16 +2020,16 @@ function handleTableKeydown(event: KeyboardEvent) {
         nextCol = colIndex - 1
         if (nextCol < 0) {
           nextCol = cols - 1
-          nextRow = Math.max(0, rowIndex - 1)
+          nextRow = findNextEntryTableRow(rowIndex, -1)
         }
       } else {
         nextCol = colIndex + 1
         if (nextCol >= cols) {
           nextCol = 0
-          nextRow = Math.min(rows - 1, rowIndex + 1)
+          nextRow = findNextEntryTableRow(rowIndex, 1)
         }
       }
-      const tabEntry = visibleKeyboardEntries.value[nextRow]
+      const tabEntry = getEntryAtTableRow(nextRow)
       const tabColDef = editableColumns.value[nextCol]
       if (tabEntry && tabColDef) {
         handleCellClick(tabEntry, tabColDef.key, event, nextRow, nextCol, true)
@@ -2008,7 +2044,7 @@ function handleTableKeydown(event: KeyboardEvent) {
       return
     case 'Enter':
       event.preventDefault()
-      const entry = visibleKeyboardEntries.value[rowIndex]
+      const entry = getEntryAtTableRow(rowIndex)
       const colDef = editableColumns.value[colIndex]
       if (entry && colDef) {
         handleCellClick(entry, colDef.key, event, rowIndex, colIndex, true)
@@ -2017,7 +2053,7 @@ function handleTableKeydown(event: KeyboardEvent) {
     default:
       // Notion: 直接輸入字符激活當前選中格進入編輯，並把該字符填入
       if (focusedCell.value && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        const typableEntry = visibleKeyboardEntries.value[focusedCell.value.rowIndex]
+        const typableEntry = getEntryAtTableRow(focusedCell.value.rowIndex)
         const typableCol = editableColumns.value[focusedCell.value.colIndex]
         if (typableEntry && typableCol) {
           event.preventDefault()
