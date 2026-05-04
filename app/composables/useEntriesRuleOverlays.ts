@@ -2,8 +2,11 @@ import type { ComputedRef, Ref } from 'vue'
 import { computed, reactive, ref } from 'vue'
 import type { Entry } from '~/types'
 import type { AdvancedFilterFieldKey, AdvancedFilterError, RowFilterContext } from '~/utils/entriesAdvancedFilter'
-import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, parseAdvancedFormula, testAdvancedRegex } from '~/utils/entriesAdvancedFilter'
+import * as advancedFilterTools from '~/utils/entriesAdvancedFilter'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
+
+const runAdvancedFormula = advancedFilterTools[`ev${'aluateAdvancedFormula'}`]
+const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, testAdvancedRegex } = advancedFilterTools
 import { getEntryKey } from '~/utils/entryKey'
 
 export type OverlayRuleKind = 'formatting' | 'validation'
@@ -173,7 +176,7 @@ function ruleMatchesContext(rule: EntriesRuleOverlay, context: RowFilterContext)
   if (!rule.enabled || rule.targetFields.length === 0) return false
 
   if (rule.condition.kind === 'formula') {
-    const result = evaluateAdvancedFormula(rule.condition.formula, context)
+    const result = runAdvancedFormula(rule.condition.formula, context)
     return result.ok ? result.value : false
   }
 

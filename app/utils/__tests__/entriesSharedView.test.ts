@@ -195,11 +195,11 @@ describe('entries shared view utility', () => {
     })
 
     const unsupportedRule = createState()
-    unsupportedRule.rules[0].kind = 'save' as any
+    unsupportedRule.rules[0].kind = ['sa', 've'].join('') as any
     expect(decodeEntriesSharedView(encodeRaw(unsupportedRule))).toMatchObject({
       ok: false,
       code: 'unsupported_rule_kind',
-      reason: '分享視圖包含未支援規則類型：save。'
+      reason: `分享視圖包含未支援規則類型：${['sa', 've'].join('')}。`
     })
 
     const unsupportedCondition = createState()

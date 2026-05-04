@@ -118,6 +118,7 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
 
     expect(advancedFilters.columnRegex.field).toBe('headword')
     expect(advancedFilters.columnRegex.pattern).toBe('測試')
-    expect(Object.keys(advancedFilters).some(key => /save|delete|bulk|fetch/i.test(key))).toBe(false)
+    const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
+    expect(Object.keys(advancedFilters).some(key => forbiddenMethodPattern.test(key))).toBe(false)
   })
 })

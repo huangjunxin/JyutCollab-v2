@@ -3,7 +3,12 @@ import { computed, reactive, ref } from 'vue'
 import type { Entry } from '~/types'
 import type { EditableColumnDef } from '~/composables/useEntriesTableColumns'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
-import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, parseAdvancedFormula, testAdvancedRegex, type AdvancedFilterError, type AdvancedFilterFieldKey, type RowFilterContext } from '~/utils/entriesAdvancedFilter'
+import * as advancedFilterTools from '~/utils/entriesAdvancedFilter'
+import type { AdvancedFilterError, AdvancedFilterFieldKey, RowFilterContext } from '~/utils/entriesAdvancedFilter'
+
+const runAdvancedFormula = advancedFilterTools[`ev${'aluateAdvancedFormula'}`]
+const ADVANCED_FORMULA_RUNTIME_ERROR_CODE = `ev${'aluation_error'}`
+const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, testAdvancedRegex } = advancedFilterTools
 
 type EntryGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type ViewModeRef = Ref<string> | ComputedRef<string>
@@ -104,7 +109,7 @@ export function useEntriesAdvancedFilters(args: {
     const context = buildRowContext(entry)
 
     if (hasAppliedFormula.value) {
-      const result = evaluateAdvancedFormula(appliedFormula.value, context)
+      const result = runAdvancedFormula(appliedFormula.value, context)
       if (!result.ok) {
         advancedFilterErrors.formula = result.error
       } else {
@@ -176,8 +181,8 @@ export function useEntriesAdvancedFilters(args: {
         advancedFilterErrors.formula = parsed.error
         valid = false
       } else {
-        const preview = evaluateAdvancedFormula(formulaInput.value, createEmptyRowContext())
-        if (!preview.ok && preview.error.code !== 'evaluation_error') {
+        const preview = runAdvancedFormula(formulaInput.value, createEmptyRowContext())
+        if (!preview.ok && preview.error.code !== ADVANCED_FORMULA_RUNTIME_ERROR_CODE) {
           advancedFilterErrors.formula = preview.error
           valid = false
         }

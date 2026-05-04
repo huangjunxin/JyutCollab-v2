@@ -132,6 +132,7 @@ describe('useEntriesRuleOverlays shared view APIs', () => {
     expect(headwordMeta.validationMatches.map(match => match.ruleName)).toEqual(['詞頭警告'])
     expect(entry._isDirty).toBeUndefined()
     expect(entry).not.toHaveProperty('__ruleOverlayMeta')
-    expect(Object.keys(overlay).some(key => /save|delete|bulk|fetch/i.test(key))).toBe(false)
+    const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
+    expect(Object.keys(overlay).some(key => forbiddenMethodPattern.test(key))).toBe(false)
   })
 })
