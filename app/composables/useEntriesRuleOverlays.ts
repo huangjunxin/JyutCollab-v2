@@ -51,6 +51,7 @@ export interface EntryCellOverlayMeta {
 }
 
 export type EntriesRuleDraft = Omit<EntriesRuleOverlay, 'id'>
+export type SharedEntriesRuleOverlay = EntriesRuleDraft
 
 export interface EntriesRuleOverlayErrors {
   name: string | null
@@ -331,6 +332,48 @@ export function useEntriesRuleOverlays(args: {
     clearRuleOverlayErrors()
   }
 
+  function exportRuleOverlayState(): SharedEntriesRuleOverlay[] {
+    return rules.value.map(rule => ({
+      name: rule.name,
+      kind: rule.kind,
+      enabled: rule.enabled,
+      targetFields: [...rule.targetFields],
+      condition: {
+        kind: rule.condition.kind,
+        formula: rule.condition.formula,
+        regex: {
+          pattern: rule.condition.regex.pattern,
+          flags: rule.condition.regex.flags,
+          field: rule.condition.regex.field
+        }
+      },
+      stylePreset: rule.stylePreset,
+      colorHex: rule.colorHex
+    }))
+  }
+
+  function replaceRuleOverlayState(restoredRules: SharedEntriesRuleOverlay[]) {
+    rules.value = restoredRules.map(rule => ({
+      name: rule.name,
+      kind: rule.kind,
+      enabled: rule.enabled,
+      targetFields: [...rule.targetFields],
+      condition: {
+        kind: rule.condition.kind,
+        formula: rule.condition.formula,
+        regex: {
+          pattern: rule.condition.regex.pattern,
+          flags: rule.condition.regex.flags,
+          field: rule.condition.regex.field
+        }
+      },
+      stylePreset: rule.stylePreset,
+      colorHex: rule.colorHex,
+      id: createLocalRuleId()
+    }))
+    clearRuleOverlayErrors()
+  }
+
   function getCellOverlayMeta(entry: Entry, field: AdvancedFilterFieldKey): EntryCellOverlayMeta {
     if (!isAdvancedFilterField(field)) return createEmptyCellOverlayMeta()
     return cellOverlayMetaByEntryKey.value.get(String(getEntryKey(entry)))?.get(field) ?? createEmptyCellOverlayMeta()
@@ -351,6 +394,8 @@ export function useEntriesRuleOverlays(args: {
     updateRuleColor,
     clearRuleOverlayErrors,
     clearRules,
+    exportRuleOverlayState,
+    replaceRuleOverlayState,
     getCellOverlayMeta
   }
 }
