@@ -79,15 +79,23 @@ export function useEntriesAdvancedFilters(args: {
     return ungroupedNewEntryCount + getEntryCountFromGroups(groups)
   })
 
+  function clearInactiveAppliedFilterErrors() {
+    if (!hasAppliedFormula.value) advancedFilterErrors.formula = null
+    if (!hasAppliedGlobalRegex.value) advancedFilterErrors.globalRegex = null
+    if (!hasAppliedColumnRegex.value) advancedFilterErrors.columnRegex = null
+  }
+
   function matchEntry(entry: Entry): boolean {
+    clearInactiveAppliedFilterErrors()
     const context = buildRowContext(entry)
 
     if (hasAppliedFormula.value) {
       const result = evaluateAdvancedFormula(appliedFormula.value, context)
       if (!result.ok) {
         advancedFilterErrors.formula = result.error
-      } else if (!result.value) {
-        return false
+      } else {
+        advancedFilterErrors.formula = null
+        if (!result.value) return false
       }
     }
 
@@ -95,8 +103,9 @@ export function useEntriesAdvancedFilters(args: {
       const compiled = compileAdvancedRegex(appliedGlobalRegex.value, globalRegexFlags.value)
       if (!compiled.ok) {
         advancedFilterErrors.globalRegex = compiled.error
-      } else if (!testAdvancedRegex(compiled.regex, buildSearchableRowText(context))) {
-        return false
+      } else {
+        advancedFilterErrors.globalRegex = null
+        if (!testAdvancedRegex(compiled.regex, buildSearchableRowText(context))) return false
       }
     }
 
@@ -104,8 +113,9 @@ export function useEntriesAdvancedFilters(args: {
       const compiled = compileAdvancedRegex(appliedColumnRegex.pattern, appliedColumnRegex.flags)
       if (!compiled.ok) {
         advancedFilterErrors.columnRegex = compiled.error
-      } else if (!testAdvancedRegex(compiled.regex, context[appliedColumnRegex.field])) {
-        return false
+      } else {
+        advancedFilterErrors.columnRegex = null
+        if (!testAdvancedRegex(compiled.regex, context[appliedColumnRegex.field])) return false
       }
     }
 
@@ -196,6 +206,7 @@ export function useEntriesAdvancedFilters(args: {
     appliedColumnRegex.field = columnRegex.field
     appliedColumnRegex.pattern = columnRegex.pattern
     appliedColumnRegex.flags = columnRegex.flags
+    clearInactiveAppliedFilterErrors()
     return true
   }
 
