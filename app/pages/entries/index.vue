@@ -1417,10 +1417,25 @@ function updateRuleOverlayDraft(nextDraft: EntriesRuleDraft) {
   })
 }
 
-/** 當前頁用於多選/未保存檢測的條目列表（平鋪=entries，聚合=displayGroups 內所有 entries + 新建） */
+/** 當前頁用於多選等可見列操作的條目列表（跟隨進階篩選）。 */
 const currentPageEntries = computed(() => {
   if (viewMode.value === 'flat') return filteredEntries.value
   return displayGroups.value.flatMap(g => g.entries)
+})
+
+/** 保存狀態需覆蓋整個已載入頁面，避免進階篩選隱藏未保存修改。 */
+const allLoadedPageEntries = computed(() => {
+  if (viewMode.value === 'flat') return entries.value
+  const groups = viewMode.value === 'lexeme' ? lexemeGroups.value : aggregatedGroups.value
+  const seenKeys = new Set<string>()
+  const loadedEntries: Entry[] = []
+  for (const entry of [...entries.value.filter(e => (e as any)._isNew), ...groups.flatMap(group => group.entries)]) {
+    const key = String(getEntryKey(entry))
+    if (seenKeys.has(key)) continue
+    seenKeys.add(key)
+    loadedEntries.push(entry)
+  }
+  return loadedEntries
 })
 
 const {
@@ -1546,7 +1561,7 @@ function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
 
 // Computed
 const hasUnsavedChanges = computed(() => {
-  return currentPageEntries.value.some(e => e._isDirty || (e as any)._isNew)
+  return allLoadedPageEntries.value.some(e => e._isDirty || (e as any)._isNew)
 })
 
 // Helper functions
@@ -2251,7 +2266,7 @@ async function saveNewEntry(entry: Entry) {
 async function saveAllChanges() {
   if (savingAll.value || isAnyEntrySaving.value) return
   savingAll.value = true
-  const dirtyEntries = currentPageEntries.value.filter(e => e._isDirty && !(e as any)._isNew)
+  const dirtyEntries = allLoadedPageEntries.value.filter(e => e._isDirty && !(e as any)._isNew)
 
   try {
     // 先更新本地狀態（如審核員保存→已發佈），再發送請求，避免保存後仍顯示「有修改」
