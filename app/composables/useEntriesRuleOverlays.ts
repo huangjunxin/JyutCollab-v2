@@ -4,7 +4,7 @@ import type { Entry } from '~/types'
 import type { AdvancedFilterFieldKey, AdvancedFilterError, RowFilterContext } from '~/utils/entriesAdvancedFilter'
 import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, parseAdvancedFormula, testAdvancedRegex } from '~/utils/entriesAdvancedFilter'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
-import { getEntryIdString } from '~/utils/entryKey'
+import { getEntryKey } from '~/utils/entryKey'
 
 export type OverlayRuleKind = 'formatting' | 'validation'
 export type OverlayConditionKind = 'formula' | 'regex'
@@ -29,6 +29,7 @@ export interface EntriesRuleOverlay {
   targetFields: AdvancedFilterFieldKey[]
   condition: EntriesRuleCondition
   stylePreset: OverlayStylePreset
+  colorHex: string
 }
 
 export interface CellRuleMatch {
@@ -36,12 +37,14 @@ export interface CellRuleMatch {
   ruleName: string
   ruleKind: OverlayRuleKind
   stylePreset: OverlayStylePreset
+  colorHex: string
 }
 
 export interface EntryCellOverlayMeta {
   formattingMatches: CellRuleMatch[]
   validationMatches: CellRuleMatch[]
   classNames: string[]
+  style: Record<string, string>
   tooltipText: string
   formattingTooltipText: string
   validationTooltipText: string
@@ -58,13 +61,8 @@ export interface EntriesRuleOverlayErrors {
 
 const DEFAULT_RULE_NAME = '新規則'
 const DEFAULT_STYLE_PRESET: OverlayStylePreset = 'green'
+const DEFAULT_STYLE_COLOR = '#22c55e'
 
-const FORMATTING_CLASS_PRESETS: Record<OverlayStylePreset, string[]> = {
-  green: ['bg-green-50', 'ring-1', 'ring-green-200'],
-  blue: ['bg-blue-50', 'ring-1', 'ring-blue-200'],
-  purple: ['bg-purple-50', 'ring-1', 'ring-purple-200'],
-  amber: ['bg-amber-50', 'ring-1', 'ring-amber-200']
-}
 
 const VALIDATION_CLASS_NAMES = ['bg-amber-50', 'ring-1', 'ring-amber-300', 'text-amber-950']
 
@@ -108,7 +106,8 @@ function createDefaultDraftRule(): EntriesRuleDraft {
         field: 'any'
       }
     },
-    stylePreset: DEFAULT_STYLE_PRESET
+    stylePreset: DEFAULT_STYLE_PRESET,
+    colorHex: DEFAULT_STYLE_COLOR
   }
 }
 
@@ -127,7 +126,8 @@ function cloneDraftRule(draft: EntriesRuleDraft): EntriesRuleDraft {
         field: draft.condition.regex.field
       }
     },
-    stylePreset: draft.stylePreset
+    stylePreset: draft.stylePreset,
+    colorHex: draft.colorHex
   }
 }
 
@@ -136,14 +136,18 @@ function createCellRuleMatch(rule: EntriesRuleOverlay): CellRuleMatch {
     ruleId: rule.id,
     ruleName: rule.name,
     ruleKind: rule.kind,
-    stylePreset: rule.stylePreset
+    stylePreset: rule.stylePreset,
+    colorHex: rule.colorHex
   }
 }
 
 function createCellOverlayMeta(formattingMatches: CellRuleMatch[], validationMatches: CellRuleMatch[]): EntryCellOverlayMeta {
   const classNameSet = new Set<string>()
-  for (const match of formattingMatches) {
-    for (const className of FORMATTING_CLASS_PRESETS[match.stylePreset]) classNameSet.add(className)
+  const style: Record<string, string> = {}
+  const primaryFormattingMatch = formattingMatches[0]
+  if (primaryFormattingMatch) {
+    style.backgroundColor = `${primaryFormattingMatch.colorHex}24`
+    style.boxShadow = `inset 0 0 0 1px ${primaryFormattingMatch.colorHex}80`
   }
   if (validationMatches.length > 0) {
     for (const className of VALIDATION_CLASS_NAMES) classNameSet.add(className)
@@ -157,6 +161,7 @@ function createCellOverlayMeta(formattingMatches: CellRuleMatch[], validationMat
     formattingMatches,
     validationMatches,
     classNames: [...classNameSet],
+    style,
     tooltipText,
     formattingTooltipText,
     validationTooltipText
@@ -184,6 +189,7 @@ export function createEmptyCellOverlayMeta(): EntryCellOverlayMeta {
     formattingMatches: [],
     validationMatches: [],
     classNames: [],
+    style: {},
     tooltipText: '',
     formattingTooltipText: '',
     validationTooltipText: ''
@@ -230,7 +236,7 @@ export function useEntriesRuleOverlays(args: {
       for (const [field, matches] of matchesByField) {
         fieldMetaMap.set(field, createCellOverlayMeta(matches.formatting, matches.validation))
       }
-      metaByEntryKey.set(getEntryIdString(entry), fieldMetaMap)
+      metaByEntryKey.set(String(getEntryKey(entry)), fieldMetaMap)
     }
 
     return metaByEntryKey
@@ -316,6 +322,10 @@ export function useEntriesRuleOverlays(args: {
     rules.value = nextRules
   }
 
+  function updateRuleColor(ruleId: string, colorHex: string) {
+    rules.value = rules.value.map(rule => rule.id === ruleId ? { ...rule, colorHex } : rule)
+  }
+
   function clearRules() {
     rules.value = []
     clearRuleOverlayErrors()
@@ -323,7 +333,7 @@ export function useEntriesRuleOverlays(args: {
 
   function getCellOverlayMeta(entry: Entry, field: AdvancedFilterFieldKey): EntryCellOverlayMeta {
     if (!isAdvancedFilterField(field)) return createEmptyCellOverlayMeta()
-    return cellOverlayMetaByEntryKey.value.get(getEntryIdString(entry))?.get(field) ?? createEmptyCellOverlayMeta()
+    return cellOverlayMetaByEntryKey.value.get(String(getEntryKey(entry)))?.get(field) ?? createEmptyCellOverlayMeta()
   }
 
   return {
@@ -338,6 +348,7 @@ export function useEntriesRuleOverlays(args: {
     toggleRule,
     removeRule,
     moveRule,
+    updateRuleColor,
     clearRuleOverlayErrors,
     clearRules,
     getCellOverlayMeta

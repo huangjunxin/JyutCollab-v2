@@ -1204,6 +1204,11 @@ function autoExpandGroupForEntry(entry: any) {
   expandedGroupKeys.value = next
 }
 
+function createLocalEntryId(prefix: 'new' | 'dup'): string {
+  if (typeof crypto?.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 function setViewMode(v: string) {
   const mode = v === 'aggregated' ? 'aggregated' : (v === 'lexeme' ? 'lexeme' : 'flat')
   viewMode.value = mode
@@ -2086,9 +2091,10 @@ function handleTableKeydown(event: KeyboardEvent) {
 // Entry operations
 function addNewRow() {
   const defaultDialect = getUserDefaultDialect()
+  const tempId = createLocalEntryId('new')
   const newEntry: any = {
-    _tempId: `new-${Date.now()}`,
-    id: `new-${Date.now()}`,
+    _tempId: tempId,
+    id: tempId,
     headword: { display: '', search: '', normalized: '', isPlaceholder: false },
     text: '',
     dialect: { name: defaultDialect },
@@ -2113,7 +2119,7 @@ function addNewRow() {
 /** 複製詞條：複製所有內容，方言改為當前用戶的母語/默認方言，插入為新行（草稿） */
 function duplicateEntry(entry: Entry) {
   const defaultDialect = getUserDefaultDialect()
-  const tempId = `dup-${Date.now()}`
+  const tempId = createLocalEntryId('dup')
   const clonedHeadword = entry.headword
     ? deepCopy(entry.headword)
     : { display: '', search: '', normalized: '', isPlaceholder: false }
