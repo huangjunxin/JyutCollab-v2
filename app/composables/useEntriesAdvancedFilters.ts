@@ -8,6 +8,10 @@ import { buildSearchableRowText, compileAdvancedRegex, evaluateAdvancedFormula, 
 type EntryGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type ViewModeRef = Ref<string> | ComputedRef<string>
 
+function getEntryCountFromGroups(groups: EntryGroup[]): number {
+  return groups.reduce((sum, group) => sum + group.entries.length, 0)
+}
+
 interface AdvancedFilterColumnRegexState {
   field: AdvancedFilterFieldKey | ''
   pattern: string
@@ -66,7 +70,13 @@ export function useEntriesAdvancedFilters(args: {
   const loadedEntryCount = computed(() => {
     if (args.viewMode.value === 'flat') return args.entries.value.length
     const groups = args.viewMode.value === 'lexeme' ? args.lexemeGroups.value : args.aggregatedGroups.value
-    return groups.reduce((sum, group) => sum + group.entries.length, 0)
+    const groupedEntryKeys = new Set(groups.flatMap(group => group.entries.map(entry => String(entry.id ?? (entry as any)._tempId ?? ''))))
+    const ungroupedNewEntryCount = args.entries.value.filter(entry => {
+      if (!(entry as any)._isNew) return false
+      const key = String(entry.id ?? (entry as any)._tempId ?? '')
+      return !groupedEntryKeys.has(key)
+    }).length
+    return ungroupedNewEntryCount + getEntryCountFromGroups(groups)
   })
 
   function matchEntry(entry: Entry): boolean {
@@ -117,7 +127,13 @@ export function useEntriesAdvancedFilters(args: {
   const visibleEntryCount = computed(() => {
     if (args.viewMode.value === 'flat') return filteredEntries.value.length
     const groups = args.viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
-    return groups.reduce((sum, group) => sum + group.entries.length, 0)
+    const groupedEntryKeys = new Set(groups.flatMap(group => group.entries.map(entry => String(entry.id ?? (entry as any)._tempId ?? ''))))
+    const ungroupedNewEntryCount = filteredEntries.value.filter(entry => {
+      if (!(entry as any)._isNew) return false
+      const key = String(entry.id ?? (entry as any)._tempId ?? '')
+      return !groupedEntryKeys.has(key)
+    }).length
+    return ungroupedNewEntryCount + getEntryCountFromGroups(groups)
   })
   const advancedEmptyStateActive = computed(() => hasActiveAdvancedFilters.value && loadedEntryCount.value > 0 && visibleEntryCount.value === 0)
 

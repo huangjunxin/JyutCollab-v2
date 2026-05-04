@@ -1350,8 +1350,9 @@ const loadedEntryCount = advancedFilters.loadedEntryCount
 const displayGroups = computed(() => {
   if (viewMode.value !== 'aggregated' && viewMode.value !== 'lexeme') return []
   const base = viewMode.value === 'lexeme' ? filteredLexemeGroups.value : filteredAggregatedGroups.value
+  const groupedEntryKeys = new Set(base.flatMap(group => group.entries.map(entry => String(getEntryKey(entry)))))
   const newOnes = filteredEntries.value
-    .filter(e => (e as any)._isNew)
+    .filter(e => (e as any)._isNew && !groupedEntryKeys.has(String(getEntryKey(e))))
     .map(e => ({
       headwordDisplay: e.headword?.display || e.text || '',
       headwordNormalized:
