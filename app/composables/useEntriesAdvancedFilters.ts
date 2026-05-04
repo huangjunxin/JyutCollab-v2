@@ -12,10 +12,24 @@ function getEntryCountFromGroups(groups: EntryGroup[]): number {
   return groups.reduce((sum, group) => sum + group.entries.length, 0)
 }
 
-interface AdvancedFilterColumnRegexState {
+export interface AdvancedFilterColumnRegexState {
   field: AdvancedFilterFieldKey | ''
   pattern: string
   flags: string
+}
+
+export interface ExportedAdvancedFilterState {
+  formula: {
+    input: string
+    applied: string
+  }
+  globalRegex: {
+    enabled: boolean
+    input: string
+    applied: string
+    flags: string
+  }
+  columnRegex: AdvancedFilterColumnRegexState
 }
 
 interface AdvancedFilterErrors {
@@ -226,6 +240,42 @@ export function useEntriesAdvancedFilters(args: {
     clearAdvancedFilterErrors()
   }
 
+  function exportAdvancedFilterState(): ExportedAdvancedFilterState {
+    return {
+      formula: {
+        input: formulaInput.value,
+        applied: appliedFormula.value
+      },
+      globalRegex: {
+        enabled: globalRegexEnabled.value,
+        input: globalRegexInput.value,
+        applied: appliedGlobalRegex.value,
+        flags: globalRegexFlags.value
+      },
+      columnRegex: {
+        field: columnRegex.field,
+        pattern: columnRegex.pattern,
+        flags: columnRegex.flags
+      }
+    }
+  }
+
+  function restoreAdvancedFilterState(state: ExportedAdvancedFilterState) {
+    formulaInput.value = state.formula.input
+    appliedFormula.value = state.formula.applied
+    globalRegexEnabled.value = state.globalRegex.enabled
+    globalRegexInput.value = state.globalRegex.input
+    appliedGlobalRegex.value = state.globalRegex.applied
+    globalRegexFlags.value = state.globalRegex.flags
+    columnRegex.field = state.columnRegex.field
+    columnRegex.pattern = state.columnRegex.pattern
+    columnRegex.flags = state.columnRegex.flags
+    appliedColumnRegex.field = state.columnRegex.field
+    appliedColumnRegex.pattern = state.columnRegex.pattern
+    appliedColumnRegex.flags = state.columnRegex.flags
+    clearAdvancedFilterErrors()
+  }
+
   return {
     advancedFilterExpanded,
     formulaInput,
@@ -250,6 +300,8 @@ export function useEntriesAdvancedFilters(args: {
     buildRowContext,
     applyAdvancedFilters,
     clearAdvancedFilters,
-    clearAdvancedFilterErrors
+    clearAdvancedFilterErrors,
+    exportAdvancedFilterState,
+    restoreAdvancedFilterState
   }
 }
