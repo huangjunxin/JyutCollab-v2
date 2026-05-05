@@ -2203,13 +2203,22 @@ function moveToNextCell(entry: Entry, currentField: string, direction: number): 
 
 function handleTableKeydown(event: KeyboardEvent) {
   // 若焦點在可編輯元素內（如展開區的 input/textarea），不攔截按鍵，讓用戶正常輸入
+  // Phase 04: also guard when focus is inside toolbar, panels, popovers, alerts, color picker, or fallback URL controls
   const target = event.target as Node
   if (
     target &&
     (target instanceof HTMLInputElement ||
       target instanceof HTMLTextAreaElement ||
       target instanceof HTMLSelectElement ||
-      (target instanceof HTMLElement && target.isContentEditable))
+      target instanceof HTMLButtonElement ||
+      (target instanceof HTMLElement && target.isContentEditable) ||
+      (target instanceof HTMLElement && (
+        target.closest('#entries-advanced-filter-panel') ||
+        target.closest('#entries-rule-overlay-panel') ||
+        target.closest('[role="alert"]') ||
+        target.closest('.popover-content') ||
+        target.closest('[data-testid="color-picker"]')
+      )))
   ) {
     return
   }

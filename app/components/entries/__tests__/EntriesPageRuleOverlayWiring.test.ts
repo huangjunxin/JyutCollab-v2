@@ -5,6 +5,9 @@ import { resolve } from 'node:path'
 const pagePath = resolve(process.cwd(), 'app/pages/entries/index.vue')
 const source = readFileSync(pagePath, 'utf8')
 
+const panelPath = resolve(process.cwd(), 'app/components/entries/EntriesRuleOverlayPanel.vue')
+const panelSource = readFileSync(panelPath, 'utf8')
+
 describe('entries page rule overlay wiring', () => {
   it('imports the rule overlay panel and composable', () => {
     expect(source).toContain('EntriesRuleOverlayPanel')
@@ -40,5 +43,26 @@ describe('entries page rule overlay wiring', () => {
     expect(source).toContain(':cell-meta="isAdvancedFilterFieldKey(col.key) ? ruleOverlays.getCellOverlayMeta')
     expect(source).toContain('isAdvancedFilterFieldKey')
     expect(source).not.toMatch(/localStorage.*rule|\$fetch.*rule|save.*rule|delete.*rule|review.*rule|bulk.*rule/i)
+  })
+
+  it('provides accessible icon-only toolbar button with tooltip and aria-label', () => {
+    expect(panelSource).toContain('UTooltip text="規則"')
+    expect(panelSource).toContain('aria-label="規則"')
+    expect(panelSource).toContain('aria-expanded')
+    expect(panelSource).toContain('aria-controls')
+    expect(panelSource).toContain('class="h-8 w-8 justify-center p-0"')
+  })
+
+  it('provides visible HK Traditional invalid color feedback with role="alert"', () => {
+    expect(panelSource).toContain('規則顏色無效。請使用色彩選擇器重新選擇顏色。')
+    expect(panelSource).toContain('role="alert"')
+    expect(panelSource).toContain('v-if="errors.colorHex"')
+    expect(panelSource).toContain('id="entries-rule-color-error"')
+    expect(panelSource).toContain('v-if="rule.colorHex && !/^#[0-9a-fA-F]{6}$/.test(rule.colorHex)"')
+    expect(panelSource).toContain('id="entries-rule-existing-color-error"')
+  })
+
+  it('provides tooltip explaining disabled color picker for validation rules', () => {
+    expect(panelSource).toMatch(/UTooltip[\s\S]*:text.*draftKind !== 'formatting'[\s\S]*驗證警告規則不支援自訂顏色/)
   })
 })

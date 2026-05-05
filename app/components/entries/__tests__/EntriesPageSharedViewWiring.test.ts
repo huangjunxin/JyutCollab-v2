@@ -5,6 +5,9 @@ import { resolve } from 'node:path'
 const pagePath = resolve(process.cwd(), 'app/pages/entries/index.vue')
 const source = readFileSync(pagePath, 'utf8')
 
+const sharePopoverPath = resolve(process.cwd(), 'app/components/entries/EntriesShareViewPopover.vue')
+const sharePopoverSource = readFileSync(sharePopoverPath, 'utf8')
+
 describe('EntriesPageSharedViewWiring', () => {
   it('imports the share popover and shared-view utility helpers', () => {
     expect(source).toContain('EntriesShareViewPopover')
@@ -78,5 +81,25 @@ describe('EntriesPageSharedViewWiring', () => {
     expect(source).not.toMatch(/localStorage.*shared|\$fetch.*shared|save.*shared|deleteSharedView|review.*shared|bulk.*shared|saved view|savedView/i)
     expect(source).not.toMatch(/shared[\s\S]{0,120}_isDirty|_isDirty[\s\S]{0,120}shared/i)
     expect(source).not.toMatch(/from ['"](?:@radix-ui|shadcn|antd|element-plus|vuetify)/)
+  })
+
+  it('provides accessible icon-only toolbar button with tooltip and aria-label', () => {
+    expect(sharePopoverSource).toContain('UTooltip text="分享目前視圖"')
+    expect(sharePopoverSource).toContain('aria-label="分享目前視圖"')
+    expect(sharePopoverSource).toContain('class="h-8 w-8 justify-center p-0"')
+  })
+
+  it('provides readable keyboard-accessible clipboard fallback URL', () => {
+    expect(sharePopoverSource).toContain('v-if="shouldShowFallbackUrl"')
+    expect(sharePopoverSource).toContain('readonly')
+    expect(sharePopoverSource).toContain('aria-label="分享目前視圖網址"')
+    expect(sharePopoverSource).toContain('@focus="$event.target instanceof HTMLInputElement && $event.target.select()"')
+  })
+
+  it('shows visible HK Traditional copy failure feedback and disabled button tooltip', () => {
+    expect(sharePopoverSource).toContain('無法複製連結。請手動複製下方網址。')
+    expect(sharePopoverSource).toContain('role="alert"')
+    expect(sharePopoverSource).toContain(':disabled="!canShare"')
+    expect(sharePopoverSource).toMatch(/UTooltip[\s\S]*:text.*canShare.*目前沒有可分享的篩選或規則/)
   })
 })

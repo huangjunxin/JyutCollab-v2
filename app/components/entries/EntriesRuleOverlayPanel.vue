@@ -1,16 +1,18 @@
 <template>
   <div class="inline-flex items-center gap-2 flex-wrap">
-    <UButton
-      size="sm"
-      color="neutral"
-      variant="soft"
-      icon="i-heroicons-swatch"
-      class="h-8 w-8 justify-center p-0"
-      aria-label="規則"
-      :aria-expanded="expanded"
-      :aria-controls="panelId"
-      @click="emit('update:expanded', !expanded)"
-    />
+    <UTooltip text="規則">
+      <UButton
+        size="sm"
+        color="neutral"
+        variant="soft"
+        icon="i-heroicons-swatch"
+        class="h-8 w-8 justify-center p-0"
+        aria-label="規則"
+        :aria-expanded="expanded"
+        :aria-controls="panelId"
+        @click="emit('update:expanded', !expanded)"
+      />
+    </UTooltip>
     <UBadge
       v-if="activeRuleCount > 0"
       color="primary"
@@ -211,18 +213,28 @@
           </label>
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
             自訂顏色
+            <p
+              v-if="errors.colorHex"
+              id="entries-rule-color-error"
+              role="alert"
+              class="text-sm font-normal text-red-600 dark:text-red-400"
+            >
+              規則顏色無效。請使用色彩選擇器重新選擇顏色。
+            </p>
             <UPopover :content="{ side: 'bottom', sideOffset: 8 }">
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                class="justify-start"
-                :disabled="draftKind !== 'formatting'"
-              >
-                <span class="h-4 w-4 rounded border border-gray-300" :style="{ backgroundColor: draftColorHex }" />
-                {{ draftColorHex }}
-              </UButton>
+              <UTooltip :text="draftKind !== 'formatting' ? '驗證警告規則不支援自訂顏色' : '選擇條件格式顏色'">
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  class="justify-start"
+                  :disabled="draftKind !== 'formatting'"
+                >
+                  <span class="h-4 w-4 rounded border border-gray-300" :style="{ backgroundColor: draftColorHex }" />
+                  {{ draftColorHex }}
+                </UButton>
+              </UTooltip>
               <template #content>
                 <div class="p-3">
                   <UColorPicker
@@ -559,6 +571,14 @@
               </div>
               <p class="text-sm text-gray-600 dark:text-gray-300">目標欄位：{{ ruleTargetSummary(rule) }}</p>
               <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ conditionSummary(rule) }}</p>
+              <p
+                v-if="rule.colorHex && !/^#[0-9a-fA-F]{6}$/.test(rule.colorHex)"
+                id="entries-rule-existing-color-error"
+                role="alert"
+                class="text-sm text-red-600 dark:text-red-400"
+              >
+                規則顏色無效。請使用色彩選擇器重新選擇顏色。
+              </p>
               <UPopover v-if="rule.kind === 'formatting'" :content="{ side: 'bottom', sideOffset: 8 }">
                 <UButton
                   type="button"

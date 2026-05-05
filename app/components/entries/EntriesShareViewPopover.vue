@@ -66,17 +66,19 @@
           </UAlert>
 
           <div class="space-y-2">
-            <UButton
-              type="button"
-              color="primary"
-              variant="solid"
-              size="sm"
-              block
-              :disabled="!canShare"
-              @click="emit('copy')"
-            >
-              複製視圖連結
-            </UButton>
+            <UTooltip :text="canShare ? '複製包含目前篩選和規則的連結' : '目前沒有可分享的篩選或規則'">
+              <UButton
+                type="button"
+                color="primary"
+                variant="solid"
+                size="sm"
+                block
+                :disabled="!canShare"
+                @click="emit('copy')"
+              >
+                複製視圖連結
+              </UButton>
+            </UTooltip>
 
             <p
               v-if="copyStatus === 'success'"

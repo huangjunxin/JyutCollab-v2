@@ -1,16 +1,18 @@
 <template>
   <div class="inline-flex items-center gap-2 flex-wrap">
-      <UButton
-        size="sm"
-        color="neutral"
-        variant="soft"
-        icon="i-heroicons-funnel"
-        class="h-8 w-8 justify-center p-0"
-        aria-label="進階篩選"
-        :aria-expanded="expanded"
-        aria-controls="entries-advanced-filter-panel"
-        @click="emit('update:expanded', !expanded)"
-      />
+      <UTooltip text="進階篩選">
+        <UButton
+          size="sm"
+          color="neutral"
+          variant="soft"
+          icon="i-heroicons-funnel"
+          class="h-8 w-8 justify-center p-0"
+          aria-label="進階篩選"
+          :aria-expanded="expanded"
+          aria-controls="entries-advanced-filter-panel"
+          @click="emit('update:expanded', !expanded)"
+        />
+      </UTooltip>
       <UBadge
         v-if="hasActiveAdvancedFilters"
         color="primary"
