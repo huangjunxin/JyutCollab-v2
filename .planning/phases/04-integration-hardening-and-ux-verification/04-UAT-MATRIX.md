@@ -1,0 +1,90 @@
+# Phase 04 Manual Browser Verification Matrix
+
+**Created:** 2026-05-05
+**Purpose:** Repeatable checklist for `/entries` Excel-style tools UX verification
+
+## Matrix Columns
+
+| Column | Purpose |
+|--------|---------|
+| ID | Stable identifier matching UI-SPEC contract |
+| Area | Functional category (formula, regex, rules, share, keyboard, editing, view modes, AI, performance, localization) |
+| Setup | Required route, data, auth, environment state |
+| Steps | Concrete user actions in `/entries` |
+| Expected Result | Visible UI behavior and safety outcome |
+| Status | 已通過 / 未通過 / 受環境限制 |
+| Limitations | Missing credentials/session/data/AI/clipboard notes |
+
+## Verification Rows
+
+### Formula Filtering
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-FORM-01 | Formula golden path | Route: `/entries` with 10+ loaded entries visible; advanced filter panel closed | 1. Click advanced filter toolbar button<br>2. Enter formula: `=定義包含("檢查")`<br>3. Click Apply button<br>4. Verify table filters to matching entries<br>5. Verify no dirty state indicator appears<br>6. Clear formula using Clear button | Table shows only entries with "檢查" in definition field; no entries marked dirty; no save indicator appears; table remains usable; no mutation APIs called | 受環境限制 | Environment needs dev server running with test entries containing "檢查" in definition field; credentials required for authenticated entry data if backend is live |
+| UAT-FORM-02 | Invalid formula | Route: `/entries` with loaded entries; advanced filter panel closed | 1. Click advanced filter toolbar button<br>2. Enter invalid formula: `=UNSUPPORTEDFUNC("test")`<br>3. Click Apply button<br>4. Verify error alert appears<br>5. Verify table remains usable with previous state | Visible HK Traditional error alert appears below toolbar or near panel: "公式無法套用：{message} 請檢查公式語法、欄位名稱或函數參數。"; table does not filter; existing entries visible; no mutation; error has role="alert" | 受環境限制 | Environment needs dev server running; formula evaluator whitelist must reject UNSUPPORTEDFUNC; requires browser to observe alert visibility |
+
+### Regex Filtering
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-REGX-01 | Global regex | Route: `/entries` with entries containing "香港" and "廣州" in display fields; global search visible | 1. Enable regex mode toggle in global search<br>2. Enter regex: `香港|廣州`<br>3. Press Enter or trigger search<br>4. Verify table filters to matching entries<br>5. Verify matches are consistent across display fields | Table shows entries with "香港" or "廣州" in headword, variants, or display text; regex matching works consistently; no dirty state; no mutation | 受環境限制 | Environment needs dev server running with test entries containing "香港" and "廣州"; requires browser to verify global search regex toggle |
+| UAT-REGX-02 | Column regex | Route: `/entries` with entries; column filter visible for definition field | 1. Open column filter menu for definition column<br>2. Enable regex mode for column<br>3. Enter regex: `粵語詞條`<br>4. Apply column filter<br>5. Verify only definition column affected | Table shows entries where definition matches "粵語詞條"; other column filters unaffected; only definition field filtered; no mutation | 受環境限制 | Environment needs dev server running with test entries containing "粵語詞條" in definition; requires column filter UI to be visible |
+| UAT-REGX-03 | Invalid/unsafe regex | Route: `/entries` with loaded entries; regex mode enabled | 1. Enter invalid regex pattern: `[unclosed`<br>2. Trigger search/apply<br>3. Verify error alert appears<br>4. Verify table does not freeze | Visible HK Traditional error alert: "正則表達式無法套用：{message} 請檢查括號、轉義符號或旗標。"; table remains responsive; no freeze; no mutation; error has role="alert" | 受環境限制 | Environment needs dev server running; regex engine must reject invalid pattern; requires browser to verify error visibility and responsiveness |
+
+### Conditional Formatting and Validation Rules
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-RULE-01 | Conditional formatting | Route: `/entries` with entries matching condition; rule overlay panel closed | 1. Click rule overlay toolbar button<br>2. Create new conditional formatting rule<br>3. Enter condition: `=定義包含("檢查")`<br>4. Choose highlight color<br>5. Apply rule<br>6. Verify matching cells highlighted<br>7. Verify no dirty state | Matching definition cells show highlight color overlay; cells not marked dirty; no save indicator; table data unchanged; overlay metadata only | 受環境限制 | Environment needs dev server running with test entries containing "檢查" in definition; color picker must be functional; requires browser to observe cell highlighting |
+| UAT-RULE-02 | Validation warning | Route: `/entries` with entries; validation rule draft ready | 1. Create validation rule with condition: `=詞條==""`<br>2. Apply validation rule<br>3. Verify entries with empty headword flagged<br>4. Verify warning styling distinct from formatting | Validation warnings show distinct warning styling (amber/warning color, icon, text, title); validation cells visually different from conditional formatting highlights; no mutation; read-only overlay | 受環境限制 | Environment needs dev server running with test entries including empty headword entries; validation warning styling must be distinct; requires browser to observe visual distinction |
+| UAT-RULE-03 | Rule ordering | Route: `/entries` with multiple active rules applied | 1. Verify rules list shows order<br>2. Reorder rules using drag or up/down controls<br>3. Toggle rule off and on<br>4. Delete one rule<br>5. Verify overlay updates<br>6. Verify entry data unchanged | Rule order change updates cell overlay rendering immediately; toggle off removes overlay; toggle on restores overlay; delete removes overlay; entry objects remain unchanged; no dirty state; no mutation | 受環境限制 | Environment needs dev server running with multiple rules applied; rule reorder/toggle/delete controls must be functional; requires browser to observe overlay updates |
+| UAT-RULE-04 | Invalid color | Route: `/entries` with rule draft; color picker visible | 1. Attempt to enter invalid color value manually (if input allows)<br>2. Trigger apply or color change<br>3. Verify error appears<br>4. Use UColorPicker to select valid color<br>5. Verify error clears | Visible HK Traditional error appears: "規則顏色無效。請使用色彩選擇器重新選擇顏色。" with role="alert"; UColorPicker allows correction; error clears on valid color; rule applies correctly | 受環境限制 | Environment needs dev server running; color picker must reject invalid manual input if reachable; requires browser to observe error and correction; some color pickers may not allow manual invalid input |
+
+### Shareable Views
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-SHARE-01 | Copy/restore | Route: `/entries` with applied formula filter and one conditional formatting rule; share popover closed | 1. Click share toolbar button<br>2. Click Copy Link button<br>3. Verify success feedback<br>4. Open new browser tab<br>5. Paste copied URL<br>6. Verify filters/rules restored<br>7. Verify no mutation | Copy succeeds with visible success feedback; new tab loads `/entries` with view parameter; formula filter and conditional formatting rule restored; table shows same filtered/highlighted state; no entry mutation; no dirty state | 受環境限制 | Environment needs dev server running; clipboard API functional; requires browser with clipboard access and ability to open new tab; credentials required if auth needed for entry data |
+| UAT-SHARE-02 | Invalid payload | Route: `/entries?view=not-valid` (manual URL entry or helper link) | 1. Load URL with invalid view parameter<br>2. Verify visible error alert<br>3. Verify table remains usable<br>4. Verify no state applied | Visible HK Traditional error alert appears below toolbar: "分享視圖無法套用：{reason}。已保留目前表格，請清除網址中的分享參數或重新複製視圖。"; table shows default state; no filters/rules applied; existing table data intact; Clear action available | 受環境限制 | Environment needs dev server running; requires browser to load malformed URL; error alert must be visible without opening share popover |
+| UAT-SHARE-03 | Too-old/unsupported/too-large | Route: `/entries` with helper links for: unsupported version, too-old version, too-large payload (if helper links can be produced) | 1. Load unsupported version URL<br>2. Verify specific error copy<br>3. Load too-old version URL<br>4. Verify specific error copy<br>5. Load too-large payload URL<br>6. Verify specific error copy | Unsupported version: "此分享視圖版本未受支援。請使用較新的連結，或重新複製目前視圖。"<br>Too-old: "此分享視圖版本太舊，無法安全還原。請重新建立分享連結。"<br>Too-large: "分享視圖資料太長，無法安全還原。請減少規則數量後再試。"<br>Each error visible, specific, HK Traditional; no state applied | 受環境限制 | Environment needs dev server running; requires helper URLs or manual payload crafting; may need utility to generate test payloads; requires browser to observe specific error messages |
+| UAT-SHARE-04 | Clipboard fallback | Route: `/entries` with share popover open; clipboard API blocked or failing (manual browser setting or mock) | 1. Force clipboard failure (browser permission deny or mock)<br>2. Click Copy Link button<br>3. Verify fallback appears<br>4. Verify URL readable and selectable<br>5. Verify keyboard accessible | Fallback message appears: "無法複製連結。請手動複製下方網址。"; URL shown in readable, selectable readonly input or bordered text block; URL selectable by mouse and keyboard (Tab to focus, Ctrl+C to copy); popover remains usable; no mutation | 受環境限制 | Environment needs dev server running; requires clipboard failure scenario (may need browser permissions denied or manual mock); fallback URL must be keyboard accessible |
+
+### Keyboard Navigation and Compatibility
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-KEY-01 | Keyboard navigation | Route: `/entries` with loaded entries; advanced filters and rules enabled; focus in table cell | 1. Press Arrow Down to move focus to next row cell<br>2. Press Arrow Up to move focus up<br>3. Press Enter to enter edit mode<br>4. Press Escape to cancel edit<br>5. Press Tab to move to next field<br>6. Verify keyboard behavior unchanged with rules active | Arrow keys navigate cells; Enter enters edit mode; Escape cancels edit; Tab moves fields; keyboard handlers not blocked by active rules; table navigation works; no mutation; focus outlines visible | 受環境限制 | Environment needs dev server running with keyboard-accessible entries table; requires browser to verify keyboard events; focus outlines must be visible |
+| UAT-EDIT-01 | Inline editing | Route: `/entries` with loaded editable entries; rules enabled; focus in cell | 1. Enter edit mode with Enter key or click<br>2. Edit cell content<br>3. Press Escape to cancel<br>4. Verify draft state cleared<br>5. Edit cell again<br>6. Press Enter or click Save One<br>7. Verify dirty state indicator<br>8. Click Save All<br>9. Verify save success | Edit mode works; Escape cancels and clears draft; Enter saves cell; dirty state indicator appears after edit; Save All submits entries; save indicator shows success; rules remain active during edit; no rule mutation; existing save workflow preserved | 受環境限制 | Environment needs dev server running with authenticated session; requires backend save API functional; dirty state indicator must be visible; credentials required for actual save |
+| UAT-EDIT-02 | Draft recovery | Route: `/entries` with rules active; local draft exists from prior incomplete edit | 1. Load `/entries` with active rules<br>2. Verify draft recovery prompt appears<br>3. Accept draft recovery<br>4. Verify draft restored<br>5. Clear share parameter if present<br>6. Verify draft persists | Draft recovery prompt appears; draft restored to cell; clearing share query does not clear draft; draft survives rule changes; local draft recovery functional with rules active; no mutation; localStorage draft intact | 受環境限制 | Environment needs dev server running; requires localStorage draft from prior session; may need manual draft creation; requires browser to verify draft recovery prompt |
+
+### View Modes
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-VIEW-01 | Flat mode | Route: `/entries` with loaded entries; view mode selector showing Flat | 1. Apply advanced filter or rule<br>2. Verify Flat mode shows filtered entries<br>3. Clear filter/rule<br>4. Verify all entries visible | Flat mode shows filtered entries when rule active; clearing rule restores all entries; no mutation; Flat mode functional with filters/rules | 受環境限制 | Environment needs dev server running with test entries; requires view mode selector visible; Flat mode must respect filters |
+| UAT-VIEW-02 | Aggregated mode | Route: `/entries` with grouped entries; Aggregated mode active | 1. Switch to Aggregated mode<br>2. Verify groups visible<br>3. Apply formula filter<br>4. Verify groups filter<br>5. Expand one group<br>6. Edit entry in group<br>7. Verify edit works<br>8. Clear filter<br>9. Verify groups restore | Aggregated mode shows groups; formula filter affects groups; expanding group works; editing entry in group works; clearing filter restores groups; no mutation; Aggregated mode functional with filters | 受環境限制 | Environment needs dev server running with grouped entries; requires Aggregated mode functional; credentials for edit; requires browser to verify group expand/edit |
+| UAT-VIEW-03 | Lexeme mode | Route: `/entries` with lexeme-grouped entries; Lexeme mode active | 1. Switch to Lexeme mode<br>2. Verify lexeme groups visible<br>3. Apply conditional formatting rule<br>4. Verify cells highlighted in groups<br>5. Expand one lexeme group<br>6. Edit entry in lexeme group<br>7. Verify edit works<br>8. Toggle rule off<br>9. Verify highlight cleared | Lexeme mode shows lexeme groups; conditional formatting highlights cells in groups; expanding lexeme group works; editing entry in lexeme group works; toggling rule clears highlight; no mutation; Lexeme mode functional with rules | 受環境限制 | Environment needs dev server running with lexeme-linked entries; requires Lexeme mode functional; credentials for edit; requires browser to verify lexeme group expand/edit |
+
+### AI and Performance
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-AI-01 | AI compatibility | Route: `/entries` with loaded entries; AI suggestions enabled; rules active; OpenRouter API key configured | 1. Edit a cell triggering AI suggestion<br>2. Verify AI suggestion appears inline<br>3. Press Tab to accept suggestion<br>4. Verify suggestion accepted<br>5. Edit another cell<br>6. Press Escape to dismiss suggestion<br>7. Verify suggestion dismissed<br>8. Verify rules remain active | AI suggestion appears inline; Tab accepts suggestion; Escape dismisses suggestion; suggestion workflow unchanged with rules active; no rule mutation; AI integration functional | 受環境限制 | Environment needs dev server running; requires OpenRouter API key configured; AI service must be reachable; credentials for AI API; if AI unavailable, mark as 受環境限制 with "缺少 OpenRouter API 金鑰或服務不可用" |
+| UAT-PERF-01 | Responsiveness | Route: `/entries` with 50+ loaded entries; rules active | 1. Type in global search rapidly<br>2. Verify no visible freeze<br>3. Edit cell rapidly<br>4. Verify typing responsive<br>5. Toggle rule on/off rapidly<br>6. Verify overlay updates responsive<br>7. Reorder rules rapidly<br>8. Verify updates responsive<br>9. Restore shared view<br>10. Verify restore immediate | Typing in search responsive; editing cells responsive; toggling rules responsive; reordering rules responsive; restoring shared view immediate; no visible freeze; table remains usable; perceived performance good | 受環境限制 | Environment needs dev server running with 50+ entries loaded; requires browser to verify responsiveness; may need network timing or manual observation; subjective responsiveness check |
+
+### Localization
+
+| ID | Area | Setup | Steps | Expected Result | Status | Limitations |
+|----|------|-------|-------|-----------------|--------|-------------|
+| UAT-LOC-01 | Localization | Route: `/entries` with Excel-style tools visible | 1. Verify advanced filter panel labels HK Traditional<br>2. Verify rule overlay panel labels HK Traditional<br>3. Verify share popover labels HK Traditional<br>4. Trigger invalid formula<br>5. Verify error message HK Traditional<br>6. Trigger invalid regex<br>7. Verify error message HK Traditional<br>8. Trigger invalid shared view<br>9. Verify error message HK Traditional<br>10. Verify all tooltips HK Traditional<br>11. Verify helper text HK Traditional | All Excel-tool toolbar button aria-labels and tooltips HK Traditional; panel labels HK Traditional; error messages use exact UI-SPEC copy; helper text HK Traditional; no Simplified or Standard Traditional characters (e.g., 词 not 詞, 语 not 語); correct HK variants (e.g., 詞, 語, 義, 錄, 冊, 審, 類, 態, 暫, 無, 條, 裏, 羣, 劃, 牀) | 受環境限制 | Environment needs dev server running; requires browser to inspect Chinese text; manual inspection of labels, tooltips, errors, helper text; verify against UI-SPEC copy table |
+
+---
+
+**Matrix Status Summary:**
+- Total rows: 22
+- Passed: 0 (awaiting manual run)
+- Failed: 0
+- Environment-limited: 22 (all rows pending browser verification)
+
+**Next Step:** Run manual verification per Task 2 and update Status column with observed results.
