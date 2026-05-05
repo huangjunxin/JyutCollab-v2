@@ -261,4 +261,33 @@ describe('entries shared view utility', () => {
     expect(raw).not.toContain('_isDirty')
     expect(raw).not.toMatch(/userId|session|Cloudinary|apiResponse|selectedRow/i)
   })
+
+  it('does not serialize user identifiers, session data, AI responses, Cloudinary credentials, selected rows, or API responses', () => {
+    const sensitive = createState()
+    ;(sensitive as any).userId = 'user-12345'
+    ;(sensitive as any).sessionId = 'sess-abc-def-ghi'
+    ;(sensitive as any).currentUser = { id: 'user-12345', role: 'admin', email: 'user@example.com' }
+    ;(sensitive.filters as any).aiResponse = { suggestion: 'AI建議內容', confidence: 0.95 }
+    ;(sensitive.filters as any).cloudinaryUpload = { publicId: 'cloudinary-123', apiKey: 'api-key-secret', apiSecret: 'api-secret-value' }
+    ;(sensitive as any).selectedRows = ['entry-1', 'entry-2', 'entry-3']
+    ;(sensitive as any).lastFetchResponse = { entries: [], totalCount: 100, timestamp: '2026-05-05' }
+    ;(sensitive.rules[0] as any).suggestedDefinition = 'AI自動生成釋義'
+
+    const encoded = encodeEntriesSharedView(sensitive)
+    const raw = JSON.stringify(decodeRaw(encoded))
+
+    expect(raw).not.toContain('user-12345')
+    expect(raw).not.toContain('sess-abc-def-ghi')
+    expect(raw).not.toContain('user@example.com')
+    expect(raw).not.toContain('AI建議內容')
+    expect(raw).not.toContain('cloudinary-123')
+    expect(raw).not.toContain('api-key-secret')
+    expect(raw).not.toContain('api-secret-value')
+    expect(raw).not.toContain('entry-1')
+    expect(raw).not.toContain('entry-2')
+    expect(raw).not.toContain('entry-3')
+    expect(raw).not.toContain('AI自動生成釋義')
+    expect(raw).not.toContain('lastFetchResponse')
+    expect(raw).not.toMatch(/apiKey|apiSecret|publicId|email|password|token|secret|credential/i)
+  })
 })

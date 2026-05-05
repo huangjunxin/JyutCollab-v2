@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computed } from 'vue'
+import { computed, toRaw } from 'vue'
 import type { Entry } from '../../types'
 import type { RowFilterContext } from '../../utils/entriesAdvancedFilter'
 import { ADVANCED_FILTER_FIELDS } from '../../utils/entriesTableConstants'
@@ -134,5 +134,51 @@ describe('useEntriesRuleOverlays shared view APIs', () => {
     expect(entry).not.toHaveProperty('__ruleOverlayMeta')
     const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
     expect(Object.keys(overlay).some(key => forbiddenMethodPattern.test(key))).toBe(false)
+  })
+
+  it('preserves Entry object identity and cleanliness through rule toggle, reorder, remove, and clear operations', () => {
+    const entry1 = createEntry('entry-1')
+    const entry2 = createEntry('entry-2')
+    const entry1Ref = entry1
+    const entry2Ref = entry2
+    const entry1Keys = Object.keys(entry1)
+    const entry2Keys = Object.keys(entry2)
+
+    const overlay = useEntriesRuleOverlays({
+      visibleEntries: computed(() => [entry1, entry2]),
+      buildRowContext: () => createContext({ headword: '測試詞', definition: '缺少例句' })
+    })
+    overlay.replaceRuleOverlayState(createSharedRules())
+
+    const firstRuleId = overlay.rules.value[0].id
+    const secondRuleId = overlay.rules.value[1].id
+
+    overlay.toggleRule(firstRuleId, false)
+    expect(overlay.rules.value[0].enabled).toBe(false)
+
+    overlay.moveRule(secondRuleId, -1)
+    expect(overlay.rules.value[0].id).toBe(secondRuleId)
+
+    overlay.removeRule(firstRuleId)
+    expect(overlay.rules.value.length).toBe(1)
+
+    overlay.clearRules()
+    expect(overlay.rules.value.length).toBe(0)
+
+    expect(Object.keys(entry1)).toEqual(entry1Keys)
+    expect(Object.keys(entry2)).toEqual(entry2Keys)
+    expect(entry1._isDirty).toBeUndefined()
+    expect(entry2._isDirty).toBeUndefined()
+    expect(entry1).not.toHaveProperty('__ruleOverlayMeta')
+    expect(entry2).not.toHaveProperty('__ruleOverlayMeta')
+    expect(entry1).not.toHaveProperty('__sharedView')
+    expect(entry2).not.toHaveProperty('__sharedView')
+    expect(entry1).not.toHaveProperty('__formattingMatches')
+    expect(entry2).not.toHaveProperty('__validationMatches')
+
+    const meta1 = overlay.getCellOverlayMeta(entry1, 'definition')
+    const meta2 = overlay.getCellOverlayMeta(entry2, 'definition')
+    expect(meta1.formattingMatches).toEqual([])
+    expect(meta2.validationMatches).toEqual([])
   })
 })

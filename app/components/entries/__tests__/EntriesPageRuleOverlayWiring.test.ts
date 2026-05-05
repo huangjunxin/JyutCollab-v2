@@ -12,10 +12,11 @@ describe('entries page rule overlay wiring', () => {
   })
 
   it('renders the rules panel near advanced filters with a dedicated toolbar host', () => {
-    expect(source).toContain('teleport-to="#entries-rule-overlay-host"')
+    expect(source).toMatch(/teleport-to="#entries-rule-overlay-host"/)
     expect(source).toContain('id="entries-rule-overlay-host"')
     expect(source).toContain('v-model:expanded="ruleOverlays.ruleOverlayExpanded.value"')
-    expect(source).toContain('v-model:draft-rule="ruleOverlays.draftRule"')
+    expect(source).toContain(':draft-rule="ruleOverlays.draftRule"')
+    expect(source).toContain('@update:draft-rule="updateRuleOverlayDraft"')
     expect(source).toContain(':active-rule-count="ruleOverlays.activeRuleCount.value"')
   })
 
