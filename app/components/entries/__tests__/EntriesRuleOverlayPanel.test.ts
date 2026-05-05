@@ -64,4 +64,22 @@ describe('EntriesRuleOverlayPanel', () => {
     expect(source).toContain("emit('update-rule-color'")
     expect(source).toContain('修改顏色')
   })
+
+  it('provides accessible icon-only toolbar button with UTooltip wrapper', () => {
+    expect(source).toContain('UTooltip text="規則"')
+    expect(source).toContain('class="h-8 w-8 justify-center p-0"')
+  })
+
+  it('provides visible HK Traditional invalid color feedback with role="alert"', () => {
+    expect(source).toContain('規則顏色無效。請使用色彩選擇器重新選擇顏色。')
+    expect(source).toContain('role="alert"')
+    expect(source).toContain('v-if="errors.colorHex"')
+    expect(source).toContain('id="entries-rule-color-error"')
+    expect(source).toContain('v-if="rule.colorHex && !/^#[0-9a-fA-F]{6}$/.test(rule.colorHex)"')
+    expect(source).toContain('id="entries-rule-existing-color-error"')
+  })
+
+  it('provides tooltip explaining disabled color picker for validation rules', () => {
+    expect(source).toMatch(/UTooltip[\s\S]*:text.*draftKind !== 'formatting'[\s\S]*驗證警告規則不支援自訂顏色/)
+  })
 })
