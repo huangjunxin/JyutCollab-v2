@@ -57,8 +57,14 @@ describe('EntriesPageSharedViewWiring', () => {
 
   it('fails invalid shared-view payloads safely with HK Traditional feedback before applying state', () => {
     expect(source).toContain('分享視圖無法套用：${result.reason}。已保留目前表格，請清除網址中的分享參數或重新複製視圖。')
+    expect(source).toMatch(/<UAlert\s+v-if="sharedViewError"[\s\S]*:description="sharedViewError"[\s\S]*@click="clearSharedViewQuery"/)
     expect(source).toMatch(/if \(!result\.ok\) \{[\s\S]*sharedViewError\.value[\s\S]*sharedViewRestored\.value = false[\s\S]*return false[\s\S]*\}/)
     expect(source).toMatch(/advancedFilters\.restoreAdvancedFilterState\(result\.data\.filters\)[\s\S]*ruleOverlays\.replaceRuleOverlayState\(result\.data\.rules\)/)
+  })
+
+  it('resets stale shared-view feedback and guard when the query disappears', () => {
+    expect(source).toMatch(/if \(typeof sharedViewParam !== 'string'\) \{[\s\S]*sharedViewError\.value = ''[\s\S]*lastAppliedSharedView\.value = null[\s\S]*return false[\s\S]*\}/)
+    expect(source).toMatch(/function clearSharedViewQuery\(\)[\s\S]*sharedViewError\.value = ''[\s\S]*lastAppliedSharedView\.value = null[\s\S]*navigateTo\(\{ path: route\.path, query \}, \{ replace: true \}\)/)
   })
 
   it('clears only the shared-view query parameter with router replace', () => {
@@ -69,7 +75,7 @@ describe('EntriesPageSharedViewWiring', () => {
   })
 
   it('does not introduce backend, localStorage, saved-view, entry-mutation, or UI-library scope creep for shared views', () => {
-    expect(source).not.toMatch(/localStorage.*shared|\$fetch.*shared|save.*shared|delete.*shared|review.*shared|bulk.*shared|saved view|savedView/i)
+    expect(source).not.toMatch(/localStorage.*shared|\$fetch.*shared|save.*shared|deleteSharedView|review.*shared|bulk.*shared|saved view|savedView/i)
     expect(source).not.toMatch(/shared[\s\S]{0,120}_isDirty|_isDirty[\s\S]{0,120}shared/i)
     expect(source).not.toMatch(/from ['"](?:@radix-ui|shadcn|antd|element-plus|vuetify)/)
   })

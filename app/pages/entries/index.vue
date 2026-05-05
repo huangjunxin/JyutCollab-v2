@@ -157,6 +157,20 @@
             @move-rule="ruleOverlays.moveRule"
             @update-rule-color="ruleOverlays.updateRuleColor"
           />
+          <EntriesShareViewPopover
+            :version="ENTRIES_SHARED_VIEW_VERSION"
+            :generated-url="generatedSharedViewUrl"
+            :can-share="canShareEntriesView"
+            :filter-count="sharedViewSummary.filterCount"
+            :rule-count="sharedViewSummary.ruleCount"
+            :restored="sharedViewRestored"
+            :restored-summary="sharedViewRestoredSummary"
+            :shared-view-error="sharedViewError"
+            :copy-status="sharedViewCopyStatus"
+            :show-fallback-url="showSharedViewFallbackUrl"
+            @copy="copySharedViewLink"
+            @clear-share-query="clearSharedViewQuery"
+          />
           <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-2">
             <span class="text-sm text-gray-500 dark:text-gray-400">視圖</span>
             <USelectMenu
@@ -196,6 +210,21 @@
       </div>
       <div id="entries-advanced-filter-host" class="w-full" />
       <div id="entries-rule-overlay-host" class="w-full" />
+      <UAlert
+        v-if="sharedViewError"
+        color="error"
+        variant="subtle"
+        role="alert"
+        title="分享視圖無法套用"
+        :description="sharedViewError"
+        class="mt-3"
+      >
+        <template #actions>
+          <UButton color="neutral" variant="soft" size="sm" @click="clearSharedViewQuery">
+            清除分享參數
+          </UButton>
+        </template>
+      </UAlert>
     </div>
 
     <!-- Loading state -->
@@ -917,6 +946,15 @@ import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
 import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 import EntriesAdvancedFilterPanel from '~/components/entries/EntriesAdvancedFilterPanel.vue'
 import EntriesRuleOverlayPanel from '~/components/entries/EntriesRuleOverlayPanel.vue'
+import EntriesShareViewPopover from '~/components/entries/EntriesShareViewPopover.vue'
+import {
+  ENTRIES_SHARED_VIEW_MAX_ENCODED_LENGTH,
+  ENTRIES_SHARED_VIEW_QUERY_PARAM,
+  ENTRIES_SHARED_VIEW_VERSION,
+  buildEntriesSharedViewUrl,
+  decodeEntriesSharedView,
+  summarizeEntriesSharedView
+} from '~/utils/entriesSharedView'
 
 definePageMeta({
   layout: 'default',
@@ -1421,6 +1459,111 @@ function updateRuleOverlayDraft(nextDraft: EntriesRuleDraft) {
     },
     colorHex: nextDraft.colorHex
   })
+}
+
+const lastAppliedSharedView = ref<string | null>(null)
+const sharedViewError = ref('')
+const sharedViewRestored = ref(false)
+const sharedViewRestoredSummary = ref('')
+const sharedViewCopyStatus = ref<'idle' | 'success' | 'error'>('idle')
+const showSharedViewFallbackUrl = ref(false)
+
+const currentSharedViewState = computed(() => ({
+  version: ENTRIES_SHARED_VIEW_VERSION,
+  filters: advancedFilters.exportAdvancedFilterState(),
+  rules: ruleOverlays.exportRuleOverlayState()
+}))
+
+const sharedViewSummary = computed(() => summarizeEntriesSharedView(currentSharedViewState.value))
+
+const generatedSharedViewUrl = computed(() => {
+  if (!import.meta.client) return `/entries?${ENTRIES_SHARED_VIEW_QUERY_PARAM}=`
+  try {
+    return buildEntriesSharedViewUrl(window.location.href, currentSharedViewState.value)
+  } catch {
+    return `/entries?${ENTRIES_SHARED_VIEW_QUERY_PARAM}=`
+  }
+})
+
+const sharedViewEncodedLength = computed(() => {
+  try {
+    return new URL(generatedSharedViewUrl.value, import.meta.client ? window.location.origin : 'http://localhost').searchParams.get(ENTRIES_SHARED_VIEW_QUERY_PARAM)?.length ?? 0
+  } catch {
+    return ENTRIES_SHARED_VIEW_MAX_ENCODED_LENGTH + 1
+  }
+})
+
+const canShareEntriesView = computed(() => (
+  (sharedViewSummary.value.filterCount > 0 || sharedViewSummary.value.ruleCount > 0) &&
+  sharedViewEncodedLength.value <= ENTRIES_SHARED_VIEW_MAX_ENCODED_LENGTH
+))
+
+async function copySharedViewLink() {
+  if (!canShareEntriesView.value) return
+  sharedViewCopyStatus.value = 'idle'
+  showSharedViewFallbackUrl.value = false
+
+  if (!import.meta.client || !navigator.clipboard?.writeText) {
+    sharedViewCopyStatus.value = 'error'
+    showSharedViewFallbackUrl.value = true
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(generatedSharedViewUrl.value)
+    sharedViewCopyStatus.value = 'success'
+  } catch {
+    sharedViewCopyStatus.value = 'error'
+    showSharedViewFallbackUrl.value = true
+  }
+}
+
+function applySharedViewQuery(): boolean {
+  const sharedViewParam = route.query[ENTRIES_SHARED_VIEW_QUERY_PARAM]
+  if (typeof sharedViewParam !== 'string') {
+    sharedViewError.value = ''
+    sharedViewRestored.value = false
+    sharedViewRestoredSummary.value = ''
+    sharedViewCopyStatus.value = 'idle'
+    showSharedViewFallbackUrl.value = false
+    lastAppliedSharedView.value = null
+    return false
+  }
+  if (lastAppliedSharedView.value === sharedViewParam) return false
+
+  const result = decodeEntriesSharedView(sharedViewParam)
+  if (!result.ok) {
+    sharedViewError.value = `分享視圖無法套用：${result.reason}。已保留目前表格，請清除網址中的分享參數或重新複製視圖。`
+    sharedViewRestored.value = false
+    sharedViewRestoredSummary.value = ''
+    sharedViewCopyStatus.value = 'idle'
+    showSharedViewFallbackUrl.value = false
+    lastAppliedSharedView.value = sharedViewParam
+    return false
+  }
+
+  advancedFilters.restoreAdvancedFilterState(result.data.filters)
+  ruleOverlays.replaceRuleOverlayState(result.data.rules)
+  const restoredSummary = summarizeEntriesSharedView(result.data)
+  sharedViewError.value = ''
+  sharedViewRestored.value = true
+  sharedViewRestoredSummary.value = restoredSummary.message
+  sharedViewCopyStatus.value = 'idle'
+  showSharedViewFallbackUrl.value = false
+  lastAppliedSharedView.value = sharedViewParam
+  return true
+}
+
+function clearSharedViewQuery() {
+  const query = { ...route.query }
+  delete query[ENTRIES_SHARED_VIEW_QUERY_PARAM]
+  sharedViewError.value = ''
+  sharedViewRestored.value = false
+  sharedViewRestoredSummary.value = ''
+  sharedViewCopyStatus.value = 'idle'
+  showSharedViewFallbackUrl.value = false
+  lastAppliedSharedView.value = null
+  navigateTo({ path: route.path, query }, { replace: true })
 }
 
 /** 當前頁用於多選等可見列操作的條目列表（跟隨進階篩選）。 */
@@ -2530,6 +2673,7 @@ watch(
   () => route.query,
   () => {
     if (isInitializing.value) return
+    applySharedViewQuery()
     const changed = applyUrlParams()
     if (changed) {
       currentPage.value = 1
@@ -2582,6 +2726,7 @@ onMounted(async () => {
   isMobile.value = window.innerWidth < 768
 
   // Apply URL parameters (search, filter=mine)
+  applySharedViewQuery()
   applyUrlParams()
 
   await fetchEntries()

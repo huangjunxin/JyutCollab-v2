@@ -258,9 +258,9 @@ export function useEntriesAdvancedFilters(args: {
         flags: globalRegexFlags.value
       },
       columnRegex: {
-        field: columnRegex.field,
-        pattern: columnRegex.pattern,
-        flags: columnRegex.flags
+        field: appliedColumnRegex.field,
+        pattern: appliedColumnRegex.pattern,
+        flags: appliedColumnRegex.flags
       }
     }
   }

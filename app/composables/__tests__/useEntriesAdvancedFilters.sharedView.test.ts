@@ -108,6 +108,19 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     expect(entry).not.toHaveProperty('__ruleOverlayMeta')
   })
 
+  it('exports applied column regex state instead of an unsaved draft', () => {
+    const advancedFilters = createComposable()
+    advancedFilters.restoreAdvancedFilterState(createRestoredState())
+    advancedFilters.columnRegex.field = 'definition'
+    advancedFilters.columnRegex.pattern = '未套用草稿'
+    advancedFilters.columnRegex.flags = 'u'
+
+    const exported = advancedFilters.exportAdvancedFilterState()
+
+    expect(exported.columnRegex).toEqual({ field: 'headword', pattern: '測試', flags: 'i' })
+    expect(advancedFilters.filteredEntries.value).toHaveLength(1)
+  })
+
   it('returns defensive copies from export so callers cannot mutate composable state', () => {
     const advancedFilters = createComposable()
     advancedFilters.restoreAdvancedFilterState(createRestoredState())
@@ -116,8 +129,8 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     exported.columnRegex.field = 'definition'
     exported.columnRegex.pattern = '已改變'
 
-    expect(advancedFilters.columnRegex.field).toBe('headword')
-    expect(advancedFilters.columnRegex.pattern).toBe('測試')
+    expect(advancedFilters.appliedColumnRegex.field).toBe('headword')
+    expect(advancedFilters.appliedColumnRegex.pattern).toBe('測試')
     const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
     expect(Object.keys(advancedFilters).some(key => forbiddenMethodPattern.test(key))).toBe(false)
   })

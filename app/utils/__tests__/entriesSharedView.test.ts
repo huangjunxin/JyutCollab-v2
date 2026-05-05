@@ -211,6 +211,17 @@ describe('entries shared view utility', () => {
     })
   })
 
+  it('rejects untrusted non-hex rule colors before restore', () => {
+    const invalidColor = createState()
+    invalidColor.rules[0].colorHex = 'red;box-shadow:0 0 0 9999px black' as any
+
+    expect(decodeEntriesSharedView(encodeRaw(invalidColor))).toMatchObject({
+      ok: false,
+      code: 'schema_mismatch',
+      reason: '分享視圖資料格式無效，無法安全還原。'
+    })
+  })
+
   it('rejects invalid formula and invalid regex semantics before restore', () => {
     const invalidFormula = createState({
       filters: {

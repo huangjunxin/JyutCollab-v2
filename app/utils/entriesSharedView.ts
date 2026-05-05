@@ -67,6 +67,7 @@ const emptyOrFieldSchema = z.union([z.literal(''), fieldSchema])
 const regexFieldSchema = z.enum(REGEX_FIELD_VALUES)
 const ruleKindSchema = z.enum(RULE_KIND_VALUES)
 const conditionKindSchema = z.enum(CONDITION_KIND_VALUES)
+const colorHexSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/)
 
 const filterStateSchema = z.strictObject({
   formula: z.strictObject({
@@ -101,7 +102,7 @@ const ruleSchema = z.strictObject({
     })
   }),
   stylePreset: z.enum(STYLE_PRESET_VALUES),
-  colorHex: z.string()
+  colorHex: colorHexSchema
 })
 
 const sharedViewSchema = z.strictObject({
