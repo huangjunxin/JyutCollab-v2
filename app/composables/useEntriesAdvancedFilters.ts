@@ -4,11 +4,11 @@ import type { Entry } from '~/types'
 import type { EditableColumnDef } from '~/composables/useEntriesTableColumns'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
 import * as advancedFilterTools from '~/utils/entriesAdvancedFilter'
-import type { AdvancedFilterError, AdvancedFilterFieldKey, RowFilterContext } from '~/utils/entriesAdvancedFilter'
+import type { AdvancedFilterError, AdvancedFilterFieldKey, FormulaNode, RowFilterContext } from '~/utils/entriesAdvancedFilter'
 
 const runAdvancedFormula = advancedFilterTools[`ev${'aluateAdvancedFormula'}`]
 const ADVANCED_FORMULA_RUNTIME_ERROR_CODE = `ev${'aluation_error'}`
-const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, testAdvancedRegex } = advancedFilterTools
+const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, evaluateAdvancedFormulaAst, testAdvancedRegex } = advancedFilterTools
 
 type EntryGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type ViewModeRef = Ref<string> | ComputedRef<string>
@@ -62,6 +62,13 @@ export function useEntriesAdvancedFilters(args: {
   const appliedColumnRegex = reactive<AdvancedFilterColumnRegexState>({ field: '', pattern: '', flags: 'i' })
   const advancedFilterErrors = reactive<AdvancedFilterErrors>({ formula: null, globalRegex: null, columnRegex: null })
 
+  // Performance optimization: cache parsed formula AST
+  let cachedFormulaAst: { formula: string; ast: FormulaNode } | null = null
+
+  // Performance optimization: cache compiled regexes
+  let cachedGlobalRegex: { pattern: string; flags: string; regex: RegExp } | null = null
+  let cachedColumnRegex: { pattern: string; flags: string; regex: RegExp } | null = null
+
   function isAdvancedFilterField(key: string): key is AdvancedFilterFieldKey {
     return ADVANCED_FILTER_FIELDS.includes(key as AdvancedFilterFieldKey)
   }
@@ -109,7 +116,21 @@ export function useEntriesAdvancedFilters(args: {
     const context = buildRowContext(entry)
 
     if (hasAppliedFormula.value) {
-      const result = runAdvancedFormula(appliedFormula.value, context)
+      // Performance: use cached AST instead of parsing repeatedly
+      let ast: FormulaNode
+      if (cachedFormulaAst && cachedFormulaAst.formula === appliedFormula.value) {
+        ast = cachedFormulaAst.ast
+      } else {
+        const parsed = parseAdvancedFormula(appliedFormula.value)
+        if (!parsed.ok) {
+          advancedFilterErrors.formula = parsed.error
+          return false
+        }
+        ast = parsed.ast
+        cachedFormulaAst = { formula: appliedFormula.value, ast }
+      }
+
+      const result = evaluateAdvancedFormulaAst(ast, context)
       if (!result.ok) {
         advancedFilterErrors.formula = result.error
       } else {
@@ -119,23 +140,41 @@ export function useEntriesAdvancedFilters(args: {
     }
 
     if (hasAppliedGlobalRegex.value) {
-      const compiled = compileAdvancedRegex(appliedGlobalRegex.value, globalRegexFlags.value)
-      if (!compiled.ok) {
-        advancedFilterErrors.globalRegex = compiled.error
+      // Performance: use cached compiled regex instead of compiling repeatedly
+      let regex: RegExp
+      if (cachedGlobalRegex && cachedGlobalRegex.pattern === appliedGlobalRegex.value && cachedGlobalRegex.flags === globalRegexFlags.value) {
+        regex = cachedGlobalRegex.regex
       } else {
-        advancedFilterErrors.globalRegex = null
-        if (!testAdvancedRegex(compiled.regex, buildSearchableRowText(context))) return false
+        const compiled = compileAdvancedRegex(appliedGlobalRegex.value, globalRegexFlags.value)
+        if (!compiled.ok) {
+          advancedFilterErrors.globalRegex = compiled.error
+          return false
+        }
+        regex = compiled.regex
+        cachedGlobalRegex = { pattern: appliedGlobalRegex.value, flags: globalRegexFlags.value, regex }
       }
+
+      advancedFilterErrors.globalRegex = null
+      if (!testAdvancedRegex(regex, buildSearchableRowText(context))) return false
     }
 
     if (hasAppliedColumnRegex.value && appliedColumnRegex.field) {
-      const compiled = compileAdvancedRegex(appliedColumnRegex.pattern, appliedColumnRegex.flags)
-      if (!compiled.ok) {
-        advancedFilterErrors.columnRegex = compiled.error
+      // Performance: use cached compiled regex instead of compiling repeatedly
+      let regex: RegExp
+      if (cachedColumnRegex && cachedColumnRegex.pattern === appliedColumnRegex.pattern && cachedColumnRegex.flags === appliedColumnRegex.flags) {
+        regex = cachedColumnRegex.regex
       } else {
-        advancedFilterErrors.columnRegex = null
-        if (!testAdvancedRegex(compiled.regex, context[appliedColumnRegex.field])) return false
+        const compiled = compileAdvancedRegex(appliedColumnRegex.pattern, appliedColumnRegex.flags)
+        if (!compiled.ok) {
+          advancedFilterErrors.columnRegex = compiled.error
+          return false
+        }
+        regex = compiled.regex
+        cachedColumnRegex = { pattern: appliedColumnRegex.pattern, flags: appliedColumnRegex.flags, regex }
       }
+
+      advancedFilterErrors.columnRegex = null
+      if (!testAdvancedRegex(regex, context[appliedColumnRegex.field])) return false
     }
 
     return true
@@ -225,6 +264,12 @@ export function useEntriesAdvancedFilters(args: {
     appliedColumnRegex.field = columnRegex.field
     appliedColumnRegex.pattern = columnRegex.pattern
     appliedColumnRegex.flags = columnRegex.flags
+
+    // Invalidate caches when applying new filters
+    cachedFormulaAst = null
+    cachedGlobalRegex = null
+    cachedColumnRegex = null
+
     clearInactiveAppliedFilterErrors()
     return true
   }
@@ -243,6 +288,11 @@ export function useEntriesAdvancedFilters(args: {
     appliedColumnRegex.pattern = ''
     appliedColumnRegex.flags = 'i'
     clearAdvancedFilterErrors()
+
+    // Clear caches when clearing filters
+    cachedFormulaAst = null
+    cachedGlobalRegex = null
+    cachedColumnRegex = null
   }
 
   function exportAdvancedFilterState(): ExportedAdvancedFilterState {

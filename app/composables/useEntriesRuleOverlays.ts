@@ -1,13 +1,23 @@
 import type { ComputedRef, Ref } from 'vue'
 import { computed, reactive, ref } from 'vue'
 import type { Entry } from '~/types'
-import type { AdvancedFilterFieldKey, AdvancedFilterError, RowFilterContext } from '~/utils/entriesAdvancedFilter'
+import type { AdvancedFilterFieldKey, AdvancedFilterError, FormulaNode, RowFilterContext } from '~/utils/entriesAdvancedFilter'
 import * as advancedFilterTools from '~/utils/entriesAdvancedFilter'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
 
 const runAdvancedFormula = advancedFilterTools[`ev${'aluateAdvancedFormula'}`]
-const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, testAdvancedRegex } = advancedFilterTools
+const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, evaluateAdvancedFormulaAst, testAdvancedRegex } = advancedFilterTools
 import { getEntryKey } from '~/utils/entryKey'
+
+// Performance: cache compiled regexes and parsed formulas by rule ID
+interface RuleCompileCache {
+  ruleId: string
+  condition: EntriesRuleCondition
+  compiled?: RegExp
+  ast?: FormulaNode
+}
+
+let ruleCompileCache: RuleCompileCache[] = []
 
 export type OverlayRuleKind = 'formatting' | 'validation'
 export type OverlayConditionKind = 'formula' | 'regex'
@@ -175,17 +185,55 @@ function createCellOverlayMeta(formattingMatches: CellRuleMatch[], validationMat
 function ruleMatchesContext(rule: EntriesRuleOverlay, context: RowFilterContext): boolean {
   if (!rule.enabled || rule.targetFields.length === 0) return false
 
+  // Performance: check cache for compiled/parsed condition
+  let cached = ruleCompileCache.find(c => c.ruleId === rule.id)
+
+  // Invalidate cache if condition changed
+  const conditionChanged = !cached ||
+    cached.condition.kind !== rule.condition.kind ||
+    cached.condition.formula !== rule.condition.formula ||
+    cached.condition.regex.pattern !== rule.condition.regex.pattern ||
+    cached.condition.regex.flags !== rule.condition.regex.flags ||
+    cached.condition.regex.field !== rule.condition.regex.field
+
+  if (conditionChanged) {
+    cached = {
+      ruleId: rule.id,
+      condition: {
+        kind: rule.condition.kind,
+        formula: rule.condition.formula,
+        regex: {
+          pattern: rule.condition.regex.pattern,
+          flags: rule.condition.regex.flags,
+          field: rule.condition.regex.field
+        }
+      }
+    }
+
+    if (rule.condition.kind === 'formula') {
+      const parsed = parseAdvancedFormula(rule.condition.formula)
+      if (parsed.ok) cached.ast = parsed.ast
+    } else {
+      const compiled = compileAdvancedRegex(rule.condition.regex.pattern, rule.condition.regex.flags)
+      if (compiled.ok) cached.compiled = compiled.regex
+    }
+
+    // Update cache
+    ruleCompileCache = ruleCompileCache.filter(c => c.ruleId !== rule.id)
+    ruleCompileCache.push(cached)
+  }
+
   if (rule.condition.kind === 'formula') {
-    const result = runAdvancedFormula(rule.condition.formula, context)
+    if (!cached.ast) return false
+    const result = evaluateAdvancedFormulaAst(cached.ast, context)
     return result.ok ? result.value : false
   }
 
-  const compiled = compileAdvancedRegex(rule.condition.regex.pattern, rule.condition.regex.flags)
-  if (!compiled.ok) return false
+  if (!cached.compiled) return false
   const value = rule.condition.regex.field === 'any'
     ? buildSearchableRowText(context)
     : context[rule.condition.regex.field]
-  return testAdvancedRegex(compiled.regex, value)
+  return testAdvancedRegex(cached.compiled, value)
 }
 
 export function createEmptyCellOverlayMeta(): EntryCellOverlayMeta {
@@ -303,7 +351,12 @@ export function useEntriesRuleOverlays(args: {
     clearRuleOverlayErrors()
     const nextRule = validateDraftRule()
     if (!nextRule) return false
-    rules.value = [...rules.value, { ...nextRule, id: createLocalRuleId() }]
+    const ruleId = createLocalRuleId()
+    rules.value = [...rules.value, { ...nextRule, id: ruleId }]
+
+    // Invalidate cache for new rule
+    ruleCompileCache = ruleCompileCache.filter(c => c.ruleId !== ruleId)
+
     resetDraftRule()
     return true
   }
@@ -314,6 +367,9 @@ export function useEntriesRuleOverlays(args: {
 
   function removeRule(ruleId: string) {
     rules.value = rules.value.filter(rule => rule.id !== ruleId)
+
+    // Invalidate cache for removed rule
+    ruleCompileCache = ruleCompileCache.filter(c => c.ruleId !== ruleId)
   }
 
   function moveRule(ruleId: string, direction: -1 | 1) {
@@ -333,6 +389,9 @@ export function useEntriesRuleOverlays(args: {
   function clearRules() {
     rules.value = []
     clearRuleOverlayErrors()
+
+    // Clear all caches
+    ruleCompileCache = []
   }
 
   function exportRuleOverlayState(): SharedEntriesRuleOverlay[] {
@@ -356,25 +415,33 @@ export function useEntriesRuleOverlays(args: {
   }
 
   function replaceRuleOverlayState(restoredRules: SharedEntriesRuleOverlay[]) {
-    rules.value = restoredRules.map(rule => ({
-      name: rule.name,
-      kind: rule.kind,
-      enabled: rule.enabled,
-      targetFields: [...rule.targetFields],
-      condition: {
-        kind: rule.condition.kind,
-        formula: rule.condition.formula,
-        regex: {
-          pattern: rule.condition.regex.pattern,
-          flags: rule.condition.regex.flags,
-          field: rule.condition.regex.field
-        }
-      },
-      stylePreset: rule.stylePreset,
-      colorHex: rule.colorHex,
-      id: createLocalRuleId()
-    }))
+    const newRuleIds: string[] = []
+    rules.value = restoredRules.map(rule => {
+      const id = createLocalRuleId()
+      newRuleIds.push(id)
+      return {
+        name: rule.name,
+        kind: rule.kind,
+        enabled: rule.enabled,
+        targetFields: [...rule.targetFields],
+        condition: {
+          kind: rule.condition.kind,
+          formula: rule.condition.formula,
+          regex: {
+            pattern: rule.condition.regex.pattern,
+            flags: rule.condition.regex.flags,
+            field: rule.condition.regex.field
+          }
+        },
+        stylePreset: rule.stylePreset,
+        colorHex: rule.colorHex,
+        id
+      }
+    })
     clearRuleOverlayErrors()
+
+    // Clear old caches and prepare for new rules
+    ruleCompileCache = []
   }
 
   function getCellOverlayMeta(entry: Entry, field: AdvancedFilterFieldKey): EntryCellOverlayMeta {
