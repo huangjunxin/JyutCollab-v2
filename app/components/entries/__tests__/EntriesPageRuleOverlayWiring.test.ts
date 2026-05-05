@@ -17,6 +17,7 @@ describe('entries page rule overlay wiring', () => {
     expect(source).toContain('v-model:expanded="ruleOverlays.ruleOverlayExpanded.value"')
     expect(source).toContain(':draft-rule="ruleOverlays.draftRule"')
     expect(source).toContain('@update:draft-rule="updateRuleOverlayDraft"')
+    expect(source).toContain('@update-rule-color="ruleOverlays.updateRuleColor"')
     expect(source).toContain(':active-rule-count="ruleOverlays.activeRuleCount.value"')
   })
 
@@ -25,6 +26,14 @@ describe('entries page rule overlay wiring', () => {
     expect(source).toContain('useEntriesRuleOverlays({')
     expect(source).toContain('visibleEntries: visibleRuleOverlayEntries')
     expect(source).toContain('buildRowContext: advancedFilters.buildRowContext')
+  })
+
+  it('writes draft updates back into the reactive overlay draft instead of replacing the composable return property', () => {
+    expect(source).toContain('function updateRuleOverlayDraft(nextDraft: EntriesRuleDraft)')
+    expect(source).toContain('Object.assign(ruleOverlays.draftRule')
+    expect(source).toContain('targetFields: [...nextDraft.targetFields]')
+    expect(source).toContain('regex: { ...nextDraft.condition.regex }')
+    expect(source).toContain('colorHex: nextDraft.colorHex')
   })
 
   it('passes per-cell overlay metadata without rule persistence or data mutation coupling', () => {

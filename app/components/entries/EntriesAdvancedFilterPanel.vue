@@ -5,6 +5,7 @@
         color="neutral"
         variant="soft"
         icon="i-heroicons-funnel"
+        class="h-8 w-8 justify-center p-0"
         aria-label="進階篩選"
         :aria-expanded="expanded"
         aria-controls="entries-advanced-filter-panel"

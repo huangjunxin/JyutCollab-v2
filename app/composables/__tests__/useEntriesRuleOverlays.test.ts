@@ -42,6 +42,7 @@ describe('useEntriesRuleOverlays metadata', () => {
     overlay.draftRule.name = '缺少例句'
     overlay.draftRule.kind = 'formatting'
     overlay.draftRule.stylePreset = 'amber'
+    overlay.draftRule.colorHex = '#f59e0b'
     overlay.draftRule.targetFields = ['definition']
     overlay.draftRule.condition.kind = 'formula'
     overlay.draftRule.condition.formula = '=CONTAINS(definition, "缺少")'
@@ -58,7 +59,9 @@ describe('useEntriesRuleOverlays metadata', () => {
     const definitionMeta = overlay.getCellOverlayMeta(entry, 'definition')
     expect(definitionMeta.formattingMatches.map(match => match.ruleName)).toEqual(['缺少例句'])
     expect(definitionMeta.validationMatches).toHaveLength(0)
-    expect(definitionMeta.classNames).toContain('bg-amber-50')
+    expect(definitionMeta.formattingMatches[0].colorHex).toBe('#f59e0b')
+    expect(definitionMeta.style.backgroundColor).toBe('#f59e0b24')
+    expect(definitionMeta.style.boxShadow).toContain('#f59e0b80')
     expect(definitionMeta.tooltipText).toContain('缺少例句')
 
     const headwordMeta = overlay.getCellOverlayMeta(entry, 'headword')
@@ -150,6 +153,7 @@ describe('useEntriesRuleOverlays local draft state', () => {
     expect(overlay.draftRule.condition.kind).toBe('formula')
     expect(overlay.draftRule.targetFields).toEqual(['definition'])
     expect(overlay.draftRule.enabled).toBe(true)
+    expect(overlay.draftRule.colorHex).toBe('#22c55e')
 
     overlay.draftRule.condition.formula = '=CONTAINS(definition, "檢查")'
     expect(overlay.addRuleFromDraft()).toBe(true)
@@ -161,6 +165,8 @@ describe('useEntriesRuleOverlays local draft state', () => {
       targetFields: ['definition']
     })
     expect(overlay.activeRuleCount.value).toBe(1)
+    overlay.updateRuleColor(overlay.rules.value[0].id, '#ef4444')
+    expect(overlay.rules.value[0].colorHex).toBe('#ef4444')
     expect(Object.keys(overlay).some(key => /save|delete|bulk|fetch/i.test(key))).toBe(false)
   })
 
@@ -191,6 +197,7 @@ describe('useEntriesRuleOverlays local draft state', () => {
       formattingMatches: [],
       validationMatches: [],
       classNames: [],
+      style: {},
       tooltipText: '',
       formattingTooltipText: '',
       validationTooltipText: ''

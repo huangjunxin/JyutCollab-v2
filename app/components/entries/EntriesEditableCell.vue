@@ -7,7 +7,7 @@
       !canEdit && 'cursor-default',
       hasValidationMatches && !isEditing && 'cell-has-validation-warning'
     ]"
-    :style="cellStyle"
+    :style="cellContainerStyle"
     @click="$emit('click', $event)"
   >
     <!-- 編輯態 -->
@@ -351,6 +351,11 @@ const cellStyle = computed(() => {
   const w = props.col.width
   return w ? { minWidth: w, maxWidth: w } : {}
 })
+
+const cellContainerStyle = computed(() => ({
+  ...cellStyle.value,
+  ...(props.cellMeta?.style ?? {})
+}))
 
 const overlayClassNames = computed(() => props.cellMeta?.classNames ?? [])
 const overlayTitle = computed(() => props.cellMeta?.tooltipText || undefined)

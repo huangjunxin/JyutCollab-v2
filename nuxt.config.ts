@@ -8,6 +8,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
 
+  ignore: [
+    '.claude/**',
+    '.planning/**',
+    '.output/**'
+  ],
+
   alias: {
     '~shared': join(__dirname, 'shared')
   },
@@ -47,6 +53,19 @@ export default defineNuxtConfig({
     }
   },
 
+  vite: {
+    server: {
+      watch: {
+        ignored: [
+          '**/.claude/**',
+          '**/.planning/**',
+          '**/.output/**',
+          '**/node_modules/**'
+        ]
+      }
+    }
+  },
+
   // Nitro configuration
   nitro: {
     // 開發模式下 API 服務端口配置
@@ -54,6 +73,14 @@ export default defineNuxtConfig({
       storage: {
         driver: 'memory'
       }
+    },
+    watchOptions: {
+      ignored: [
+        '**/.claude/**',
+        '**/.planning/**',
+        '**/.output/**',
+        '**/node_modules/**'
+      ]
     }
   },
 
