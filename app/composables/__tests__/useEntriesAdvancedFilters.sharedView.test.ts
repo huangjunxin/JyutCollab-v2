@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computed, ref } from 'vue'
+import { computed, ref, toRaw } from 'vue'
 import type { Entry } from '../../types'
 import type { EditableColumnDef } from '../useEntriesTableColumns'
 import { decodeEntriesSharedView, encodeEntriesSharedView, ENTRIES_SHARED_VIEW_VERSION } from '../../utils/entriesSharedView'
@@ -133,5 +133,44 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     expect(advancedFilters.appliedColumnRegex.pattern).toBe('測試')
     const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
     expect(Object.keys(advancedFilters).some(key => forbiddenMethodPattern.test(key))).toBe(false)
+  })
+
+  it('preserves Entry object identity and cleanliness through filter restore, evaluation, and clear operations', () => {
+    const entry1 = createEntry('entry-1', '測試釋義一')
+    const entry2 = createEntry('entry-2', '測試釋義二')
+    const entry1Ref = entry1
+    const entry2Ref = entry2
+    const entry1Keys = Object.keys(entry1)
+    const entry2Keys = Object.keys(entry2)
+
+    const advancedFilters = createComposable([entry1, entry2])
+
+    advancedFilters.restoreAdvancedFilterState({
+      formula: { input: '=CONTAINS(definition, "測試")', applied: '=CONTAINS(definition, "測試")' },
+      globalRegex: { enabled: false, input: '', applied: '', flags: 'i' },
+      columnRegex: { field: '', pattern: '', flags: 'i' }
+    })
+
+    const filteredAfterRestore = advancedFilters.filteredEntries.value
+    expect(filteredAfterRestore.length).toBe(2)
+    expect(toRaw(filteredAfterRestore.find(e => e.id === 'entry-1'))).toBe(entry1Ref)
+    expect(toRaw(filteredAfterRestore.find(e => e.id === 'entry-2'))).toBe(entry2Ref)
+
+    advancedFilters.clearAdvancedFilters()
+    const filteredAfterClear = advancedFilters.filteredEntries.value
+    expect(filteredAfterClear.length).toBe(2)
+    expect(toRaw(filteredAfterClear.find(e => e.id === 'entry-1'))).toBe(entry1Ref)
+    expect(toRaw(filteredAfterClear.find(e => e.id === 'entry-2'))).toBe(entry2Ref)
+
+    expect(Object.keys(entry1)).toEqual(entry1Keys)
+    expect(Object.keys(entry2)).toEqual(entry2Keys)
+    expect(entry1._isDirty).toBeUndefined()
+    expect(entry2._isDirty).toBeUndefined()
+    expect(entry1).not.toHaveProperty('__sharedView')
+    expect(entry2).not.toHaveProperty('__sharedView')
+    expect(entry1).not.toHaveProperty('__ruleOverlayMeta')
+    expect(entry2).not.toHaveProperty('__ruleOverlayMeta')
+    expect(entry1).not.toHaveProperty('__filtered')
+    expect(entry2).not.toHaveProperty('__filtered')
   })
 })
