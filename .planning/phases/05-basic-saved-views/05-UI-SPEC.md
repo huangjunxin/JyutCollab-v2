@@ -61,13 +61,13 @@ Exceptions: none
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px | 400 (regular) | 1.5 |
-| Label | 13px | 500 (medium) | 1.4 |
+| Label | 13px | 400 (regular) | 1.4 |
 | Heading | 18px | 600 (semibold) | 1.2 |
 | Display | 24px | 600 (semibold) | 1.2 |
 
 **Usage mapping:**
 - **Body (14px/regular/1.5):** Modal descriptions, banner descriptions, list item text, empty state body, form field descriptions, error messages
-- **Label (13px/medium/1.4):** Form field labels (視圖名稱, 可見性), visibility badges, section labels in dropdown, timestamp text
+- **Label (13px/regular/1.4):** Form field labels (視圖名稱, 可見性), visibility badges, section labels in dropdown, timestamp text
 - **Heading (18px/semibold/1.2):** Modal titles, banner titles, empty state heading, dropdown section headers
 - **Display (24px/semibold/1.2):** Reserved for the main entries page "視圖" section header if needed; may also be used as the empty state heading (precedence: heading size at 18px per convention, but empty state heading can use display size per visual hierarchy)
 
