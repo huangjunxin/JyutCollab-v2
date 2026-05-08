@@ -511,22 +511,19 @@ watch(
 | A2 | The `decodeEntriesSharedView()` function will accept a `view_` prefix string and discriminate via the `starts with 'eyJ'` check without modification. | Architecture Patterns (Pattern 4) | If the discriminator logic needs to be extracted or modified, additional changes to `entriesSharedView.ts` are needed beyond adding the view-ID fetch path. |
 | A3 | View mode (flat/aggregated/lexeme) is independent of which saved view is applied. When a saved view is loaded, it does not change the active view mode. | Common Pitfalls (Pitfall 1) | If users expect saved views to also restore view mode, the schema would need a `viewMode` field (currently not in scope per D-23). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **USelectMenu mixed item type support in @nuxt/ui 4.4.0**
-   - What we know: @nuxt/ui v4 uses Reka UI as its foundation. USelectMenu typically supports `type: 'separator'` and `type: 'label'` items.
-   - What's unclear: Exact item type constants in the installed 4.4.0 version. The project uses a coarse `[{ value, label }]` array currently — whether `type: 'separator'` works needs a quick browser check.
-   - Recommendation: The planner should include a quick smoke test task — verify USelectMenu renders a test item array with a separator before building the full dropdown.
+1. **USelectMenu mixed item type support in @nuxt/ui 4.4.0 — RESOLVED**
+   - Resolution: Do not depend on undocumented `type: 'separator'` / `type: 'label'` item support. Implement the unified views dropdown using currently verified Nuxt UI patterns: either supported grouped items if confirmed by local smoke test, or a custom dropdown/menu panel if mixed item rendering is unsupported.
+   - Planning impact: Plan 05-03 includes a fallback path and must verify the dropdown renders mode options, saved views, and action rows before completing.
 
-2. **Rate limiting for public `GET /api/views/[id]` endpoint**
-   - What we know: Phase 3 had no rate limiting on shared view resolution because state was client-side. Unauthenticated view resolution could be abused.
-   - What's unclear: Whether the project has any rate limiting infrastructure in place.
-   - Recommendation: For v1, accept the risk (view state is non-sensitive). Add a note that v2 could add rate limiting if needed. This matches the Phase 3 approach.
+2. **Rate limiting for public `GET /api/views/[id]` endpoint — RESOLVED**
+   - Resolution: Do not add rate limiting in Phase 5. Saved view state is non-sensitive filter/rule configuration, and this project currently has no rate-limiting infrastructure. Keep the endpoint safe by returning only public/non-sensitive view fields and by never returning creator private data beyond safe display name if already exposed elsewhere.
+   - Planning impact: Rate limiting is deferred; endpoint validation and output shaping remain mandatory.
 
-3. **View name uniqueness**
-   - What we know: D-09 does not specify uniqueness on view names. A user could create multiple views with the same name.
-   - What's unclear: Whether users expect unique names or are OK with duplicates.
-   - Recommendation: Do not enforce uniqueness (not in requirements, simplifies implementation). The UI can display `createdAt` to disambiguate.
+3. **View name uniqueness — RESOLVED**
+   - Resolution: Do not enforce unique view names. Requirements do not specify uniqueness, and duplicates are acceptable because saved views have stable `id`, `creatorId`, visibility, and timestamps.
+   - Planning impact: UI should display enough metadata (visibility badge and timestamp/creator where appropriate) to disambiguate duplicate names.
 
 ## Environment Availability
 
