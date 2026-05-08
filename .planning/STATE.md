@@ -5,11 +5,11 @@ milestone_name: milestone
 status: executing
 last_updated: "2026-05-05T17:38:25.515Z"
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 9
-  percent: 75
+  total_plans: 15
+  completed_plans: 12
+  percent: 80
 ---
 
 # GSD State
@@ -35,6 +35,7 @@ See: .planning/PROJECT.md (updated 2026-05-03)
 | 2 | Conditional Formatting and Validation UI | Completed | COND-01, COND-02, COND-03, COND-04, VALD-01, VALD-02, VALD-03 |
 | 3 | Shareable Excel-Style Views | Completed | VIEW-01, VIEW-02, VIEW-03, VIEW-04 |
 | 4 | Integration Hardening and UX Verification | Executing | SAFE-01, SAFE-02, SAFE-03, SAFE-04 |
+| 5 | Basic Saved Views | Planned | VIEW-05, VIEW-06, VIEW-07 |
 
 ## Workflow Preferences
 
@@ -49,7 +50,7 @@ See: .planning/PROJECT.md (updated 2026-05-03)
 
 ## Latest Event
 
-2026-05-05 — Phase 04 execution started (Wave 1: safety regression coverage).
+2026-05-06 — Phase 05 added: Basic Saved Views. User requested merging the "Share View" popover and "視圖" dropdown into a unified views feature with public/private visibility.
 
 ## Decisions
 
@@ -59,9 +60,10 @@ See: .planning/PROJECT.md (updated 2026-05-03)
 - Kept advanced filtering opt-in and visually secondary by placing it in a disclosure panel inside the existing search/filter card.
 - Kept the panel read-only for data safety: it only emits apply/clear and v-model updates, with no mutation, save, delete, submit, or bulk actions.
 - Documented browser verification limitation because /entries redirects to /login locally and the local environment lacks MongoDB credentials/session data for loaded-row testing.
+- Added Phase 5 (Basic Saved Views) per user UX feedback: the separate "Share View" popover and "視圖" dropdown should be unified. Regular users should be able to create public/private views even if they can't delete others' views.
 
 ## Next Command
 
-`/gsd-execute-phase 4 --auto`
+`/gsd-discuss-phase 5 --auto`
 
 **Planned Phase:** 04 (Integration Hardening and UX Verification) — 3 plans — 2026-05-05T14:51:36.961Z

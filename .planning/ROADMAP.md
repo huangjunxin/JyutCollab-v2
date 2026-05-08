@@ -2,8 +2,8 @@
 
 **Created:** 2026-05-03
 **Granularity:** Coarse
-**Total phases:** 4
-**v1 requirements covered:** 23 / 23
+**Total phases:** 5
+**v1 requirements covered:** 24 / 24
 
 ## Overview
 
@@ -13,6 +13,7 @@
 | 2 | Conditional Formatting and Validation UI | Users can create, manage, and see cell-level formatting and validation rule matches. | COND-01, COND-02, COND-03, COND-04, VALD-01, VALD-02, VALD-03 | 5 |
 | 3 | Shareable Excel-Style Views | Users can share and reopen rule/filter configurations safely. | VIEW-01, VIEW-02, VIEW-03, VIEW-04 | 4 |
 | 4 | Integration Hardening and UX Verification | Rules remain read-only, responsive, localized, and compatible with existing table workflows. | SAFE-01, SAFE-02, SAFE-03, SAFE-04 | 5 |
+| 5 | Basic Saved Views | Users can save, name, and manage views (public/private) instead of only sharing ephemeral URL snapshots. | VIEW-05, VIEW-06, VIEW-07 | 4 |
 
 ## Phase Details
 
@@ -99,6 +100,32 @@
 - Regression checks for existing table behavior.
 - Localization/text review.
 
+### Phase 5: Basic Saved Views
+
+**Goal:** Users can save, name, and manage views (public/private) instead of only sharing ephemeral URL snapshots. The "Share View" popover and the "視圖" dropdown are merged into a unified Views feature.
+
+**UI hint:** yes
+
+**Requirements:** VIEW-05, VIEW-06, VIEW-07
+
+**Success criteria:**
+1. A user can save the current filter/rule configuration as a named view.
+2. Saved views appear in the existing "視圖" dropdown alongside the current view modes (flat/aggregated/lexeme).
+3. A user can switch between their saved views from the dropdown, restoring the saved filters and rules.
+4. A user can share a saved view via a link, unifying the current separate "Share View" popover into the views workflow.
+5. View creation supports public (all users can see) and private (only the creator can see) visibility.
+6. A user can update or delete their own saved views (permission-scoped: regular users can only delete their own views).
+
+**Implementation focus:**
+- Add saved-view persistence (server-side: MongoDB collection for named views).
+- Add save/load/update/delete API endpoints for views.
+- Merge the "Share View" popover into the views dropdown — sharing becomes an action on a saved view.
+- Add public/private visibility toggle for views.
+- Team-visible views with permissions per VIEW-06.
+- Backward compatibility: anonymous shared links from Phase 3 still work alongside saved views.
+
+**Depends on:** Phase 4 (the serialization format, composable export/restore APIs, and strict validation from Phases 1-4 provide the foundation).
+
 ## Requirement Coverage Matrix
 
 | Requirement | Phase |
@@ -126,16 +153,19 @@
 | SAFE-02 | Phase 4 |
 | SAFE-03 | Phase 4 |
 | SAFE-04 | Phase 4 |
+| VIEW-05 | Phase 5 |
+| VIEW-06 | Phase 5 |
+| VIEW-07 | Phase 5 |
 
 **Coverage validation:**
-- v1 requirements: 23
-- Requirements mapped exactly once: 23
+- v1 requirements: 24
+- Requirements mapped exactly once: 24
 - Unmapped requirements: 0
 - Duplicate mappings: 0
 
 ## Next Step
 
-Run `/gsd-discuss-phase 1` to gather implementation context for the safe formula and regex filtering foundation.
+Run `/gsd-discuss-phase 5` to gather implementation context for the basic saved views feature.
 
 ---
 *Roadmap created: 2026-05-03 after initial project setup*

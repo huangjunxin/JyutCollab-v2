@@ -50,14 +50,15 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **SAFE-03**: Rule evaluation remains responsive on typical entries table datasets and does not freeze typing or editing interactions.
 - [ ] **SAFE-04**: New Chinese UI labels, errors, and help text use Hong Kong Traditional Chinese.
 
+### Saved Views
+
+- [ ] **VIEW-05**: User can save named views to their account and access them across devices.
+- [ ] **VIEW-06**: User can manage team-visible saved views with permissions.
+- [ ] **VIEW-07**: User can choose public (all users can see) or private (only the creator can see) visibility when saving a view.
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
-
-### Saved Views
-
-- **VIEW-05**: User can save named views to their account and access them across devices.
-- **VIEW-06**: User can manage team-visible saved views with permissions.
 
 ### Advanced Spreadsheet Features
 
@@ -111,10 +112,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SAFE-02 | Phase 4 | Pending |
 | SAFE-03 | Phase 4 | Pending |
 | SAFE-04 | Phase 4 | Pending |
+| VIEW-05 | Phase 5 | Pending |
+| VIEW-06 | Phase 5 | Pending |
+| VIEW-07 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
+- v1 requirements: 24 total
+- Mapped to phases: 24
 - Unmapped: 0 ✓
 
 ---
