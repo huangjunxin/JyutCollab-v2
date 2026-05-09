@@ -249,8 +249,9 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <UButton type="submit" color="primary" variant="solid" size="sm">套用規則</UButton>
-          <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('clear')">清除規則</UButton>
+          <UButton type="submit" color="primary" variant="solid" size="sm">{{ editingRuleId ? '更新規則' : '套用規則' }}</UButton>
+          <UButton v-if="editingRuleId" type="button" color="neutral" variant="soft" size="sm" @click="emit('cancel-edit')">取消編輯</UButton>
+          <UButton v-else type="button" color="neutral" variant="soft" size="sm" @click="emit('clear')">清除規則</UButton>
         </div>
       </form>
 
@@ -308,6 +309,7 @@
                 </UPopover>
               </div>
               <div class="flex flex-wrap gap-2 sm:justify-end">
+                <UButton type="button" color="primary" variant="soft" size="sm" @click="emit('edit-rule', rule.id)">編輯</UButton>
                 <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</UButton>
                 <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</UButton>
                 <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</UButton>
@@ -536,8 +538,9 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <UButton type="submit" color="primary" variant="solid" size="sm">套用規則</UButton>
-        <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('clear')">清除規則</UButton>
+        <UButton type="submit" color="primary" variant="solid" size="sm">{{ editingRuleId ? '更新規則' : '套用規則' }}</UButton>
+        <UButton v-if="editingRuleId" type="button" color="neutral" variant="soft" size="sm" @click="emit('cancel-edit')">取消編輯</UButton>
+        <UButton v-else type="button" color="neutral" variant="soft" size="sm" @click="emit('clear')">清除規則</UButton>
       </div>
     </form>
 
@@ -603,6 +606,7 @@
               </UPopover>
             </div>
             <div class="flex flex-wrap gap-2 sm:justify-end">
+              <UButton type="button" color="primary" variant="soft" size="sm" @click="emit('edit-rule', rule.id)">編輯</UButton>
               <UButton type="button" color="neutral" variant="soft" size="sm" @click="emit('toggle-rule', rule.id)">{{ rule.enabled ? '停用' : '啟用' }}</UButton>
               <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === 0" @click="emit('move-rule', rule.id, -1)">上移</UButton>
               <UButton type="button" color="neutral" variant="soft" size="sm" :disabled="index === rules.length - 1" @click="emit('move-rule', rule.id, 1)">下移</UButton>
@@ -644,6 +648,8 @@ const emit = defineEmits<{
   'remove-rule': [ruleId: string]
   'move-rule': [ruleId: string, direction: RuleMoveDirection]
   'update-rule-color': [ruleId: string, colorHex: string]
+  'edit-rule': [ruleId: string]
+  'cancel-edit': []
 }>()
 
 const props = defineProps<{
@@ -654,6 +660,7 @@ const props = defineProps<{
   activeRuleCount: number
   fieldOptions: FieldOption[]
   teleportTo?: string
+  editingRuleId?: string | null
 }>()
 
 const canTeleport = ref(false)

@@ -150,42 +150,29 @@
             :errors="ruleOverlays.ruleOverlayErrors"
             :active-rule-count="ruleOverlays.activeRuleCount.value"
             :field-options="advancedFilterFieldOptions"
-            @apply="ruleOverlays.addRuleFromDraft"
+            :editing-rule-id="ruleOverlays.editingRuleId.value"
+            @apply="ruleOverlays.applyRuleFromDraft"
             @clear="ruleOverlays.clearRules"
             @toggle-rule="ruleOverlays.toggleRule"
             @remove-rule="ruleOverlays.removeRule"
             @move-rule="ruleOverlays.moveRule"
             @update-rule-color="ruleOverlays.updateRuleColor"
+            @edit-rule="ruleOverlays.startEditingRule"
+            @cancel-edit="ruleOverlays.cancelEditingRule"
           />
-          <EntriesShareViewPopover
-            :version="ENTRIES_SHARED_VIEW_VERSION"
-            :generated-url="generatedSharedViewUrl"
-            :can-share="canShareEntriesView"
-            :filter-count="sharedViewSummary.filterCount"
-            :rule-count="sharedViewSummary.ruleCount"
-            :restored="sharedViewRestored"
-            :restored-summary="sharedViewRestoredSummary"
-            :shared-view-error="sharedViewError"
-            :copy-status="sharedViewCopyStatus"
-            :show-fallback-url="showSharedViewFallbackUrl"
-            @copy="copySharedViewLink"
-            @clear-share-query="clearSharedViewQuery"
+          <EntriesViewsDropdown
+            :view-mode="viewMode"
+            :saved-views="savedViews.views.value"
+            :selected-view-id="selectedViewId"
+            :current-user-id="user?.id || ''"
+            :loading="savedViews.isLoading.value"
+            :error="savedViews.error.value"
+            @update:view-mode="setViewMode"
+            @select-saved-view="applySavedView"
+            @save-current="openSaveCurrentViewModal"
+            @manage="openManageViewsModal"
+            @share-current="shareSavedView"
           />
-          <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-2">
-            <span class="text-sm text-gray-500 dark:text-gray-400">視圖</span>
-            <USelectMenu
-              :model-value="viewMode"
-              :items="[
-                { value: 'flat', label: '平鋪' },
-                { value: 'aggregated', label: '按詞形聚合（參考）' },
-                { value: 'lexeme', label: '按詞語聚合' }
-              ]"
-              value-key="value"
-              size="sm"
-              class="w-28"
-              @update:model-value="setViewMode"
-            />
-          </div>
           <div class="flex items-center gap-1 border-l border-gray-200 dark:border-gray-600 pl-2">
             <UTooltip text="根據本頁內容自動調整各欄寬度">
               <UButton
@@ -210,21 +197,16 @@
       </div>
       <div id="entries-advanced-filter-host" class="w-full" />
       <div id="entries-rule-overlay-host" class="w-full" />
-      <UAlert
-        v-if="sharedViewError"
-        color="error"
-        variant="subtle"
-        role="alert"
-        title="分享視圖無法套用"
-        :description="sharedViewError"
+      <EntriesSharedViewBanner
+        v-if="sharedViewBanner"
         class="mt-3"
-      >
-        <template #actions>
-          <UButton color="neutral" variant="soft" size="sm" @click="clearSharedViewQuery">
-            清除分享參數
-          </UButton>
-        </template>
-      </UAlert>
+        :kind="sharedViewBanner.kind"
+        :view-name="sharedViewBanner.viewName"
+        :creator-name="sharedViewBanner.creatorName"
+        @apply="applySharedViewBannerState"
+        @save-as-own="saveSharedViewBannerAsOwn"
+        @close="clearSharedViewQuery"
+      />
     </div>
 
     <!-- Loading state -->
@@ -819,6 +801,32 @@
     </div>
   </div>
 
+  <EntriesSaveViewModal
+    v-model:open="saveViewModalOpen"
+    :state="saveViewModalState"
+    :id="saveViewModalId"
+    :initial-name="saveViewModalName"
+    :initial-visibility="saveViewModalVisibility"
+    :submitting="saveViewSubmitting"
+    :error="saveViewError"
+    @save="handleSaveView"
+    @cancel="resetSaveViewModal"
+  />
+
+  <EntriesManageViewsModal
+    v-model:open="manageViewsModalOpen"
+    :views="savedViews.views.value"
+    :current-user-id="user?.id || ''"
+    :loading="savedViews.isLoading.value"
+    :error="savedViews.error.value || manageViewsError"
+    :deleting="manageViewDeleting"
+    @apply="applySavedView"
+    @edit="editSavedView"
+    @delete="deleteSavedView"
+    @copy-as-own="copySavedViewAsOwn"
+    @close="manageViewsError = ''"
+  />
+
   <LexemeExternalEtymonsModal
     :open="externalEtymonModalOpen"
     :lexeme-id="activeExternalEtymonLexemeId"
@@ -946,14 +954,17 @@ import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
 import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 import EntriesAdvancedFilterPanel from '~/components/entries/EntriesAdvancedFilterPanel.vue'
 import EntriesRuleOverlayPanel from '~/components/entries/EntriesRuleOverlayPanel.vue'
-import EntriesShareViewPopover from '~/components/entries/EntriesShareViewPopover.vue'
+import EntriesViewsDropdown from '~/components/entries/EntriesViewsDropdown.vue'
+import EntriesSaveViewModal from '~/components/entries/EntriesSaveViewModal.vue'
+import EntriesManageViewsModal from '~/components/entries/EntriesManageViewsModal.vue'
+import EntriesSharedViewBanner from '~/components/entries/EntriesSharedViewBanner.vue'
+import { useEntriesSavedViews, type SavedViewRecord, type SavedViewVisibility } from '~/composables/useEntriesSavedViews'
 import {
-  ENTRIES_SHARED_VIEW_MAX_ENCODED_LENGTH,
   ENTRIES_SHARED_VIEW_QUERY_PARAM,
   ENTRIES_SHARED_VIEW_VERSION,
-  buildEntriesSharedViewUrl,
   decodeEntriesSharedView,
-  summarizeEntriesSharedView
+  summarizeEntriesSharedView,
+  type EntriesSharedViewState
 } from '~/utils/entriesSharedView'
 
 definePageMeta({
@@ -1461,107 +1472,200 @@ function updateRuleOverlayDraft(nextDraft: EntriesRuleDraft) {
   })
 }
 
+const savedViews = useEntriesSavedViews()
+const selectedViewId = ref<string | null>(null)
 const lastAppliedSharedView = ref<string | null>(null)
-const sharedViewError = ref('')
-const sharedViewRestored = ref(false)
-const sharedViewRestoredSummary = ref('')
-const sharedViewCopyStatus = ref<'idle' | 'success' | 'error'>('idle')
-const showSharedViewFallbackUrl = ref(false)
-
-const currentSharedViewState = computed(() => ({
+const saveViewModalOpen = ref(false)
+const saveViewModalId = ref<string | undefined>(undefined)
+const saveViewModalName = ref('')
+const saveViewModalVisibility = ref<SavedViewVisibility>('private')
+const saveViewModalState = ref<EntriesSharedViewState>({
   version: ENTRIES_SHARED_VIEW_VERSION,
+  viewMode: viewMode.value,
+  filters: advancedFilters.exportAdvancedFilterState(),
+  rules: ruleOverlays.exportRuleOverlayState()
+})
+const saveViewSubmitting = ref(false)
+const saveViewError = ref<string | null>(null)
+const manageViewsModalOpen = ref(false)
+const manageViewsError = ref('')
+const manageViewDeleting = ref(false)
+
+type SharedViewBannerState =
+  | { kind: 'named'; viewName: string; creatorName: string; state: EntriesSharedViewState }
+  | { kind: 'anonymous'; state: EntriesSharedViewState }
+  | { kind: 'not-found'; state?: undefined }
+
+const sharedViewBanner = ref<SharedViewBannerState | null>(null)
+
+const currentSharedViewState = computed<EntriesSharedViewState>(() => ({
+  version: ENTRIES_SHARED_VIEW_VERSION,
+  viewMode: viewMode.value,
   filters: advancedFilters.exportAdvancedFilterState(),
   rules: ruleOverlays.exportRuleOverlayState()
 }))
 
 const sharedViewSummary = computed(() => summarizeEntriesSharedView(currentSharedViewState.value))
 
-const generatedSharedViewUrl = computed(() => {
-  if (!import.meta.client) return `/entries?${ENTRIES_SHARED_VIEW_QUERY_PARAM}=`
+function restoreSharedViewState(state: EntriesSharedViewState) {
+  if (state.viewMode) setViewMode(state.viewMode)
+  advancedFilters.restoreAdvancedFilterState(state.filters)
+  ruleOverlays.replaceRuleOverlayState(state.rules)
+  summarizeEntriesSharedView(state)
+}
+
+function resetSaveViewModal() {
+  saveViewModalId.value = undefined
+  saveViewModalName.value = ''
+  saveViewModalVisibility.value = 'private'
+  saveViewModalState.value = currentSharedViewState.value
+  saveViewError.value = null
+}
+
+function openSaveCurrentViewModal() {
+  resetSaveViewModal()
+  saveViewModalState.value = currentSharedViewState.value
+  saveViewModalOpen.value = true
+}
+
+function openManageViewsModal() {
+  manageViewsError.value = ''
+  manageViewsModalOpen.value = true
+  savedViews.fetchViews().catch(() => {})
+}
+
+async function handleSaveView(payload: { id?: string; name: string; visibility: SavedViewVisibility; state: EntriesSharedViewState }) {
+  saveViewSubmitting.value = true
+  saveViewError.value = null
   try {
-    return buildEntriesSharedViewUrl(window.location.href, currentSharedViewState.value)
-  } catch {
-    return `/entries?${ENTRIES_SHARED_VIEW_QUERY_PARAM}=`
-  }
-})
-
-const sharedViewEncodedLength = computed(() => {
-  try {
-    return new URL(generatedSharedViewUrl.value, import.meta.client ? window.location.origin : 'http://localhost').searchParams.get(ENTRIES_SHARED_VIEW_QUERY_PARAM)?.length ?? 0
-  } catch {
-    return ENTRIES_SHARED_VIEW_MAX_ENCODED_LENGTH + 1
-  }
-})
-
-const canShareEntriesView = computed(() => (
-  (sharedViewSummary.value.filterCount > 0 || sharedViewSummary.value.ruleCount > 0) &&
-  sharedViewEncodedLength.value <= ENTRIES_SHARED_VIEW_MAX_ENCODED_LENGTH
-))
-
-async function copySharedViewLink() {
-  if (!canShareEntriesView.value) return
-  sharedViewCopyStatus.value = 'idle'
-  showSharedViewFallbackUrl.value = false
-
-  if (!import.meta.client || !navigator.clipboard?.writeText) {
-    sharedViewCopyStatus.value = 'error'
-    showSharedViewFallbackUrl.value = true
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(generatedSharedViewUrl.value)
-    sharedViewCopyStatus.value = 'success'
-  } catch {
-    sharedViewCopyStatus.value = 'error'
-    showSharedViewFallbackUrl.value = true
+    const view = payload.id
+      ? await savedViews.updateView({ id: payload.id, name: payload.name, visibility: payload.visibility, state: payload.state })
+      : await savedViews.createView({ name: payload.name, visibility: payload.visibility, state: payload.state })
+    selectedViewId.value = view.id
+    saveViewModalOpen.value = false
+    resetSaveViewModal()
+  } catch (error: any) {
+    saveViewError.value = error?.message || '儲存視圖失敗，請稍後再試'
+  } finally {
+    saveViewSubmitting.value = false
   }
 }
 
-function applySharedViewQuery(): boolean {
+async function applySavedView(view: SavedViewRecord) {
+  restoreSharedViewState(view.state)
+  selectedViewId.value = view.id
+  sharedViewBanner.value = {
+    kind: 'named',
+    viewName: view.name,
+    creatorName: view.creatorName || '未知用戶',
+    state: view.state
+  }
+}
+
+function editSavedView(view: SavedViewRecord) {
+  saveViewModalId.value = view.id
+  saveViewModalName.value = view.name
+  saveViewModalVisibility.value = view.visibility
+  saveViewModalState.value = view.state
+  saveViewError.value = null
+  saveViewModalOpen.value = true
+}
+
+async function deleteSavedView(view: SavedViewRecord) {
+  manageViewDeleting.value = true
+  manageViewsError.value = ''
+  try {
+    await savedViews.deleteView(view.id)
+    if (selectedViewId.value === view.id) selectedViewId.value = null
+  } catch (error: any) {
+    manageViewsError.value = error?.message || '刪除視圖失敗，請稍後再試'
+  } finally {
+    manageViewDeleting.value = false
+  }
+}
+
+function copySavedViewAsOwn(view: SavedViewRecord) {
+  saveViewModalId.value = undefined
+  saveViewModalName.value = view.name
+  saveViewModalVisibility.value = 'private'
+  saveViewModalState.value = view.state
+  saveViewError.value = null
+  saveViewModalOpen.value = true
+}
+
+async function shareSavedView(view: SavedViewRecord) {
+  const url = import.meta.client
+    ? new URL(window.location.href)
+    : new URL('/entries', 'http://localhost')
+  url.pathname = '/entries'
+  url.searchParams.set(ENTRIES_SHARED_VIEW_QUERY_PARAM, view.id)
+  const shareUrl = import.meta.client ? url.toString() : `/entries?${ENTRIES_SHARED_VIEW_QUERY_PARAM}=${view.id}`
+  if (import.meta.client && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(shareUrl).catch(() => {})
+  }
+}
+
+function applySharedViewBannerState() {
+  if (!sharedViewBanner.value?.state) return
+  restoreSharedViewState(sharedViewBanner.value.state)
+}
+
+function saveSharedViewBannerAsOwn() {
+  if (!sharedViewBanner.value?.state) return
+  saveViewModalId.value = undefined
+  saveViewModalName.value = sharedViewBanner.value.kind === 'named' ? sharedViewBanner.value.viewName : ''
+  saveViewModalVisibility.value = 'private'
+  saveViewModalState.value = sharedViewBanner.value.state
+  saveViewError.value = null
+  saveViewModalOpen.value = true
+}
+
+async function applySharedViewQuery(): Promise<boolean> {
   const sharedViewParam = route.query[ENTRIES_SHARED_VIEW_QUERY_PARAM]
   if (typeof sharedViewParam !== 'string') {
-    sharedViewError.value = ''
-    sharedViewRestored.value = false
-    sharedViewRestoredSummary.value = ''
-    sharedViewCopyStatus.value = 'idle'
-    showSharedViewFallbackUrl.value = false
+    sharedViewBanner.value = null
     lastAppliedSharedView.value = null
     return false
   }
   if (lastAppliedSharedView.value === sharedViewParam) return false
 
-  const result = decodeEntriesSharedView(sharedViewParam)
-  if (!result.ok) {
-    sharedViewError.value = `分享視圖無法套用：${result.reason}。已保留目前表格，請清除網址中的分享參數或重新複製視圖。`
-    sharedViewRestored.value = false
-    sharedViewRestoredSummary.value = ''
-    sharedViewCopyStatus.value = 'idle'
-    showSharedViewFallbackUrl.value = false
+  if (sharedViewParam.startsWith('eyJ')) {
+    const result = decodeEntriesSharedView(sharedViewParam)
+    if (!result.ok) {
+      sharedViewBanner.value = { kind: 'not-found' }
+      lastAppliedSharedView.value = sharedViewParam
+      return false
+    }
+    restoreSharedViewState(result.data)
+    sharedViewBanner.value = { kind: 'anonymous', state: result.data }
+    selectedViewId.value = null
+    lastAppliedSharedView.value = sharedViewParam
+    return true
+  }
+
+  try {
+    const view = await savedViews.getViewById(sharedViewParam)
+    restoreSharedViewState(view.state)
+    selectedViewId.value = view.id
+    sharedViewBanner.value = {
+      kind: 'named',
+      viewName: view.name,
+      creatorName: view.creatorName || '未知用戶',
+      state: view.state
+    }
+    lastAppliedSharedView.value = sharedViewParam
+    return true
+  } catch {
+    sharedViewBanner.value = { kind: 'not-found' }
     lastAppliedSharedView.value = sharedViewParam
     return false
   }
-
-  advancedFilters.restoreAdvancedFilterState(result.data.filters)
-  ruleOverlays.replaceRuleOverlayState(result.data.rules)
-  const restoredSummary = summarizeEntriesSharedView(result.data)
-  sharedViewError.value = ''
-  sharedViewRestored.value = true
-  sharedViewRestoredSummary.value = restoredSummary.message
-  sharedViewCopyStatus.value = 'idle'
-  showSharedViewFallbackUrl.value = false
-  lastAppliedSharedView.value = sharedViewParam
-  return true
 }
 
 function clearSharedViewQuery() {
   const query = { ...route.query }
   delete query[ENTRIES_SHARED_VIEW_QUERY_PARAM]
-  sharedViewError.value = ''
-  sharedViewRestored.value = false
-  sharedViewRestoredSummary.value = ''
-  sharedViewCopyStatus.value = 'idle'
-  showSharedViewFallbackUrl.value = false
+  sharedViewBanner.value = null
   lastAppliedSharedView.value = null
   navigateTo({ path: route.path, query }, { replace: true })
 }
@@ -2682,7 +2786,7 @@ watch(
   () => route.query,
   () => {
     if (isInitializing.value) return
-    applySharedViewQuery()
+    void applySharedViewQuery()
     const changed = applyUrlParams()
     if (changed) {
       currentPage.value = 1
@@ -2735,7 +2839,7 @@ onMounted(async () => {
   isMobile.value = window.innerWidth < 768
 
   // Apply URL parameters (search, filter=mine)
-  applySharedViewQuery()
+  await applySharedViewQuery()
   applyUrlParams()
 
   await fetchEntries()

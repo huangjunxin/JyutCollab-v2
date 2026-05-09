@@ -40,8 +40,11 @@ export interface EntriesSharedViewAdvancedFilterState {
 
 export type EntriesSharedViewRule = EntriesRuleDraft
 
+export type EntriesSharedViewMode = 'flat' | 'aggregated' | 'lexeme'
+
 export interface EntriesSharedViewState {
   version: typeof ENTRIES_SHARED_VIEW_VERSION
+  viewMode?: EntriesSharedViewMode
   filters: EntriesSharedViewAdvancedFilterState
   rules: EntriesSharedViewRule[]
 }
@@ -105,8 +108,11 @@ const ruleSchema = z.strictObject({
   colorHex: colorHexSchema
 })
 
+const viewModeSchema = z.enum(['flat', 'aggregated', 'lexeme'])
+
 const sharedViewSchema = z.strictObject({
   version: z.literal(ENTRIES_SHARED_VIEW_VERSION),
+  viewMode: viewModeSchema.optional(),
   filters: filterStateSchema,
   rules: z.array(ruleSchema)
 })
@@ -144,6 +150,7 @@ function isSupportedField(value: unknown): value is AdvancedFilterFieldKey {
 function normalizeState(state: EntriesSharedViewState): EntriesSharedViewState {
   return {
     version: ENTRIES_SHARED_VIEW_VERSION,
+    ...(state.viewMode ? { viewMode: state.viewMode } : {}),
     filters: {
       formula: {
         input: state.filters.formula.input,

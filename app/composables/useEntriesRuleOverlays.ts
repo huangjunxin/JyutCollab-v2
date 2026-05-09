@@ -386,6 +386,75 @@ export function useEntriesRuleOverlays(args: {
     rules.value = rules.value.map(rule => rule.id === ruleId ? { ...rule, colorHex } : rule)
   }
 
+  const editingRuleId: Ref<string | null> = ref(null)
+
+  function startEditingRule(ruleId: string) {
+    const rule = rules.value.find(r => r.id === ruleId)
+    if (!rule) return
+    editingRuleId.value = ruleId
+    draftRule.name = rule.name
+    draftRule.kind = rule.kind
+    draftRule.enabled = rule.enabled
+    draftRule.targetFields = [...rule.targetFields]
+    draftRule.condition = {
+      kind: rule.condition.kind,
+      formula: rule.condition.formula,
+      regex: {
+        pattern: rule.condition.regex.pattern,
+        flags: rule.condition.regex.flags,
+        field: rule.condition.regex.field
+      }
+    }
+    draftRule.stylePreset = rule.stylePreset
+    draftRule.colorHex = rule.colorHex
+    clearRuleOverlayErrors()
+  }
+
+  function cancelEditingRule() {
+    editingRuleId.value = null
+    resetDraftRule()
+  }
+
+  function applyRuleFromDraft(): boolean {
+    if (editingRuleId.value) {
+      return editRuleFromDraft()
+    }
+    return addRuleFromDraft()
+  }
+
+  function editRuleFromDraft(): boolean {
+    clearRuleOverlayErrors()
+    const nextRule = validateDraftRule()
+    if (!nextRule) return false
+
+    const ruleId = editingRuleId.value!
+    rules.value = rules.value.map(rule => rule.id === ruleId ? {
+      id: ruleId,
+      name: nextRule.name,
+      kind: nextRule.kind,
+      enabled: nextRule.enabled,
+      targetFields: [...nextRule.targetFields],
+      condition: {
+        kind: nextRule.condition.kind,
+        formula: nextRule.condition.formula,
+        regex: {
+          pattern: nextRule.condition.regex.pattern,
+          flags: nextRule.condition.regex.flags,
+          field: nextRule.condition.regex.field
+        }
+      },
+      stylePreset: nextRule.stylePreset,
+      colorHex: nextRule.colorHex
+    } : rule)
+
+    // Invalidate cache for edited rule
+    ruleCompileCache = ruleCompileCache.filter(c => c.ruleId !== ruleId)
+
+    editingRuleId.value = null
+    resetDraftRule()
+    return true
+  }
+
   function clearRules() {
     rules.value = []
     clearRuleOverlayErrors()
@@ -456,8 +525,13 @@ export function useEntriesRuleOverlays(args: {
     ruleOverlayErrors,
     activeRuleCount,
     cellOverlayMetaByEntryKey,
+    editingRuleId,
     resetDraftRule,
     addRuleFromDraft,
+    editRuleFromDraft,
+    applyRuleFromDraft,
+    startEditingRule,
+    cancelEditingRule,
     toggleRule,
     removeRule,
     moveRule,

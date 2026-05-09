@@ -32,6 +32,11 @@ export default defineEventHandler(async (event) => {
     return
   }
 
+  // GET /api/views/:id - public for shared view resolution
+  if (path.match(/^\/api\/views\/[^/]+$/) && method === 'GET') {
+    return
+  }
+
   // GET /api/stats - public for sidebar counts
   if (path === '/api/stats' && method === 'GET') {
     return
