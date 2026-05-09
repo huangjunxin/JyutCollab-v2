@@ -55,6 +55,21 @@ export function useEntriesList(
     return parts.join('|')
   })
 
+  const allFetchCacheKey = computed(() => {
+    const parts = [
+      'entries-all',
+      `v:${viewMode.value}`,
+      `q:${searchQuery.value || 'none'}`,
+      `r:${filters.region || 'all'}`,
+      `s:${filters.status || 'all'}`,
+      `t:${filters.theme || 'all'}`,
+      `c:${filters.createdBy || 'all'}`,
+      `sb:${sortBy.value}`,
+      `so:${sortOrder.value}`
+    ]
+    return parts.join('|')
+  })
+
   async function fetchFromAPI(): Promise<EntriesResponse> {
     const query: Record<string, any> = {
       page: currentPage.value,
@@ -79,22 +94,38 @@ export function useEntriesList(
     isAllFetched.value = true
     loading.value = true
     try {
-      const query: Record<string, any> = {
-        all: true,
-        sortBy: sortBy.value,
-        sortOrder: sortOrder.value
+      const key = allFetchCacheKey.value
+      const nuxtApp = useNuxtApp()
+      const tsKey = `_ts_${key}`
+
+      const cached = nuxtApp.payload.data[key] as EntriesResponse | undefined
+      const timestamp = nuxtApp.payload.data[tsKey] as number | undefined
+
+      let response: EntriesResponse
+
+      if (cached !== undefined && timestamp && Date.now() - timestamp < CACHE_TTL.entries) {
+        response = cached
+      } else {
+        const query: Record<string, any> = {
+          all: true,
+          sortBy: sortBy.value,
+          sortOrder: sortOrder.value
+        }
+
+        if (searchQuery.value) query.query = searchQuery.value
+        if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
+        if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
+        if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
+        if (filters.createdBy) query.createdBy = filters.createdBy
+
+        if (viewMode.value === 'aggregated') query.groupBy = 'headword'
+        if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
+
+        response = await $fetch<EntriesResponse>('/api/entries', { query })
+        nuxtApp.payload.data[key] = response
+        nuxtApp.payload.data[tsKey] = Date.now()
       }
 
-      if (searchQuery.value) query.query = searchQuery.value
-      if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
-      if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
-      if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
-      if (filters.createdBy) query.createdBy = filters.createdBy
-
-      if (viewMode.value === 'aggregated') query.groupBy = 'headword'
-      if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
-
-      const response = await $fetch<EntriesResponse>('/api/entries', { query })
       processResponse(response)
     } catch (error) {
       console.error('Failed to fetch all entries:', error)
@@ -216,6 +247,7 @@ export function useEntriesList(
 
   function invalidateCache() {
     clearCacheByKey('entries-list')
+    clearCacheByKey('entries-all')
   }
 
   return {
