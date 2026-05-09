@@ -29,6 +29,7 @@ export function useEntriesList(
   const aggregatedGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
   const lexemeGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
   const loading = ref(false)
+  const isAllFetched = ref(false)
   const currentPage = ref(1)
   const pagination = reactive({
     total: 0,
@@ -72,6 +73,34 @@ export function useEntriesList(
     if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
 
     return await $fetch<EntriesResponse>('/api/entries', { query })
+  }
+
+  async function fetchAllEntries() {
+    isAllFetched.value = true
+    loading.value = true
+    try {
+      const query: Record<string, any> = {
+        all: true,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value
+      }
+
+      if (searchQuery.value) query.query = searchQuery.value
+      if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
+      if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
+      if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
+      if (filters.createdBy) query.createdBy = filters.createdBy
+
+      if (viewMode.value === 'aggregated') query.groupBy = 'headword'
+      if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
+
+      const response = await $fetch<EntriesResponse>('/api/entries', { query })
+      processResponse(response)
+    } catch (error) {
+      console.error('Failed to fetch all entries:', error)
+    } finally {
+      loading.value = false
+    }
   }
 
   function processResponse(response: EntriesResponse) {
@@ -141,6 +170,7 @@ export function useEntriesList(
   }
 
   async function fetchEntries() {
+    isAllFetched.value = false
     loading.value = true
     try {
       const key = cacheKey.value
@@ -193,9 +223,11 @@ export function useEntriesList(
     aggregatedGroups,
     lexemeGroups,
     loading,
+    isAllFetched,
     currentPage,
     pagination,
     fetchEntries,
+    fetchAllEntries,
     handleSearch,
     handleSort,
     invalidateCache

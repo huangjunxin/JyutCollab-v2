@@ -1,8 +1,11 @@
 import { z } from 'zod'
 
+const ALL_MAX_LIMIT = 5000
+
 const QuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   perPage: z.coerce.number().int().min(1).max(100).default(20),
+  all: z.coerce.boolean().optional(),
   query: z.string().optional(),
   dialectName: z.string().optional(), // 新字段
   region: z.string().optional(), // 兼容舊字段
@@ -42,6 +45,7 @@ export default defineEventHandler(async (event) => {
     const {
       page,
       perPage,
+      all: fetchAll,
       query: searchQuery,
       dialectName,
       region,
@@ -106,7 +110,8 @@ export default defineEventHandler(async (event) => {
       sort[sortBy] = sortOrder === 'asc' ? 1 : -1
     }
 
-    const skip = (page - 1) * perPage
+    const skip = fetchAll ? 0 : (page - 1) * perPage
+    const effectiveLimit = fetchAll ? ALL_MAX_LIMIT : perPage
 
     const transformEntry = (entry: any) => ({
       id: entry.id || entry._id?.toString?.(),
@@ -163,7 +168,7 @@ export default defineEventHandler(async (event) => {
               { $group: { _id: groupKey, headwordDisplay: { $first: '$headword.display' }, entries: { $push: '$$ROOT' } } },
               { $sort: { _id: sortOrder === 'asc' ? 1 : -1 } },
               { $skip: skip },
-              { $limit: perPage }
+              { $limit: effectiveLimit }
             ]
           }
         }
@@ -177,9 +182,9 @@ export default defineEventHandler(async (event) => {
       return {
         data: groups,
         total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
+        page: fetchAll ? 1 : page,
+        perPage: fetchAll ? groups.length : perPage,
+        totalPages: fetchAll ? 1 : Math.ceil(total / perPage),
         grouped: true
       }
     }
@@ -212,7 +217,7 @@ export default defineEventHandler(async (event) => {
               },
               { $sort: { _id: sortOrder === 'asc' ? 1 : -1 } },
               { $skip: skip },
-              { $limit: perPage }
+              { $limit: effectiveLimit }
             ]
           }
         }
@@ -227,15 +232,15 @@ export default defineEventHandler(async (event) => {
       return {
         data: groups,
         total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
+        page: fetchAll ? 1 : page,
+        perPage: fetchAll ? groups.length : perPage,
+        totalPages: fetchAll ? 1 : Math.ceil(total / perPage),
         grouped: true
       }
     }
 
     const [entries, total] = await Promise.all([
-      Entry.find(filter).sort(sort).skip(skip).limit(perPage).lean(),
+      Entry.find(filter).sort(sort).skip(skip).limit(effectiveLimit).lean(),
       Entry.countDocuments(filter)
     ])
     const data = entries.map((entry: any) => transformEntry(entry))
@@ -243,9 +248,10 @@ export default defineEventHandler(async (event) => {
     return {
       data,
       total,
-      page,
-      perPage,
-      totalPages: Math.ceil(total / perPage)
+      page: fetchAll ? 1 : page,
+      perPage: fetchAll ? data.length : perPage,
+      totalPages: fetchAll ? 1 : Math.ceil(total / perPage),
+      all: fetchAll
     }
   } catch (error: any) {
     console.error('Get entries error:', error.message || error)

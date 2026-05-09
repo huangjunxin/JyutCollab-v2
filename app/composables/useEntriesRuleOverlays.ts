@@ -332,7 +332,7 @@ export function useEntriesRuleOverlays(args: {
       if (regexField !== 'any' && !isAdvancedFilterField(regexField)) {
         ruleOverlayErrors.regex = createRegexApplicationError({
           code: 'invalid_pattern',
-          message: '正則表達式欄位無效。'
+          message: '搜尋範圍無效。'
         })
         return null
       }

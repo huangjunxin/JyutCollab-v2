@@ -55,9 +55,9 @@ describe('useEntriesAdvancedFilters performance hardening', () => {
     const args = createMockArgs(entries)
     const filters = useEntriesAdvancedFilters(args)
 
-    // Apply global regex
-    filters.globalRegexEnabled.value = true
-    filters.globalRegexInput.value = '香港'
+    // Apply regex
+    filters.regexField.value = 'any'
+    filters.regexPattern.value = '香港'
     const applyResult = filters.applyAdvancedFilters()
     expect(applyResult).toBe(true)
 
@@ -126,14 +126,14 @@ describe('useEntriesAdvancedFilters performance hardening', () => {
     const filters = useEntriesAdvancedFilters(args)
 
     // Apply first regex
-    filters.globalRegexEnabled.value = true
-    filters.globalRegexInput.value = '香港'
+    filters.regexField.value = 'any'
+    filters.regexPattern.value = '香港'
     filters.applyAdvancedFilters()
     const filtered1 = filters.filteredEntries.value
     expect(filtered1.length).toBe(1)
 
     // Apply different regex
-    filters.globalRegexInput.value = '廣州'
+    filters.regexPattern.value = '廣州'
     filters.applyAdvancedFilters()
     const filtered2 = filters.filteredEntries.value
     expect(filtered2.length).toBe(1)

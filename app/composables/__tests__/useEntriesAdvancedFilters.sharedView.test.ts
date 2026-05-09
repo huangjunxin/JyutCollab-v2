@@ -53,16 +53,15 @@ function createRestoredState(): ExportedAdvancedFilterState {
       input: '=CONTAINS(definition, "檢查")',
       applied: '=CONTAINS(definition, "檢查")'
     },
-    globalRegex: {
-      enabled: true,
-      input: '測試',
-      applied: '測試',
-      flags: 'i'
-    },
-    columnRegex: {
+    regex: {
       field: 'headword',
       pattern: '測試',
-      flags: 'i'
+      flags: 'i',
+      applied: {
+        field: 'headword',
+        pattern: '測試',
+        flags: 'i'
+      }
     }
   }
 }
@@ -76,12 +75,10 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
 
     expect(advancedFilters.formulaInput.value).toBe('=CONTAINS(definition, "檢查")')
     expect(advancedFilters.appliedFormula.value).toBe('=CONTAINS(definition, "檢查")')
-    expect(advancedFilters.globalRegexEnabled.value).toBe(true)
-    expect(advancedFilters.globalRegexInput.value).toBe('測試')
-    expect(advancedFilters.appliedGlobalRegex.value).toBe('測試')
-    expect(advancedFilters.globalRegexFlags.value).toBe('i')
-    expect(advancedFilters.columnRegex).toMatchObject({ field: 'headword', pattern: '測試', flags: 'i' })
-    expect(advancedFilters.appliedColumnRegex).toMatchObject({ field: 'headword', pattern: '測試', flags: 'i' })
+    expect(advancedFilters.regexField.value).toBe('headword')
+    expect(advancedFilters.regexPattern.value).toBe('測試')
+    expect(advancedFilters.regexFlags.value).toBe('i')
+    expect(advancedFilters.appliedRegex).toMatchObject({ field: 'headword', pattern: '測試', flags: 'i' })
     expect(advancedFilters.advancedFilterErrors.formula).toBeNull()
     expect(advancedFilters.hasActiveAdvancedFilters.value).toBe(true)
     expect(advancedFilters.filteredEntries.value).toHaveLength(1)
@@ -108,16 +105,16 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     expect(entry).not.toHaveProperty('__ruleOverlayMeta')
   })
 
-  it('exports applied column regex state instead of an unsaved draft', () => {
+  it('exports applied regex state instead of an unsaved draft', () => {
     const advancedFilters = createComposable()
     advancedFilters.restoreAdvancedFilterState(createRestoredState())
-    advancedFilters.columnRegex.field = 'definition'
-    advancedFilters.columnRegex.pattern = '未套用草稿'
-    advancedFilters.columnRegex.flags = 'u'
+    advancedFilters.regexField.value = 'definition'
+    advancedFilters.regexPattern.value = '未套用草稿'
+    advancedFilters.regexFlags.value = 'u'
 
     const exported = advancedFilters.exportAdvancedFilterState()
 
-    expect(exported.columnRegex).toEqual({ field: 'headword', pattern: '測試', flags: 'i' })
+    expect(exported.regex.applied).toEqual({ field: 'headword', pattern: '測試', flags: 'i' })
     expect(advancedFilters.filteredEntries.value).toHaveLength(1)
   })
 
@@ -126,11 +123,11 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     advancedFilters.restoreAdvancedFilterState(createRestoredState())
 
     const exported = advancedFilters.exportAdvancedFilterState()
-    exported.columnRegex.field = 'definition'
-    exported.columnRegex.pattern = '已改變'
+    exported.regex.field = 'definition'
+    exported.regex.pattern = '已改變'
 
-    expect(advancedFilters.appliedColumnRegex.field).toBe('headword')
-    expect(advancedFilters.appliedColumnRegex.pattern).toBe('測試')
+    expect(advancedFilters.appliedRegex.field).toBe('headword')
+    expect(advancedFilters.appliedRegex.pattern).toBe('測試')
     const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
     expect(Object.keys(advancedFilters).some(key => forbiddenMethodPattern.test(key))).toBe(false)
   })
@@ -147,8 +144,12 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
 
     advancedFilters.restoreAdvancedFilterState({
       formula: { input: '=CONTAINS(definition, "測試")', applied: '=CONTAINS(definition, "測試")' },
-      globalRegex: { enabled: false, input: '', applied: '', flags: 'i' },
-      columnRegex: { field: '', pattern: '', flags: 'i' }
+      regex: {
+        field: 'any',
+        pattern: '',
+        flags: 'i',
+        applied: { field: 'any', pattern: '', flags: 'i' }
+      }
     })
 
     const filteredAfterRestore = advancedFilters.filteredEntries.value

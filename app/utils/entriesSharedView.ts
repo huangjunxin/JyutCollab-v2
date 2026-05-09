@@ -25,16 +25,15 @@ export interface EntriesSharedViewAdvancedFilterState {
     input: string
     applied: string
   }
-  globalRegex: {
-    enabled: boolean
-    input: string
-    applied: string
-    flags: string
-  }
-  columnRegex: {
-    field: AdvancedFilterFieldKey | ''
+  regex: {
+    field: AdvancedFilterFieldKey | 'any'
     pattern: string
     flags: string
+    applied: {
+      field: AdvancedFilterFieldKey | 'any'
+      pattern: string
+      flags: string
+    }
   }
 }
 
@@ -66,7 +65,6 @@ const STYLE_PRESET_VALUES = ['green', 'blue', 'purple', 'amber'] as const
 const REGEX_FIELD_VALUES = ['any', ...ADVANCED_FILTER_FIELDS] as const
 
 const fieldSchema = z.enum(FIELD_VALUES)
-const emptyOrFieldSchema = z.union([z.literal(''), fieldSchema])
 const regexFieldSchema = z.enum(REGEX_FIELD_VALUES)
 const ruleKindSchema = z.enum(RULE_KIND_VALUES)
 const conditionKindSchema = z.enum(CONDITION_KIND_VALUES)
@@ -77,16 +75,15 @@ const filterStateSchema = z.strictObject({
     input: z.string(),
     applied: z.string()
   }),
-  globalRegex: z.strictObject({
-    enabled: z.boolean(),
-    input: z.string(),
-    applied: z.string(),
-    flags: z.string()
-  }),
-  columnRegex: z.strictObject({
-    field: emptyOrFieldSchema,
+  regex: z.strictObject({
+    field: regexFieldSchema,
     pattern: z.string(),
-    flags: z.string()
+    flags: z.string(),
+    applied: z.strictObject({
+      field: regexFieldSchema,
+      pattern: z.string(),
+      flags: z.string()
+    })
   })
 })
 
@@ -156,16 +153,15 @@ function normalizeState(state: EntriesSharedViewState): EntriesSharedViewState {
         input: state.filters.formula.input,
         applied: state.filters.formula.applied
       },
-      globalRegex: {
-        enabled: state.filters.globalRegex.enabled,
-        input: state.filters.globalRegex.input,
-        applied: state.filters.globalRegex.applied,
-        flags: state.filters.globalRegex.flags
-      },
-      columnRegex: {
-        field: state.filters.columnRegex.field,
-        pattern: state.filters.columnRegex.pattern,
-        flags: state.filters.columnRegex.flags
+      regex: {
+        field: state.filters.regex.field,
+        pattern: state.filters.regex.pattern,
+        flags: state.filters.regex.flags,
+        applied: {
+          field: state.filters.regex.applied.field,
+          pattern: state.filters.regex.applied.pattern,
+          flags: state.filters.regex.applied.flags
+        }
       }
     },
     rules: state.rules.map(rule => ({
@@ -208,10 +204,15 @@ function findUnsupportedSemanticValue(payload: unknown): EntriesSharedViewDecode
 
   const filters = payload.filters
   if (isPlainObject(filters)) {
-    const columnRegex = filters.columnRegex
-    if (isPlainObject(columnRegex)) {
-      const field = columnRegex.field
-      if (field !== '' && typeof field === 'string' && !isSupportedField(field)) return createDecodeError('unsupported_field', field)
+    const regex = filters.regex
+    if (isPlainObject(regex)) {
+      for (const key of ['field', 'applied']) {
+        const section = isPlainObject(regex[key as string]) ? regex[key as string] : regex
+        if (isPlainObject(section)) {
+          const field = section.field
+          if (typeof field === 'string' && field !== 'any' && !isSupportedField(field)) return createDecodeError('unsupported_field', field)
+        }
+      }
     }
   }
 
@@ -257,11 +258,9 @@ function validateSharedViewSemantics(state: EntriesSharedViewState): EntriesShar
   const formulaError = validateFormula(state.filters.formula.input) ?? validateFormula(state.filters.formula.applied)
   if (formulaError) return formulaError
 
-  const globalRegexError = validateRegex(state.filters.globalRegex.input, state.filters.globalRegex.flags) ?? validateRegex(state.filters.globalRegex.applied, state.filters.globalRegex.flags)
-  if (globalRegexError) return globalRegexError
-
-  const columnRegexError = validateRegex(state.filters.columnRegex.pattern, state.filters.columnRegex.flags)
-  if (columnRegexError) return columnRegexError
+  const regexError = validateRegex(state.filters.regex.pattern, state.filters.regex.flags)
+    ?? validateRegex(state.filters.regex.applied.pattern, state.filters.regex.applied.flags)
+  if (regexError) return regexError
 
   for (const rule of state.rules) {
     if (rule.condition.kind === 'formula') {
@@ -317,8 +316,7 @@ export function buildEntriesSharedViewUrl(baseUrl: string, state: EntriesSharedV
 export function summarizeEntriesSharedView(state: EntriesSharedViewState): EntriesSharedViewSummary {
   const filterCount = [
     state.filters.formula.applied.trim(),
-    state.filters.globalRegex.enabled && state.filters.globalRegex.applied.trim(),
-    state.filters.columnRegex.field && state.filters.columnRegex.pattern.trim()
+    state.filters.regex.applied.pattern.trim()
   ].filter(Boolean).length
   const ruleCount = state.rules.length
 

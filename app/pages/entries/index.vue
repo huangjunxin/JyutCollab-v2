@@ -126,15 +126,12 @@
           <EntriesAdvancedFilterPanel
             v-model:expanded="advancedFilters.advancedFilterExpanded.value"
             v-model:formula-input="advancedFilters.formulaInput.value"
-            v-model:global-regex-enabled="advancedFilters.globalRegexEnabled.value"
-            v-model:global-regex-input="advancedFilters.globalRegexInput.value"
-            v-model:column-regex-field="advancedFilters.columnRegex.field"
-            v-model:column-regex-pattern="advancedFilters.columnRegex.pattern"
+            v-model:regex-field="advancedFilters.regexField.value"
+            v-model:regex-pattern="advancedFilters.regexPattern.value"
             teleport-to="#entries-advanced-filter-host"
             :field-options="advancedFilterFieldOptions"
             :formula-error="advancedFilters.advancedFilterErrors.formula?.message || ''"
-            :global-regex-error="advancedFilters.advancedFilterErrors.globalRegex?.message || ''"
-            :column-regex-error="advancedFilters.advancedFilterErrors.columnRegex?.message || ''"
+            :regex-error="advancedFilters.advancedFilterErrors.regex?.message || ''"
             :has-active-advanced-filters="advancedFilters.hasActiveAdvancedFilters.value"
             :visible-count="advancedFilters.visibleEntryCount.value"
             :loaded-count="advancedFilters.loadedEntryCount.value"
@@ -763,7 +760,7 @@
       </div>
 
       <!-- Pagination -->
-      <div class="flex-shrink-0 px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4 bg-gray-50 dark:bg-gray-900/50">
+      <div v-if="!hasActiveAdvancedFilters" class="flex-shrink-0 px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4 bg-gray-50 dark:bg-gray-900/50">
         <div class="text-sm text-gray-500 dark:text-gray-400">
           {{ (pagination.page - 1) * pagination.perPage + 1 }}-{{ Math.min(pagination.page * pagination.perPage, pagination.total) }} / {{ pagination.total }}
         </div>
@@ -1189,7 +1186,7 @@ const isAnyEntrySaving = computed(() => savingEntryKeys.value.size > 0)
 const searchQuery = ref('')
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
-const { entries, aggregatedGroups, lexemeGroups, loading, currentPage, pagination, fetchEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
+const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentPage, pagination, fetchEntries, fetchAllEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
 
 // Handle URL parameters - will be processed in onMounted before fetchEntries
 const route = useRoute()
@@ -2770,7 +2767,7 @@ function applyUrlParams(): boolean {
 
 // Watch for page changes
 watch(currentPage, () => {
-  if (isInitializing.value) return
+  if (isInitializing.value || isAllFetched.value) return
   fetchEntries()
 })
 
@@ -2778,7 +2775,15 @@ watch(currentPage, () => {
 watch([() => filters.region, () => filters.status, () => filters.theme, () => filters.createdBy], () => {
   if (isInitializing.value) return
   currentPage.value = 1
-  fetchEntries()
+  if (hasActiveAdvancedFilters.value) fetchAllEntries()
+  else fetchEntries()
+})
+
+watch(hasActiveAdvancedFilters, (active) => {
+  if (isInitializing.value) return
+  currentPage.value = 1
+  if (active) fetchAllEntries()
+  else fetchEntries()
 })
 
 // Watch for route.query changes (handles navigation from homepage with search/filter params)
@@ -2846,6 +2851,11 @@ onMounted(async () => {
 
   // Mark initialization complete so watches can trigger normally
   isInitializing.value = false
+
+  // If advanced filters were restored from a saved view, switch to all-fetch
+  if (hasActiveAdvancedFilters.value) {
+    await fetchAllEntries()
+  }
 })
 </script>
 

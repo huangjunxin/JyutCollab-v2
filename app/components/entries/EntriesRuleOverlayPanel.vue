@@ -111,6 +111,7 @@
 
         <fieldset class="flex flex-col gap-2">
           <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">目標欄位</legend>
+          <p class="text-xs text-gray-500 dark:text-gray-400">符合條件時將標示這些欄位。</p>
           <div class="flex flex-wrap gap-2">
             <UButton
               v-for="option in normalizedFieldOptions"
@@ -159,15 +160,16 @@
 
         <div v-else class="grid gap-3 lg:grid-cols-[14rem_1fr_8rem]">
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
-            正則表達式欄位
+            搜尋範圍
             <USelectMenu
               v-model="draftRegexField"
               :items="regexFieldOptions"
               value-key="value"
               size="sm"
               class="w-full"
-              aria-label="正則表達式欄位"
+              aria-label="搜尋範圍"
             />
+            <span class="text-xs font-normal text-gray-500 dark:text-gray-400">在此欄位中尋找符合正則表達式的內容。</span>
           </label>
           <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
             正則表達式
@@ -410,6 +412,7 @@
 
       <fieldset class="flex flex-col gap-2">
         <legend class="text-xs font-semibold text-gray-700 dark:text-gray-200">目標欄位</legend>
+          <p class="text-xs text-gray-500 dark:text-gray-400">符合條件時將標示這些欄位。</p>
         <div class="flex flex-wrap gap-2">
           <UButton
             v-for="option in normalizedFieldOptions"
@@ -458,15 +461,16 @@
 
       <div v-else class="grid gap-3 lg:grid-cols-[14rem_1fr_8rem]">
         <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
-          正則表達式欄位
+          搜尋範圍
           <USelectMenu
             v-model="draftRegexField"
             :items="regexFieldOptions"
             value-key="value"
             size="sm"
             class="w-full"
-            aria-label="正則表達式欄位"
+            aria-label="搜尋範圍"
           />
+          <span class="text-xs font-normal text-gray-500 dark:text-gray-400">在此欄位中尋找符合正則表達式的內容。</span>
         </label>
         <label class="flex flex-col gap-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
           正則表達式

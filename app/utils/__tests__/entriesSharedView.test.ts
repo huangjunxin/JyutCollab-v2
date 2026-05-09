@@ -18,16 +18,15 @@ function createState(overrides: Partial<EntriesSharedViewState> = {}): EntriesSh
         input: '=CONTAINS(definition, "檢查")',
         applied: '=CONTAINS(definition, "檢查")'
       },
-      globalRegex: {
-        enabled: true,
-        input: '香港|廣州',
-        applied: '香港|廣州',
-        flags: 'iu'
-      },
-      columnRegex: {
+      regex: {
         field: 'headword',
         pattern: '測試',
-        flags: 'i'
+        flags: 'i',
+        applied: {
+          field: 'headword',
+          pattern: '測試',
+          flags: 'i'
+        }
       }
     },
     rules: [
@@ -87,9 +86,9 @@ describe('entries shared view utility', () => {
     if (!decoded.ok) return
     expect(decoded.data).toEqual(state)
     expect(summarizeEntriesSharedView(decoded.data)).toEqual({
-      filterCount: 3,
+      filterCount: 2,
       ruleCount: 2,
-      message: '已還原 3 項篩選和 2 項規則。'
+      message: '已還原 2 項篩選和 2 項規則。'
     })
   })
 
@@ -177,7 +176,7 @@ describe('entries shared view utility', () => {
     })
 
     const withUnknownNestedField = createState()
-    ;(withUnknownNestedField.filters.globalRegex as any).secretToken = 'sk-secret'
+    ;(withUnknownNestedField.filters.regex as any).secretToken = 'sk-secret'
     expect(decodeEntriesSharedView(encodeRaw(withUnknownNestedField))).toMatchObject({
       ok: false,
       code: 'schema_mismatch',
@@ -187,7 +186,7 @@ describe('entries shared view utility', () => {
 
   it('rejects unsupported fields, rule kinds, and condition kinds with explicit copy', () => {
     const unsupportedField = createState()
-    unsupportedField.filters.columnRegex.field = 'unknown' as any
+    unsupportedField.filters.regex.field = 'unknown' as any
     expect(decodeEntriesSharedView(encodeRaw(unsupportedField))).toMatchObject({
       ok: false,
       code: 'unsupported_field',
@@ -237,7 +236,11 @@ describe('entries shared view utility', () => {
     const invalidRegex = createState({
       filters: {
         ...createState().filters,
-        globalRegex: { enabled: true, input: '(', applied: '(', flags: 'i' }
+        regex: {
+          ...createState().filters.regex,
+          pattern: '(',
+          flags: 'i'
+        }
       }
     })
     expect(decodeEntriesSharedView(encodeRaw(invalidRegex))).toMatchObject({

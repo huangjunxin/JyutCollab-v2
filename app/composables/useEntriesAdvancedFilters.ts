@@ -17,8 +17,8 @@ function getEntryCountFromGroups(groups: EntryGroup[]): number {
   return groups.reduce((sum, group) => sum + group.entries.length, 0)
 }
 
-export interface AdvancedFilterColumnRegexState {
-  field: AdvancedFilterFieldKey | ''
+export interface AdvancedFilterRegexState {
+  field: AdvancedFilterFieldKey | 'any'
   pattern: string
   flags: string
 }
@@ -28,19 +28,12 @@ export interface ExportedAdvancedFilterState {
     input: string
     applied: string
   }
-  globalRegex: {
-    enabled: boolean
-    input: string
-    applied: string
-    flags: string
-  }
-  columnRegex: AdvancedFilterColumnRegexState
+  regex: AdvancedFilterRegexState & { applied: AdvancedFilterRegexState }
 }
 
 interface AdvancedFilterErrors {
   formula: AdvancedFilterError | null
-  globalRegex: AdvancedFilterError | null
-  columnRegex: AdvancedFilterError | null
+  regex: AdvancedFilterError | null
 }
 
 export function useEntriesAdvancedFilters(args: {
@@ -54,20 +47,17 @@ export function useEntriesAdvancedFilters(args: {
   const advancedFilterExpanded = ref(false)
   const formulaInput = ref('')
   const appliedFormula = ref('')
-  const globalRegexEnabled = ref(false)
-  const globalRegexInput = ref('')
-  const appliedGlobalRegex = ref('')
-  const globalRegexFlags = ref('i')
-  const columnRegex = reactive<AdvancedFilterColumnRegexState>({ field: '', pattern: '', flags: 'i' })
-  const appliedColumnRegex = reactive<AdvancedFilterColumnRegexState>({ field: '', pattern: '', flags: 'i' })
-  const advancedFilterErrors = reactive<AdvancedFilterErrors>({ formula: null, globalRegex: null, columnRegex: null })
+  const regexField = ref<AdvancedFilterFieldKey | 'any'>('any')
+  const regexPattern = ref('')
+  const regexFlags = ref('i')
+  const appliedRegex = reactive<AdvancedFilterRegexState>({ field: 'any', pattern: '', flags: 'i' })
+  const advancedFilterErrors = reactive<AdvancedFilterErrors>({ formula: null, regex: null })
 
   // Performance optimization: cache parsed formula AST
   let cachedFormulaAst: { formula: string; ast: FormulaNode } | null = null
 
-  // Performance optimization: cache compiled regexes
-  let cachedGlobalRegex: { pattern: string; flags: string; regex: RegExp } | null = null
-  let cachedColumnRegex: { pattern: string; flags: string; regex: RegExp } | null = null
+  // Performance optimization: cache compiled regex
+  let cachedRegex: { field: AdvancedFilterFieldKey | 'any'; pattern: string; flags: string; regex: RegExp } | null = null
 
   function isAdvancedFilterField(key: string): key is AdvancedFilterFieldKey {
     return ADVANCED_FILTER_FIELDS.includes(key as AdvancedFilterFieldKey)
@@ -90,9 +80,8 @@ export function useEntriesAdvancedFilters(args: {
   }
 
   const hasAppliedFormula = computed(() => appliedFormula.value.trim().length > 0)
-  const hasAppliedGlobalRegex = computed(() => globalRegexEnabled.value && appliedGlobalRegex.value.trim().length > 0)
-  const hasAppliedColumnRegex = computed(() => !!appliedColumnRegex.field && appliedColumnRegex.pattern.trim().length > 0)
-  const hasActiveAdvancedFilters = computed(() => hasAppliedFormula.value || hasAppliedGlobalRegex.value || hasAppliedColumnRegex.value)
+  const hasAppliedRegex = computed(() => appliedRegex.pattern.trim().length > 0)
+  const hasActiveAdvancedFilters = computed(() => hasAppliedFormula.value || hasAppliedRegex.value)
   const loadedEntryCount = computed(() => {
     if (args.viewMode.value === 'flat') return args.entries.value.length
     const groups = args.viewMode.value === 'lexeme' ? args.lexemeGroups.value : args.aggregatedGroups.value
@@ -107,8 +96,7 @@ export function useEntriesAdvancedFilters(args: {
 
   function clearInactiveAppliedFilterErrors() {
     if (!hasAppliedFormula.value) advancedFilterErrors.formula = null
-    if (!hasAppliedGlobalRegex.value) advancedFilterErrors.globalRegex = null
-    if (!hasAppliedColumnRegex.value) advancedFilterErrors.columnRegex = null
+    if (!hasAppliedRegex.value) advancedFilterErrors.regex = null
   }
 
   function matchEntry(entry: Entry): boolean {
@@ -139,42 +127,27 @@ export function useEntriesAdvancedFilters(args: {
       }
     }
 
-    if (hasAppliedGlobalRegex.value) {
-      // Performance: use cached compiled regex instead of compiling repeatedly
+    if (hasAppliedRegex.value) {
+      const field = appliedRegex.field
+      const pattern = appliedRegex.pattern
+      const flags = appliedRegex.flags
+
       let regex: RegExp
-      if (cachedGlobalRegex && cachedGlobalRegex.pattern === appliedGlobalRegex.value && cachedGlobalRegex.flags === globalRegexFlags.value) {
-        regex = cachedGlobalRegex.regex
+      if (cachedRegex && cachedRegex.field === field && cachedRegex.pattern === pattern && cachedRegex.flags === flags) {
+        regex = cachedRegex.regex
       } else {
-        const compiled = compileAdvancedRegex(appliedGlobalRegex.value, globalRegexFlags.value)
+        const compiled = compileAdvancedRegex(pattern, flags)
         if (!compiled.ok) {
-          advancedFilterErrors.globalRegex = compiled.error
+          advancedFilterErrors.regex = compiled.error
           return false
         }
         regex = compiled.regex
-        cachedGlobalRegex = { pattern: appliedGlobalRegex.value, flags: globalRegexFlags.value, regex }
+        cachedRegex = { field, pattern, flags, regex }
       }
 
-      advancedFilterErrors.globalRegex = null
-      if (!testAdvancedRegex(regex, buildSearchableRowText(context))) return false
-    }
-
-    if (hasAppliedColumnRegex.value && appliedColumnRegex.field) {
-      // Performance: use cached compiled regex instead of compiling repeatedly
-      let regex: RegExp
-      if (cachedColumnRegex && cachedColumnRegex.pattern === appliedColumnRegex.pattern && cachedColumnRegex.flags === appliedColumnRegex.flags) {
-        regex = cachedColumnRegex.regex
-      } else {
-        const compiled = compileAdvancedRegex(appliedColumnRegex.pattern, appliedColumnRegex.flags)
-        if (!compiled.ok) {
-          advancedFilterErrors.columnRegex = compiled.error
-          return false
-        }
-        regex = compiled.regex
-        cachedColumnRegex = { pattern: appliedColumnRegex.pattern, flags: appliedColumnRegex.flags, regex }
-      }
-
-      advancedFilterErrors.columnRegex = null
-      if (!testAdvancedRegex(regex, context[appliedColumnRegex.field])) return false
+      advancedFilterErrors.regex = null
+      const value = field === 'any' ? buildSearchableRowText(context) : context[field]
+      if (!testAdvancedRegex(regex, value)) return false
     }
 
     return true
@@ -207,8 +180,7 @@ export function useEntriesAdvancedFilters(args: {
 
   function clearAdvancedFilterErrors() {
     advancedFilterErrors.formula = null
-    advancedFilterErrors.globalRegex = null
-    advancedFilterErrors.columnRegex = null
+    advancedFilterErrors.regex = null
   }
 
   function validateAdvancedFilterInputs(): boolean {
@@ -228,27 +200,11 @@ export function useEntriesAdvancedFilters(args: {
       }
     }
 
-    if (globalRegexEnabled.value && globalRegexInput.value.trim().length > 0) {
-      const compiled = compileAdvancedRegex(globalRegexInput.value, globalRegexFlags.value)
+    if (regexPattern.value.trim().length > 0) {
+      const compiled = compileAdvancedRegex(regexPattern.value, regexFlags.value)
       if (!compiled.ok) {
-        advancedFilterErrors.globalRegex = compiled.error
+        advancedFilterErrors.regex = compiled.error
         valid = false
-      }
-    }
-
-    if (columnRegex.pattern.trim().length > 0) {
-      if (!columnRegex.field) {
-        advancedFilterErrors.columnRegex = {
-          code: 'empty_pattern',
-          message: '請先選擇欄位，再套用欄位正則篩選。'
-        }
-        valid = false
-      } else {
-        const compiled = compileAdvancedRegex(columnRegex.pattern, columnRegex.flags)
-        if (!compiled.ok) {
-          advancedFilterErrors.columnRegex = compiled.error
-          valid = false
-        }
       }
     }
 
@@ -260,15 +216,13 @@ export function useEntriesAdvancedFilters(args: {
     if (!validateAdvancedFilterInputs()) return false
 
     appliedFormula.value = formulaInput.value
-    appliedGlobalRegex.value = globalRegexInput.value
-    appliedColumnRegex.field = columnRegex.field
-    appliedColumnRegex.pattern = columnRegex.pattern
-    appliedColumnRegex.flags = columnRegex.flags
+    appliedRegex.field = regexField.value
+    appliedRegex.pattern = regexPattern.value
+    appliedRegex.flags = regexFlags.value
 
     // Invalidate caches when applying new filters
     cachedFormulaAst = null
-    cachedGlobalRegex = null
-    cachedColumnRegex = null
+    cachedRegex = null
 
     clearInactiveAppliedFilterErrors()
     return true
@@ -277,22 +231,17 @@ export function useEntriesAdvancedFilters(args: {
   function clearAdvancedFilters() {
     formulaInput.value = ''
     appliedFormula.value = ''
-    globalRegexEnabled.value = false
-    globalRegexInput.value = ''
-    appliedGlobalRegex.value = ''
-    globalRegexFlags.value = 'i'
-    columnRegex.field = ''
-    columnRegex.pattern = ''
-    columnRegex.flags = 'i'
-    appliedColumnRegex.field = ''
-    appliedColumnRegex.pattern = ''
-    appliedColumnRegex.flags = 'i'
+    regexField.value = 'any'
+    regexPattern.value = ''
+    regexFlags.value = 'i'
+    appliedRegex.field = 'any'
+    appliedRegex.pattern = ''
+    appliedRegex.flags = 'i'
     clearAdvancedFilterErrors()
 
     // Clear caches when clearing filters
     cachedFormulaAst = null
-    cachedGlobalRegex = null
-    cachedColumnRegex = null
+    cachedRegex = null
   }
 
   function exportAdvancedFilterState(): ExportedAdvancedFilterState {
@@ -301,16 +250,15 @@ export function useEntriesAdvancedFilters(args: {
         input: formulaInput.value,
         applied: appliedFormula.value
       },
-      globalRegex: {
-        enabled: globalRegexEnabled.value,
-        input: globalRegexInput.value,
-        applied: appliedGlobalRegex.value,
-        flags: globalRegexFlags.value
-      },
-      columnRegex: {
-        field: appliedColumnRegex.field,
-        pattern: appliedColumnRegex.pattern,
-        flags: appliedColumnRegex.flags
+      regex: {
+        field: regexField.value,
+        pattern: regexPattern.value,
+        flags: regexFlags.value,
+        applied: {
+          field: appliedRegex.field,
+          pattern: appliedRegex.pattern,
+          flags: appliedRegex.flags
+        }
       }
     }
   }
@@ -318,16 +266,37 @@ export function useEntriesAdvancedFilters(args: {
   function restoreAdvancedFilterState(state: ExportedAdvancedFilterState) {
     formulaInput.value = state.formula.input
     appliedFormula.value = state.formula.applied
-    globalRegexEnabled.value = state.globalRegex.enabled
-    globalRegexInput.value = state.globalRegex.input
-    appliedGlobalRegex.value = state.globalRegex.applied
-    globalRegexFlags.value = state.globalRegex.flags
-    columnRegex.field = state.columnRegex.field
-    columnRegex.pattern = state.columnRegex.pattern
-    columnRegex.flags = state.columnRegex.flags
-    appliedColumnRegex.field = state.columnRegex.field
-    appliedColumnRegex.pattern = state.columnRegex.pattern
-    appliedColumnRegex.flags = state.columnRegex.flags
+
+    // Backward compatibility: old saved views may have globalRegex/columnRegex instead of unified regex
+    const legacyState = state as any
+    if (state.regex) {
+      regexField.value = state.regex.field
+      regexPattern.value = state.regex.pattern
+      regexFlags.value = state.regex.flags
+      appliedRegex.field = state.regex.applied.field
+      appliedRegex.pattern = state.regex.applied.pattern
+      appliedRegex.flags = state.regex.applied.flags
+    } else if (legacyState.globalRegex || legacyState.columnRegex) {
+      // Migrate old format: prefer column regex if field is set, otherwise global
+      const col = legacyState.columnRegex
+      const glob = legacyState.globalRegex
+      if (col?.field && col?.pattern) {
+        regexField.value = col.field
+        regexPattern.value = col.pattern
+        regexFlags.value = col.flags || 'i'
+        appliedRegex.field = col.field
+        appliedRegex.pattern = col.pattern
+        appliedRegex.flags = col.flags || 'i'
+      } else if (glob?.enabled && glob?.applied) {
+        regexField.value = 'any'
+        regexPattern.value = glob.applied
+        regexFlags.value = glob.flags || 'i'
+        appliedRegex.field = 'any'
+        appliedRegex.pattern = glob.applied
+        appliedRegex.flags = glob.flags || 'i'
+      }
+    }
+
     clearAdvancedFilterErrors()
   }
 
@@ -335,16 +304,13 @@ export function useEntriesAdvancedFilters(args: {
     advancedFilterExpanded,
     formulaInput,
     appliedFormula,
-    globalRegexEnabled,
-    globalRegexInput,
-    appliedGlobalRegex,
-    globalRegexFlags,
-    columnRegex,
-    appliedColumnRegex,
+    regexField,
+    regexPattern,
+    regexFlags,
+    appliedRegex,
     advancedFilterErrors,
     hasAppliedFormula,
-    hasAppliedGlobalRegex,
-    hasAppliedColumnRegex,
+    hasAppliedRegex,
     hasActiveAdvancedFilters,
     loadedEntryCount,
     filteredEntries,

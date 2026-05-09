@@ -52,77 +52,40 @@
         </p>
       </div>
 
-      <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
-        <div class="flex flex-col gap-1 xl:w-1/2">
-          <div class="flex items-center gap-2">
-            <label for="advanced-global-regex-input" class="text-xs font-semibold text-gray-700 dark:text-gray-200">
-              正則搜尋
-            </label>
-            <UButton
-              size="xs"
-              :color="globalRegexEnabled ? 'primary' : 'neutral'"
-              :variant="globalRegexEnabled ? 'soft' : 'ghost'"
-              :aria-pressed="globalRegexEnabled"
-              @click="emit('update:globalRegexEnabled', !globalRegexEnabled)"
-            >
-              {{ globalRegexEnabled ? '已啟用' : '啟用' }}
-            </UButton>
-          </div>
+      <div class="flex flex-col gap-1">
+        <label for="advanced-regex-input" class="text-xs font-semibold text-gray-700 dark:text-gray-200">
+          正則篩選
+        </label>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <USelectMenu
+            :model-value="regexField"
+            :items="regexFieldOptions"
+            value-key="value"
+            size="sm"
+            class="w-full sm:w-44"
+            placeholder="任何欄位"
+            aria-label="正則篩選欄位"
+            @update:model-value="emit('update:regexField', String($event ?? ''))"
+          />
           <UInput
-            id="advanced-global-regex-input"
-            :model-value="globalRegexInput"
+            id="advanced-regex-input"
+            :model-value="regexPattern"
             size="sm"
             class="w-full"
-            placeholder="輸入正則表達式，只搜尋目前已載入的詞條"
-            aria-describedby="advanced-global-regex-error advanced-filter-readonly-helper"
-            @update:model-value="emit('update:globalRegexInput', String($event ?? ''))"
+            placeholder="輸入正則表達式"
+            aria-describedby="advanced-regex-error"
+            @update:model-value="emit('update:regexPattern', String($event ?? ''))"
             @keyup.enter="emit('apply')"
           />
-          <p
-            v-if="globalRegexError"
-            id="advanced-global-regex-error"
-            role="alert"
-            class="text-sm text-red-600 dark:text-red-400"
-          >
-            正則表達式無法套用：{{ globalRegexError }} 請檢查括號、轉義符號或旗標。
-          </p>
         </div>
-
-        <div class="flex flex-col gap-1 xl:w-1/2">
-          <label class="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            欄位正則篩選
-          </label>
-          <div class="flex flex-col gap-2 sm:flex-row">
-            <USelectMenu
-              :model-value="columnRegexField"
-              :items="fieldOptions"
-              value-key="value"
-              size="sm"
-              class="w-full sm:w-56"
-              placeholder="選擇欄位"
-              aria-label="欄位正則篩選"
-              @update:model-value="emit('update:columnRegexField', String($event ?? ''))"
-            />
-            <UInput
-              :model-value="columnRegexPattern"
-              size="sm"
-              class="w-full"
-              placeholder="輸入此欄位的正則表達式"
-              aria-label="欄位正則篩選"
-              aria-describedby="advanced-column-regex-error advanced-filter-readonly-helper"
-              @update:model-value="emit('update:columnRegexPattern', String($event ?? ''))"
-              @keyup.enter="emit('apply')"
-            />
-          </div>
-          <p
-            v-if="columnRegexError"
-            id="advanced-column-regex-error"
-            role="alert"
-            class="text-sm text-red-600 dark:text-red-400"
-          >
-            正則表達式無法套用：{{ columnRegexError }} 請檢查括號、轉義符號或旗標。
-          </p>
-        </div>
+        <p
+          v-if="regexError"
+          id="advanced-regex-error"
+          role="alert"
+          class="text-sm text-red-600 dark:text-red-400"
+        >
+          正則表達式無法套用：{{ regexError }} 請檢查括號、轉義符號或旗標。
+        </p>
       </div>
 
       <div
@@ -184,77 +147,40 @@
       </p>
     </div>
 
-    <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
-      <div class="flex flex-col gap-1 xl:w-1/2">
-        <div class="flex items-center gap-2">
-          <label for="advanced-global-regex-input" class="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            正則搜尋
-          </label>
-          <UButton
-            size="xs"
-            :color="globalRegexEnabled ? 'primary' : 'neutral'"
-            :variant="globalRegexEnabled ? 'soft' : 'ghost'"
-            :aria-pressed="globalRegexEnabled"
-            @click="emit('update:globalRegexEnabled', !globalRegexEnabled)"
-          >
-            {{ globalRegexEnabled ? '已啟用' : '啟用' }}
-          </UButton>
-        </div>
+    <div class="flex flex-col gap-1">
+      <label for="advanced-regex-input" class="text-xs font-semibold text-gray-700 dark:text-gray-200">
+        正則篩選
+      </label>
+      <div class="flex flex-col gap-2 sm:flex-row">
+        <USelectMenu
+          :model-value="regexField"
+          :items="regexFieldOptions"
+          value-key="value"
+          size="sm"
+          class="w-full sm:w-44"
+          placeholder="任何欄位"
+          aria-label="正則篩選欄位"
+          @update:model-value="emit('update:regexField', String($event ?? ''))"
+        />
         <UInput
-          id="advanced-global-regex-input"
-          :model-value="globalRegexInput"
+          id="advanced-regex-input"
+          :model-value="regexPattern"
           size="sm"
           class="w-full"
-          placeholder="輸入正則表達式，只搜尋目前已載入的詞條"
-          aria-describedby="advanced-global-regex-error advanced-filter-readonly-helper"
-          @update:model-value="emit('update:globalRegexInput', String($event ?? ''))"
+          placeholder="輸入正則表達式"
+          aria-describedby="advanced-regex-error"
+          @update:model-value="emit('update:regexPattern', String($event ?? ''))"
           @keyup.enter="emit('apply')"
         />
-        <p
-          v-if="globalRegexError"
-          id="advanced-global-regex-error"
-          role="alert"
-          class="text-sm text-red-600 dark:text-red-400"
-        >
-          正則表達式無法套用：{{ globalRegexError }} 請檢查括號、轉義符號或旗標。
-        </p>
       </div>
-
-      <div class="flex flex-col gap-1 xl:w-1/2">
-        <label class="text-xs font-semibold text-gray-700 dark:text-gray-200">
-          欄位正則篩選
-        </label>
-        <div class="flex flex-col gap-2 sm:flex-row">
-          <USelectMenu
-            :model-value="columnRegexField"
-            :items="fieldOptions"
-            value-key="value"
-            size="sm"
-            class="w-full sm:w-56"
-            placeholder="選擇欄位"
-            aria-label="欄位正則篩選"
-            @update:model-value="emit('update:columnRegexField', String($event ?? ''))"
-          />
-          <UInput
-            :model-value="columnRegexPattern"
-            size="sm"
-            class="w-full"
-            placeholder="輸入此欄位的正則表達式"
-            aria-label="欄位正則篩選"
-            aria-describedby="advanced-column-regex-error advanced-filter-readonly-helper"
-            @update:model-value="emit('update:columnRegexPattern', String($event ?? ''))"
-            @keyup.enter="emit('apply')"
-          />
-        </div>
-        <p
-          v-if="columnRegexError"
-          id="advanced-column-regex-error"
-          role="alert"
-          class="text-sm text-red-600 dark:text-red-400"
-        >
-          正則表達式無法套用：{{ columnRegexError }} 請檢查括號、轉義符號或旗標。
-        </p>
-      </div>
+      <p
+        v-if="regexError"
+        id="advanced-regex-error"
+        role="alert"
+        class="text-sm text-red-600 dark:text-red-400"
+      >
+        正則表達式無法套用：{{ regexError }} 請檢查括號、轉義符號或旗標。
+      </p>
     </div>
 
     <div
@@ -288,15 +214,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const emit = defineEmits<{
   'update:expanded': [value: boolean]
   'update:formulaInput': [value: string]
-  'update:globalRegexEnabled': [value: boolean]
-  'update:globalRegexInput': [value: string]
-  'update:columnRegexField': [value: string]
-  'update:columnRegexPattern': [value: string]
+  'update:regexField': [value: string]
+  'update:regexPattern': [value: string]
   apply: []
   clear: []
 }>()
@@ -305,18 +229,20 @@ const props = defineProps<{
   expanded: boolean
   teleportTo?: string
   formulaInput: string
-  globalRegexEnabled: boolean
-  globalRegexInput: string
-  columnRegexField: string
-  columnRegexPattern: string
+  regexField: string
+  regexPattern: string
   fieldOptions: Array<{ value: string; label: string }>
   formulaError?: string
-  globalRegexError?: string
-  columnRegexError?: string
+  regexError?: string
   hasActiveAdvancedFilters: boolean
   visibleCount: number
   loadedCount: number
 }>()
+
+const regexFieldOptions = computed(() => [
+  { value: 'any', label: '任何欄位' },
+  ...props.fieldOptions
+])
 
 const canTeleport = ref(false)
 onMounted(() => {
