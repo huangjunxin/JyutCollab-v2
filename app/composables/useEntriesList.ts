@@ -231,7 +231,8 @@ export function useEntriesList(
 
   function handleSearch() {
     currentPage.value = 1
-    fetchEntries()
+    if (isAllFetched.value) fetchAllEntries()
+    else fetchEntries()
   }
 
   function handleSort(key: string) {
@@ -242,7 +243,8 @@ export function useEntriesList(
       sortBy.value = key
       sortOrder.value = 'asc'
     }
-    fetchEntries()
+    if (isAllFetched.value) fetchAllEntries()
+    else fetchEntries()
   }
 
   function invalidateCache() {
