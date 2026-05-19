@@ -154,7 +154,11 @@
                 :aria-expanded="userMenuOpen"
                 @click="userMenuOpen = !userMenuOpen"
               >
-                <UAvatar :alt="user?.username" size="xs" class="bg-primary text-white" />
+                <UAvatar
+                  :alt="user?.username"
+                  size="sm"
+                  class="bg-primary text-white font-sans font-bold antialiased [&_span]:font-sans [&_span]:font-bold [&_span]:text-white"
+                />
                 <span class="hidden sm:inline">{{ user?.username }}</span>
               </UButton>
               <div

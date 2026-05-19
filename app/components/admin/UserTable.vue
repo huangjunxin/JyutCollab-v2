@@ -34,7 +34,11 @@
         >
           <td class="px-4 py-3">
             <div class="flex items-center gap-2">
-              <UAvatar :alt="user.username" size="xs" class="bg-primary text-white" />
+              <UAvatar
+                :alt="user.username"
+                size="sm"
+                class="bg-primary text-white font-sans font-bold antialiased [&_span]:font-sans [&_span]:font-bold [&_span]:text-white"
+              />
               <div>
                 <div class="text-sm font-medium">{{ user.username }}</div>
                 <div v-if="user.displayName" class="text-xs text-gray-500">{{ user.displayName }}</div>
