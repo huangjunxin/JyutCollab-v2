@@ -313,6 +313,71 @@
         </div>
       </UCard>
 
+      <!-- AI Suggestion Analytics Card -->
+      <UCard
+        v-if="canReview && aiSuggestionStats"
+        class="shadow-sm border border-gray-200 dark:border-gray-700"
+      >
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-sparkles" class="w-5 h-5 text-violet-500" />
+            <span class="font-semibold text-gray-900 dark:text-white">AI 輔助成效</span>
+          </div>
+        </template>
+        <div v-if="aiSuggestionStatsLoading" class="space-y-3">
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+        </div>
+        <div v-else class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-3">
+              <p class="text-xs text-gray-500 dark:text-gray-400">總建議</p>
+              <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ aiSuggestionStats.total }}</p>
+            </div>
+            <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
+              <p class="text-xs text-green-700 dark:text-green-300">接受率</p>
+              <p class="text-2xl font-bold text-green-700 dark:text-green-300">{{ formatPercent(aiSuggestionStats.acceptanceRate) }}</p>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600 dark:text-gray-400">已接受</span>
+              <span class="font-bold text-green-600 dark:text-green-400">{{ aiSuggestionStats.accepted }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600 dark:text-gray-400">接受後修改</span>
+              <span class="font-bold text-blue-600 dark:text-blue-400">{{ aiSuggestionStats.modified }} · {{ formatPercent(aiSuggestionStats.modificationRate) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600 dark:text-gray-400">已拒絕</span>
+              <span class="font-bold text-red-600 dark:text-red-400">{{ aiSuggestionStats.rejected }} · {{ formatPercent(aiSuggestionStats.rejectionRate) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600 dark:text-gray-400">待處理</span>
+              <span class="font-bold text-amber-600 dark:text-amber-400">{{ aiSuggestionStats.pending }}</span>
+            </div>
+          </div>
+
+          <div v-if="aiSuggestionStats.byType.length > 0" class="pt-2 border-t border-gray-100 dark:border-gray-800">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">按建議類型</p>
+            <div class="space-y-2">
+              <div
+                v-for="item in aiSuggestionStats.byType"
+                :key="item.type"
+                class="flex items-center justify-between text-sm"
+              >
+                <span class="text-gray-600 dark:text-gray-400">{{ item.label }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">
+                  {{ item.total }} · 接受 {{ formatPercent(item.acceptanceRate) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </UCard>
+
       <!-- Dialect Coverage Card -->
       <UCard class="shadow-sm border border-gray-200 dark:border-gray-700">
         <template #header>
@@ -506,6 +571,11 @@ definePageMeta({
 
 const { user, isAuthenticated, canReview } = useAuth()
 const { siteStats, userStats, reviewerStats, loading: statsLoading, fetchStats } = useStats()
+const {
+  stats: aiSuggestionStats,
+  loading: aiSuggestionStatsLoading,
+  fetchStats: fetchAISuggestionStats
+} = useAISuggestionStats()
 
 // 增強統計
 const {
@@ -551,11 +621,16 @@ async function refreshAll() {
       fetchCoverage(),
       fetchEnhancedStats(),
       fetchMyActivities(),
-      canReview.value ? fetchAllActivities() : Promise.resolve()
+      canReview.value ? fetchAllActivities() : Promise.resolve(),
+      canReview.value ? fetchAISuggestionStats() : Promise.resolve()
     ])
   } finally {
     isRefreshing.value = false
   }
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`
 }
 
 function getActionIcon(action: EditHistoryAction): string {
@@ -626,6 +701,7 @@ onMounted(() => {
     fetchEnhancedStats()
     if (canReview.value) {
       fetchAllActivities()
+      fetchAISuggestionStats()
     }
   }
 })
