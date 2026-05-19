@@ -71,7 +71,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- My Stats Card -->
       <UCard
-        v-if="isAuthenticated && userStats"
+        v-if="isAuthenticated"
         class="shadow-sm border border-gray-200 dark:border-gray-700"
       >
         <template #header>
@@ -80,41 +80,47 @@
             <span class="font-semibold text-gray-900 dark:text-white">我的詞條</span>
           </div>
         </template>
-        <div class="space-y-3">
+        <div v-if="statsLoading" class="space-y-3">
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+        </div>
+        <div v-else class="space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-document-text" class="w-4 h-4" />
               總詞條
             </span>
-            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ userStats.total }}</span>
+            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ displayedUserStats.total }}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-clock" class="w-4 h-4" />
               待審核
             </span>
-            <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ userStats.pending }}</span>
+            <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ displayedUserStats.pending }}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
               已發佈
             </span>
-            <span class="text-lg font-bold text-green-600 dark:text-green-400">{{ userStats.approved }}</span>
+            <span class="text-lg font-bold text-green-600 dark:text-green-400">{{ displayedUserStats.approved }}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-x-circle" class="w-4 h-4" />
               已拒絕
             </span>
-            <span class="text-lg font-bold text-red-600 dark:text-red-400">{{ userStats.rejected }}</span>
+            <span class="text-lg font-bold text-red-600 dark:text-red-400">{{ displayedUserStats.rejected }}</span>
           </div>
         </div>
       </UCard>
 
       <!-- Reviewer Stats Card -->
       <UCard
-        v-if="canReview && reviewerStats"
+        v-if="canReview"
         class="shadow-sm border border-gray-200 dark:border-gray-700"
       >
         <template #header>
@@ -123,7 +129,11 @@
             <span class="font-semibold text-gray-900 dark:text-white">審核數據</span>
           </div>
         </template>
-        <div class="space-y-3">
+        <div v-if="statsLoading" class="space-y-3">
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+        </div>
+        <div v-else class="space-y-3">
           <NuxtLink
             to="/review"
             class="flex items-center justify-between hover:opacity-80 transition-opacity"
@@ -132,14 +142,14 @@
               <UIcon name="i-heroicons-clock" class="w-4 h-4" />
               待審核
             </span>
-            <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ reviewerStats.pending }}</span>
+            <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ displayedReviewerStats.pending }}</span>
           </NuxtLink>
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
               <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
               我已審核
             </span>
-            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ reviewerStats.reviewedByMe }}</span>
+            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ displayedReviewerStats.reviewedByMe }}</span>
           </div>
         </div>
       </UCard>
@@ -195,7 +205,6 @@
     <div v-if="isAuthenticated" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- My Contribution Stats (Enhanced) -->
       <UCard
-        v-if="enhancedUserStats"
         class="shadow-sm border border-gray-200 dark:border-gray-700"
       >
         <template #header>
@@ -213,10 +222,10 @@
         </div>
         <div v-else class="space-y-4">
           <!-- Streak Badge -->
-          <div v-if="enhancedUserStats.streak.current > 0" class="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+          <div v-if="displayedEnhancedUserStats.streak.current > 0" class="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
             <UIcon name="i-heroicons-fire" class="w-5 h-5 text-amber-500" />
             <span class="text-sm font-medium text-amber-700 dark:text-amber-300">
-              連續貢獻 {{ enhancedUserStats.streak.current }} 天
+              連續貢獻 {{ displayedEnhancedUserStats.streak.current }} 天
             </span>
           </div>
 
@@ -227,11 +236,11 @@
               <div class="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div
                   class="h-full bg-green-500 rounded-full"
-                  :style="{ width: `${enhancedUserStats.approvalRate * 100}%` }"
+                  :style="{ width: `${displayedEnhancedUserStats.approvalRate * 100}%` }"
                 />
               </div>
               <span class="text-sm font-bold text-gray-900 dark:text-white">
-                {{ Math.round(enhancedUserStats.approvalRate * 100) }}%
+                {{ Math.round(displayedEnhancedUserStats.approvalRate * 100) }}%
               </span>
             </div>
           </div>
@@ -239,15 +248,15 @@
           <!-- Recent Activity (7 days) -->
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400">近7天新建</span>
-            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ enhancedUserStats.recentActivity.entriesCreated }}</span>
+            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ displayedEnhancedUserStats.recentActivity.entriesCreated }}</span>
           </div>
 
           <!-- Top Dialects -->
-          <div v-if="enhancedUserStats.byDialect.length > 0">
+          <div v-if="displayedEnhancedUserStats.byDialect.length > 0">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">方言分布</p>
             <div class="flex flex-wrap gap-1">
               <UBadge
-                v-for="d in enhancedUserStats.byDialect.slice(0, 3)"
+                v-for="d in displayedEnhancedUserStats.byDialect.slice(0, 3)"
                 :key="d.dialect"
                 color="primary"
                 variant="subtle"
@@ -261,7 +270,7 @@
 
       <!-- Reviewer Progress Card (Enhanced) -->
       <UCard
-        v-if="canReview && enhancedReviewerStats"
+        v-if="canReview"
         class="shadow-sm border border-gray-200 dark:border-gray-700"
       >
         <template #header>
@@ -281,7 +290,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">待審核緊急度</p>
             <div class="space-y-2">
               <div
-                v-for="bucket in enhancedReviewerStats.urgencyBuckets"
+                v-for="bucket in displayedEnhancedReviewerStats.urgencyBuckets"
                 :key="bucket.range"
                 class="flex items-center justify-between text-sm"
               >
@@ -303,11 +312,11 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">我的審核效率</p>
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-600 dark:text-gray-400">今日審核</span>
-              <span class="font-bold text-gray-900 dark:text-white">{{ enhancedReviewerStats.myPerformance.todayReviewed }}</span>
+              <span class="font-bold text-gray-900 dark:text-white">{{ displayedEnhancedReviewerStats.myPerformance.todayReviewed }}</span>
             </div>
             <div class="flex items-center justify-between text-sm mt-1">
               <span class="text-gray-600 dark:text-gray-400">本週審核</span>
-              <span class="font-bold text-gray-900 dark:text-white">{{ enhancedReviewerStats.myPerformance.thisWeekReviewed }}</span>
+              <span class="font-bold text-gray-900 dark:text-white">{{ displayedEnhancedReviewerStats.myPerformance.thisWeekReviewed }}</span>
             </div>
           </div>
         </div>
@@ -315,7 +324,7 @@
 
       <!-- AI Suggestion Analytics Card -->
       <UCard
-        v-if="canReview && aiSuggestionStats"
+        v-if="canReview"
         class="shadow-sm border border-gray-200 dark:border-gray-700"
       >
         <template #header>
@@ -324,7 +333,7 @@
             <span class="font-semibold text-gray-900 dark:text-white">AI 輔助成效</span>
           </div>
         </template>
-        <div v-if="aiSuggestionStatsLoading" class="space-y-3">
+        <div v-if="aiSuggestionStatsLoading || !aiSuggestionStats" class="space-y-3">
           <USkeleton class="h-6 w-full" />
           <USkeleton class="h-6 w-full" />
         </div>
@@ -391,12 +400,12 @@
             <span class="font-semibold text-gray-900 dark:text-white">方言覆蓋</span>
           </div>
         </template>
-        <div v-if="dialectLoading" class="space-y-3">
+        <div v-if="dialectLoading || !dialectCoverage" class="space-y-3">
           <USkeleton class="h-6 w-full" />
           <USkeleton class="h-6 w-full" />
           <USkeleton class="h-6 w-full" />
         </div>
-        <div v-else-if="dialectCoverage" class="space-y-4">
+        <div v-else class="space-y-4">
           <!-- Coverage Rate -->
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400">覆蓋率</span>
@@ -618,6 +627,38 @@ const welcomeTitle = computed(() => {
 })
 
 const isRefreshing = ref(false)
+const fallbackUserStats = { total: 0, pending: 0, approved: 0, rejected: 0 }
+const fallbackReviewerStats = { pending: 0, reviewedByMe: 0 }
+const fallbackEnhancedUserStats = {
+  total: 0,
+  pending: 0,
+  approved: 0,
+  rejected: 0,
+  byDialect: [],
+  byType: [],
+  recentActivity: { entriesCreated: 0, entriesApproved: 0, entriesUpdated: 0 },
+  streak: { current: 0, longest: 0 },
+  approvalRate: 0,
+  avgReviewTime: 0,
+  dailyActivity: []
+}
+const fallbackEnhancedReviewerStats = {
+  pending: 0,
+  reviewedByMe: 0,
+  urgencyBuckets: [],
+  byDialect: [],
+  myPerformance: {
+    avgReviewTime: 0,
+    approvalRate: 0,
+    todayReviewed: 0,
+    thisWeekReviewed: 0
+  }
+}
+
+const displayedUserStats = computed(() => userStats.value || fallbackUserStats)
+const displayedReviewerStats = computed(() => reviewerStats.value || fallbackReviewerStats)
+const displayedEnhancedUserStats = computed(() => enhancedUserStats.value || fallbackEnhancedUserStats)
+const displayedEnhancedReviewerStats = computed(() => enhancedReviewerStats.value || fallbackEnhancedReviewerStats)
 
 async function refreshAll() {
   isRefreshing.value = true
