@@ -219,8 +219,12 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     duplicateCheckResult.value = new Map(duplicateCheckResult.value)
 
     try {
+      const query: { headword: string; dialect: string; excludeId?: string } = { headword, dialect }
+      if (!(entry as any)._isNew) {
+        query.excludeId = entryId
+      }
       const res = await $fetch<{ sameDialect: OtherDialectEntryRaw[]; otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
-        query: { headword, dialect }
+        query
       })
       duplicateCheckResult.value.set(entryId, {
         loading: false,
@@ -248,9 +252,13 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     referenceSearchLoading.value = new Map(referenceSearchLoading.value)
 
     try {
+      const duplicateQuery: { headword: string; dialect: string; excludeId?: string } = { headword: q, dialect }
+      if (!(entry as any)._isNew) {
+        duplicateQuery.excludeId = entryId
+      }
       const [dbRes, jyutjyuRes] = await Promise.all([
         $fetch<{ sameDialect: OtherDialectEntryRaw[]; otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
-          query: { headword: q, dialect }
+          query: duplicateQuery
         }),
         $fetch<any>('/api/jyutjyu/search', { query: { q } })
       ])

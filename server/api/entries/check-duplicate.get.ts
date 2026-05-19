@@ -4,7 +4,8 @@ import { Entry } from '../../utils/Entry'
 
 const QuerySchema = z.object({
   headword: z.string().min(1),
-  dialect: z.string().min(1)
+  dialect: z.string().min(1),
+  excludeId: z.string().optional()
 })
 
 /** 同方言 / 其他方言詞條均帶 senses、theme、meta 供前端預覽釋義與分類 */
@@ -37,16 +38,19 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const { headword, dialect } = validated.data
+    const { headword, dialect, excludeId } = validated.data
     const displayTrimmed = headword.trim()
     if (!displayTrimmed) {
       return { sameDialect: [], otherDialects: [] }
     }
 
+    const excludeFilter = excludeId ? { id: { $ne: excludeId } } : {}
+
     const [sameDialectRaw, otherDialectsRaw] = await Promise.all([
       Entry.find({
         'headword.display': displayTrimmed,
-        'dialect.name': dialect
+        'dialect.name': dialect,
+        ...excludeFilter
       })
         .select('id headword dialect status createdAt senses theme meta')
         .sort({ createdAt: -1 })
@@ -54,7 +58,8 @@ export default defineEventHandler(async (event) => {
         .lean(),
       Entry.find({
         'headword.display': displayTrimmed,
-        'dialect.name': { $ne: dialect }
+        'dialect.name': { $ne: dialect },
+        ...excludeFilter
       })
         .select('id headword dialect status createdAt senses theme meta')
         .sort({ createdAt: -1 })

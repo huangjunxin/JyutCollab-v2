@@ -2235,9 +2235,11 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   editingCell.value = null
   aiSuggestion.value = null
   aiSuggestionForField.value = null
-  // 新建詞條：離開詞頭格且已填寫詞頭時，做一次重複性檢測 + Jyutjyu 參考查詢
-  if (field === 'headword' && entry && (entry as any)._isNew && entry.headword?.display?.trim()) {
+  if ((field === 'headword' || field === 'dialect') && entry && entry.headword?.display?.trim() && entry.dialect?.name) {
     runDuplicateCheck(entry)
+  }
+  // 新建詞條：離開詞頭格且已填寫詞頭時，做一次 Jyutjyu 參考查詢
+  if (field === 'headword' && entry && (entry as any)._isNew && entry.headword?.display?.trim()) {
     runJyutjyuRef(entry)
   }
   // 預設不主動把焦點移回整個表格 wrapper，避免在滑鼠點擊其他區域時觸發瀏覽器自動滾動造成「頁面跳動」感

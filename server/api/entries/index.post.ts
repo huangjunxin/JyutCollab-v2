@@ -10,7 +10,7 @@ function formatMongoDuplicateMessage(error: any) {
   const dialect = key['dialect.name']
 
   if (headword && dialect) {
-    return `「${headword}」在「${dialect}」已經存在，請修改詞頭或選擇其他方言。`
+    return `「${headword}」在「${dialect}」仍被資料庫唯一索引阻擋，請確認 headword.display_1_dialect.name_1 索引已移除後再試。`
   }
 
   if (key.id) {
@@ -164,19 +164,6 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 403,
         message: '你沒有權限為此方言建立詞條'
-      })
-    }
-
-    // 檢查重複（以 display + dialect 為唯一鍵；異形詞只作輔助信息）
-    const existing = await Entry.findOne({
-      'headword.display': headword.display,
-      'dialect.name': dialect.name
-    } as any)
-
-    if (existing) {
-      throw createError({
-        statusCode: 409,
-        message: `「${headword.display}」在「${dialect.name}」已經存在，請修改詞頭或選擇其他方言。`
       })
     }
 

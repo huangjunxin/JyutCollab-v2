@@ -221,7 +221,7 @@ const EntrySchema = new mongoose.Schema<IEntry>({
 })
 
 // Indexes
-EntrySchema.index({ 'headword.display': 1, 'dialect.name': 1 }, { unique: true })
+EntrySchema.index({ 'headword.display': 1, 'dialect.name': 1 })
 // 其他索引
 EntrySchema.index({ status: 1 })
 EntrySchema.index({ createdBy: 1 })

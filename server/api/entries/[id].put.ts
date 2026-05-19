@@ -2,6 +2,22 @@ import { z } from 'zod'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
+function formatMongoDuplicateMessage(error: any) {
+  const key = error.keyValue || {}
+  const headword = key['headword.display']
+  const dialect = key['dialect.name']
+
+  if (headword && dialect) {
+    return `「${headword}」在「${dialect}」仍被資料庫唯一索引阻擋，請確認 headword.display_1_dialect.name_1 索引已移除後再試。`
+  }
+
+  if (key.id) {
+    return '系統未能產生唯一詞條編號，請重新保存一次。'
+  }
+
+  return '已有相同資料，請檢查詞條內容或重新整理頁面後再試。'
+}
+
 const UpdateEntrySchema = z.object({
   // 新格式
   headword: z.object({
@@ -346,6 +362,14 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     console.error('Update entry error:', error)
     if (error.statusCode) throw error
+
+    if (error.code === 11000) {
+      throw createError({
+        statusCode: 409,
+        message: formatMongoDuplicateMessage(error)
+      })
+    }
+
     throw createError({
       statusCode: 500,
       message: '更新詞條失敗'
