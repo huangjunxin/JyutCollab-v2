@@ -2019,6 +2019,9 @@ function onThemeUpdate(entry: Entry, theme: {
   entry.theme.level2Id = theme.level2Id
   entry.theme.level3Id = theme.level3Id
   entry._isDirty = true
+  if (editingCell.value && editingCell.value.entryId === getEntryIdString(entry) && editingCell.value.field === 'theme') {
+    editValue.value = theme.level3Id
+  }
   // 清除 AI 建議
   clearThemeSuggestionForEntry(entry)
 }
