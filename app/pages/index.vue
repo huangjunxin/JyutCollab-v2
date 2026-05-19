@@ -327,51 +327,56 @@
         <div v-if="aiSuggestionStatsLoading" class="space-y-3">
           <USkeleton class="h-6 w-full" />
           <USkeleton class="h-6 w-full" />
-          <USkeleton class="h-6 w-full" />
         </div>
-        <div v-else class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-3">
+        <div v-else class="space-y-3">
+          <div class="grid grid-cols-3 gap-3">
+            <div>
               <p class="text-xs text-gray-500 dark:text-gray-400">總建議</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ aiSuggestionStats.total }}</p>
+              <p class="text-xl font-bold text-gray-900 dark:text-white">{{ aiSuggestionStats.total }}</p>
             </div>
-            <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
+            <div>
               <p class="text-xs text-green-700 dark:text-green-300">接受率</p>
-              <p class="text-2xl font-bold text-green-700 dark:text-green-300">{{ formatPercent(aiSuggestionStats.acceptanceRate) }}</p>
+              <p class="text-xl font-bold text-green-700 dark:text-green-300">{{ formatPercent(aiSuggestionStats.acceptanceRate) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-blue-700 dark:text-blue-300">修改率</p>
+              <p class="text-xl font-bold text-blue-700 dark:text-blue-300">{{ formatPercent(aiSuggestionStats.modificationRate) }}</p>
             </div>
           </div>
 
-          <div class="space-y-2">
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600 dark:text-gray-400">已接受</span>
-              <span class="font-bold text-green-600 dark:text-green-400">{{ aiSuggestionStats.accepted }}</span>
+          <div class="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">已接受</span>
+                <span class="font-bold text-green-600 dark:text-green-400">{{ aiSuggestionStats.accepted }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">已拒絕</span>
+                <span class="font-bold text-red-600 dark:text-red-400">{{ aiSuggestionStats.rejected }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">接受後修改</span>
+                <span class="font-bold text-blue-600 dark:text-blue-400">{{ aiSuggestionStats.modified }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">待處理</span>
+                <span class="font-bold text-amber-600 dark:text-amber-400">{{ aiSuggestionStats.pending }}</span>
+              </div>
             </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600 dark:text-gray-400">接受後修改</span>
-              <span class="font-bold text-blue-600 dark:text-blue-400">{{ aiSuggestionStats.modified }} · {{ formatPercent(aiSuggestionStats.modificationRate) }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600 dark:text-gray-400">已拒絕</span>
-              <span class="font-bold text-red-600 dark:text-red-400">{{ aiSuggestionStats.rejected }} · {{ formatPercent(aiSuggestionStats.rejectionRate) }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600 dark:text-gray-400">待處理</span>
-              <span class="font-bold text-amber-600 dark:text-amber-400">{{ aiSuggestionStats.pending }}</span>
-            </div>
-          </div>
 
-          <div v-if="aiSuggestionStats.byType.length > 0" class="pt-2 border-t border-gray-100 dark:border-gray-800">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">按建議類型</p>
-            <div class="space-y-2">
-              <div
-                v-for="item in aiSuggestionStats.byType"
-                :key="item.type"
-                class="flex items-center justify-between text-sm"
-              >
-                <span class="text-gray-600 dark:text-gray-400">{{ item.label }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">
-                  {{ item.total }} · 接受 {{ formatPercent(item.acceptanceRate) }}
-                </span>
+            <div v-if="aiSuggestionStats.byType.length > 0">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">按建議類型</p>
+              <div class="space-y-2">
+                <div
+                  v-for="item in aiSuggestionStats.byType"
+                  :key="item.type"
+                  class="flex items-center justify-between text-sm"
+                >
+                  <span class="text-gray-600 dark:text-gray-400">{{ item.label }}</span>
+                  <span class="font-medium text-gray-900 dark:text-white">
+                    {{ item.total }} · 接受 {{ formatPercent(item.acceptanceRate) }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

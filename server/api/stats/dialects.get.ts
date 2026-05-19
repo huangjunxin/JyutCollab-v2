@@ -5,7 +5,7 @@
 import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
 import { connectDB } from '../../utils/db'
-import { DIALECT_IDS, DIALECT_LABELS, getDialectColor } from '~shared/dialects'
+import { DIALECT_IDS, DIALECT_LABELS, getDialectColor, type DialectId } from '~shared/dialects'
 
 interface DialectCoverage {
   id: string
@@ -22,6 +22,16 @@ interface UserDialectStats {
   entries: number
   approved: number
   hasPermission: boolean
+}
+
+const DIALECT_NAME_TO_ID = new Map<string, DialectId>(
+  DIALECT_IDS.map(id => [DIALECT_LABELS[id], id])
+)
+
+function resolveDialectId(value: string | undefined | null): DialectId | null {
+  if (!value) return null
+  if ((DIALECT_IDS as readonly string[]).includes(value)) return value as DialectId
+  return DIALECT_NAME_TO_ID.get(value) || null
 }
 
 export default defineEventHandler(async (event) => {
@@ -55,11 +65,12 @@ export default defineEventHandler(async (event) => {
     const dialectMap = new Map<string, { entries: number; approved: number; contributors: number }>()
 
     dialectStats.forEach(stat => {
-      const name = stat._id || '其他'
-      dialectMap.set(name, {
-        entries: stat.total,
-        approved: stat.approved,
-        contributors: stat.contributors?.length || 0
+      const dialectId = resolveDialectId(stat._id) || 'other'
+      const existing = dialectMap.get(dialectId) || { entries: 0, approved: 0, contributors: 0 }
+      dialectMap.set(dialectId, {
+        entries: existing.entries + stat.total,
+        approved: existing.approved + stat.approved,
+        contributors: existing.contributors + (stat.contributors?.length || 0)
       })
     })
 
@@ -68,7 +79,7 @@ export default defineEventHandler(async (event) => {
       .filter(id => id !== 'other')
       .map(id => {
         const name = DIALECT_LABELS[id]
-        const stats = dialectMap.get(name)
+        const stats = dialectMap.get(id)
         if (!stats || stats.entries === 0) return null
         return {
           id,
@@ -88,11 +99,11 @@ export default defineEventHandler(async (event) => {
 
     // 用戶有權限方言的統計
     const userDialects: UserDialectStats[] = userId ? userDialectPermissions.map(dialectName => {
-      const stats = dialectMap.get(dialectName) || { entries: 0, approved: 0 }
-      const id = DIALECT_IDS.find(did => DIALECT_LABELS[did] === dialectName) || ''
+      const id = resolveDialectId(dialectName)
+      const stats = id ? dialectMap.get(id) || { entries: 0, approved: 0 } : { entries: 0, approved: 0 }
       return {
-        id,
-        name: dialectName,
+        id: id || '',
+        name: id ? DIALECT_LABELS[id] : dialectName,
         entries: stats.entries,
         approved: stats.approved,
         hasPermission: true
