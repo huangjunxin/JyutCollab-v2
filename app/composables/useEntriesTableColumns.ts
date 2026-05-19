@@ -47,18 +47,10 @@ export function useEntriesTableColumns(
           outside = (bracketMatch[1] || '').trim()
           inside = (bracketMatch[2] || '').trim()
         }
-        const parts: string[] = []
-        const pushFrom = (s: string) => {
-          s.split(/[;,，；]/).forEach(token => {
-            const v = token.trim()
-            if (v) parts.push(v)
-          })
-        }
-        if (outside) pushFrom(outside)
-        if (inside) pushFrom(inside)
-        const uniq = [...new Set(parts)]
-        const main = uniq[0] || ''
-        const variants = uniq.slice(1)
+        const main = outside.trim()
+        const variants = inside
+          ? [...new Set(inside.split(/[;,，；]/).map(token => token.trim()).filter(token => token && token !== main))]
+          : []
         if (!entry.headword) {
           entry.headword = { display: '', normalized: '', isPlaceholder: false, variants: [] }
         }
