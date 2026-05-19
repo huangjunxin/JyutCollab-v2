@@ -2564,9 +2564,8 @@ async function saveNewEntry(entry: Entry) {
     }
   } catch (error: any) {
     console.error('Failed to save entry:', error)
-    const msg = error.data?.message || error.message
-    const is409 = error.statusCode === 409 || error.data?.statusCode === 409
-    alert(is409 ? '該方言下已有相同詞頭，請修改詞頭或方言後再保存' : (msg || '保存失敗'))
+    const msg = error.data?.message || error.data?.statusMessage || error.statusMessage || error.message
+    alert(msg || '保存失敗')
   } finally {
     setEntrySaving(entry, false)
   }

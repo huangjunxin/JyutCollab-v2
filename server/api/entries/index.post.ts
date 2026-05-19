@@ -4,6 +4,34 @@ import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
+function formatMongoDuplicateMessage(error: any) {
+  const key = error.keyValue || {}
+  const headword = key['headword.display']
+  const dialect = key['dialect.name']
+
+  if (headword && dialect) {
+    return `「${headword}」在「${dialect}」已經存在，請修改詞頭或選擇其他方言。`
+  }
+
+  if (key.id) {
+    return '系統未能產生唯一詞條編號，請重新保存一次。'
+  }
+
+  return '已有相同資料，請檢查詞頭、方言或重新整理頁面後再試。'
+}
+
+function formatMongooseValidationMessage(error: any) {
+  const messages = Object.values(error.errors || {})
+    .map((validationError: any) => validationError?.message)
+    .filter(Boolean)
+
+  if (messages.length > 0) {
+    return `詞條資料未能通過驗證：${messages.join('；')}`
+  }
+
+  return '詞條資料未能通過驗證，請檢查必填欄位後再試。'
+}
+
 const CreateEntrySchema = z.object({
   // 新格式
   headword: z.object({
@@ -148,7 +176,7 @@ export default defineEventHandler(async (event) => {
     if (existing) {
       throw createError({
         statusCode: 409,
-        message: '該詞條已存在'
+        message: `「${headword.display}」在「${dialect.name}」已經存在，請修改詞頭或選擇其他方言。`
       })
     }
 
@@ -246,10 +274,38 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     console.error('Create entry error:', error)
     if (error.statusCode) throw error
-    // 未知錯誤：對用戶顯示更具體但安全的提示
+
+    if (error.code === 11000) {
+      throw createError({
+        statusCode: 409,
+        message: formatMongoDuplicateMessage(error)
+      })
+    }
+
+    if (error.name === 'ValidationError') {
+      throw createError({
+        statusCode: 400,
+        message: formatMongooseValidationMessage(error)
+      })
+    }
+
+    if (error.name === 'CastError') {
+      throw createError({
+        statusCode: 400,
+        message: '詞條資料格式不正確，請檢查欄位內容後再試。'
+      })
+    }
+
+    if (error.name === 'MongoNetworkError' || error.name === 'MongoServerSelectionError') {
+      throw createError({
+        statusCode: 503,
+        message: '暫時未能連接資料庫，請稍後再試。'
+      })
+    }
+
     throw createError({
       statusCode: 500,
-      message: '伺服器出現問題，未能創建詞條，請稍後再試。如多次出現，請聯絡管理員。'
+      message: '伺服器出現問題，未能創建詞條。請重新整理頁面後再試；如問題持續，請聯絡管理員並提供詞頭及方言。'
     })
   }
 })

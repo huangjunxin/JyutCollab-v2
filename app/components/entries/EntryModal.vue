@@ -466,7 +466,7 @@ async function handleSubmit() {
 
     close()
   } catch (err: any) {
-    error.value = err.data?.message || '保存失敗'
+    error.value = err.data?.message || err.data?.statusMessage || err.statusMessage || err.message || '保存失敗'
   } finally {
     saving.value = false
   }
@@ -504,7 +504,7 @@ async function saveDraft() {
     emit('created')
     close()
   } catch (err: any) {
-    error.value = err.data?.message || '保存失敗'
+    error.value = err.data?.message || err.data?.statusMessage || err.statusMessage || err.message || '保存失敗'
   } finally {
     saving.value = false
   }
