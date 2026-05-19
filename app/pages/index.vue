@@ -571,7 +571,8 @@ import type { EditHistory, EditHistoryAction } from '~/types'
 import { getDialectLabel } from '~shared/dialects'
 
 definePageMeta({
-  name: 'index'
+  name: 'index',
+  middleware: ['auth']
 })
 
 const { user, isAuthenticated, canReview } = useAuth()
