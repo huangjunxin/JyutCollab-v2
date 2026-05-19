@@ -578,11 +578,12 @@ async function getAIExamples() {
     })
 
     if (response.success) {
-      const examples = response.data.map((e: any) =>
+      const data = Array.isArray(response.data) ? response.data : response.data?.examples
+      const examples = data.map((e: any) =>
         `${e.sentence || e.text} (${e.scenario})`
       ).join('\n')
       aiSuggestion.value = `建議例句:\n${examples}`
-      pendingAIData.value = { type: 'examples', examples: response.data }
+      pendingAIData.value = { type: 'examples', examples: data }
     }
   } catch (err) {
     console.error('AI examples error:', err)

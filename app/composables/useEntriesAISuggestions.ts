@@ -5,6 +5,7 @@ import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
 import type { Entry, Register } from '~/types'
 
 export interface ThemeAISuggestion {
+  suggestionId?: string
   level1Name: string
   level2Name: string
   level3Name: string
@@ -16,9 +17,28 @@ export interface ThemeAISuggestion {
 }
 
 export interface DefinitionAISuggestion {
+  suggestionId?: string
   definition: string
   usageNotes?: string
   formalityLevel?: string
+}
+
+interface PendingAISuggestion {
+  entryId: string
+  field: string
+  text: string
+  suggestionId?: string
+}
+
+type AISuggestionAction = 'accepted' | 'rejected' | 'modified'
+type AcceptedAIField = 'definition' | 'theme'
+
+interface AcceptedAITracker {
+  suggestionId: string
+  entryKey: string
+  entryId?: string
+  field: AcceptedAIField
+  acceptedContent: unknown
 }
 
 export interface UseEntriesAISuggestionsOptions {
@@ -31,16 +51,121 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
   const { editingCell, editValue, currentPageEntries } = options
 
   const aiSuggestion = ref<string | null>(null)
+  const aiSuggestionId = ref<string | null>(null)
   const aiSuggestionForField = ref<string | null>(null)
-  const pendingAISuggestions = ref<Map<string, { entryId: string; field: string; text: string }>>(new Map())
+  const pendingAISuggestions = ref<Map<string, PendingAISuggestion>>(new Map())
   const aiDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
   const themeAISuggestions = ref<Map<string, ThemeAISuggestion>>(new Map())
   const definitionAISuggestions = ref<Map<string, DefinitionAISuggestion>>(new Map())
+  const acceptedAITrackers = ref<Map<string, AcceptedAITracker>>(new Map())
   const aiLoadingFor = ref<{ entryKey: string | number; action: 'definition' | 'theme' | 'examples' } | null>(null)
   const aiLoading = ref(false)
   const aiSuggestAbortController = ref<AbortController | null>(null)
   const aiLoadingInlineFor = ref<{ entryId: string; field: string } | null>(null)
   const aiInlineError = ref<{ entryId: string; field: string; message: string } | null>(null)
+
+  function getRealEntryId(entry: Entry): string | undefined {
+    return (entry as any)._isNew ? undefined : entry.id
+  }
+
+  function normalizeAICompareValue(value: unknown) {
+    return String(value ?? '').trim()
+  }
+
+  function getThemeActionContent(entry: Entry) {
+    return {
+      level1: entry.theme?.level1,
+      level2: entry.theme?.level2,
+      level3: entry.theme?.level3,
+      level1Id: entry.theme?.level1Id,
+      level2Id: entry.theme?.level2Id,
+      level3Id: entry.theme?.level3Id
+    }
+  }
+
+  function logAISuggestionAction(
+    suggestionId: string | undefined | null,
+    action: AISuggestionAction,
+    payload: {
+      entryId?: string
+      clientEntryKey?: string
+      field?: string
+      acceptedContent?: unknown
+      finalContent?: unknown
+      metadata?: Record<string, unknown>
+    } = {}
+  ) {
+    if (!suggestionId) return
+    void $fetch(`/api/ai/suggestions/${suggestionId}/action`, {
+      method: 'POST',
+      body: {
+        action,
+        ...payload
+      }
+    }).catch((error) => {
+      console.warn('Failed to log AI suggestion action:', error)
+    })
+  }
+
+  function trackAcceptedAISuggestion(tracker: AcceptedAITracker) {
+    const key = `${tracker.entryKey}:${tracker.field}`
+    acceptedAITrackers.value.set(key, tracker)
+    acceptedAITrackers.value = new Map(acceptedAITrackers.value)
+  }
+
+  function markModifiedAISuggestionsForEntry(entry: Entry) {
+    const entryKey = getEntryIdString(entry)
+    const realEntryId = getRealEntryId(entry) || entry.id
+    const definitionTracker = acceptedAITrackers.value.get(`${entryKey}:definition`)
+    if (definitionTracker) {
+      const currentDefinition = entry.senses?.[0]?.definition
+      if (normalizeAICompareValue(currentDefinition) !== normalizeAICompareValue(definitionTracker.acceptedContent)) {
+        logAISuggestionAction(definitionTracker.suggestionId, 'modified', {
+          entryId: realEntryId,
+          clientEntryKey: entryKey,
+          field: 'senses.0.definition',
+          finalContent: currentDefinition,
+          metadata: { previousAction: 'accepted' }
+        })
+      }
+    }
+
+    const themeTracker = acceptedAITrackers.value.get(`${entryKey}:theme`)
+    if (themeTracker) {
+      const acceptedTheme = themeTracker.acceptedContent as Partial<{ level1Id: number; level2Id: number; level3Id: number }>
+      const currentTheme = getThemeActionContent(entry)
+      const changed = acceptedTheme.level1Id !== currentTheme.level1Id || acceptedTheme.level2Id !== currentTheme.level2Id || acceptedTheme.level3Id !== currentTheme.level3Id
+      if (changed) {
+        logAISuggestionAction(themeTracker.suggestionId, 'modified', {
+          entryId: realEntryId,
+          clientEntryKey: entryKey,
+          field: 'theme',
+          finalContent: currentTheme,
+          metadata: { previousAction: 'accepted' }
+        })
+      }
+    }
+  }
+
+  function clearAcceptedAITrackersForEntry(entry: Entry) {
+    const entryKey = getEntryIdString(entry)
+    acceptedAITrackers.value.delete(`${entryKey}:definition`)
+    acceptedAITrackers.value.delete(`${entryKey}:theme`)
+    acceptedAITrackers.value = new Map(acceptedAITrackers.value)
+  }
+
+  function migrateAcceptedAITrackersEntryId(prevId: string, nextId: string) {
+    const nextTrackers = new Map<string, AcceptedAITracker>()
+    acceptedAITrackers.value.forEach((tracker, key) => {
+      if (key.startsWith(`${prevId}:`)) {
+        const field = key.slice(prevId.length + 1) as AcceptedAIField
+        nextTrackers.set(`${nextId}:${field}`, { ...tracker, entryKey: nextId, entryId: nextId })
+      } else {
+        nextTrackers.set(key, tracker)
+      }
+    })
+    acceptedAITrackers.value = nextTrackers
+  }
 
   function clearPendingSuggestionForCurrentCell() {
     if (editingCell.value && aiSuggestionForField.value) {
@@ -78,18 +203,31 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         aiLoading.value = true
         try {
           const firstDefinition = entry.senses?.[0]?.definition?.trim()
-          const categorizeBody: any = { expression: headword }
+          const categorizeBody: any = {
+            expression: headword,
+            clientEntryKey: entryId,
+            entryId: getRealEntryId(entry),
+            field: 'theme',
+            originalContent: entry.theme ?? {}
+          }
           if (firstDefinition) {
             categorizeBody.context = firstDefinition
           }
 
           const [definitionResponse, categorizeResponse] = await Promise.all([
-            $fetch<{ success: boolean; data?: { definition?: string } }>('/api/ai/definitions', {
+            $fetch<{ success: boolean; data?: { definition?: string; suggestionId?: string } }>('/api/ai/definitions', {
               method: 'POST',
-              body: { expression: headword, region: 'hongkong' },
+              body: {
+                expression: headword,
+                region: 'hongkong',
+                clientEntryKey: entryId,
+                entryId: getRealEntryId(entry),
+                field: 'senses.0.definition',
+                originalContent: entry.senses?.[0]?.definition ?? ''
+              },
               signal
             }),
-            $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string } }>('/api/ai/categorize', {
+            $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/categorize', {
               method: 'POST',
               body: categorizeBody,
               signal
@@ -108,13 +246,15 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             const suggestionText = `建議釋義: ${definitionResponse.data.definition}`
             const targetField = 'definition'
             aiSuggestion.value = suggestionText
+            aiSuggestionId.value = definitionResponse.data.suggestionId || null
             aiSuggestionForField.value = targetField
             const stillEditingThisCell = editingCell.value && String(editingCell.value.entryId) === entryId && editingCell.value.field === targetField
             if (!stillEditingThisCell) {
               const key = `${entryId}-${targetField}`
-              pendingAISuggestions.value.set(key, { entryId, field: targetField, text: suggestionText })
+              pendingAISuggestions.value.set(key, { entryId, field: targetField, text: suggestionText, suggestionId: definitionResponse.data.suggestionId })
               pendingAISuggestions.value = new Map(pendingAISuggestions.value)
               aiSuggestion.value = null
+              aiSuggestionId.value = null
               aiSuggestionForField.value = null
             }
           }
@@ -124,6 +264,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             const theme = getThemeById(themeId)
             if (theme) {
               themeAISuggestions.value.set(entryId, {
+                suggestionId: categorizeResponse.data.suggestionId,
                 level1Name: theme.level1Name,
                 level2Name: theme.level2Name,
                 level3Name: theme.level3Name,
@@ -163,21 +304,27 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     }
     aiLoadingFor.value = { entryKey: getEntryKey(entry), action: 'examples' }
     try {
-      const response = await $fetch<{ success: boolean; data?: Array<{ sentence?: string; text?: string; explanation?: string; translation?: string; scenario?: string }> }>('/api/ai/examples', {
+      const entryKey = getEntryIdString(entry)
+      const response = await $fetch<{ success: boolean; data?: { examples?: Array<{ sentence?: string; text?: string; explanation?: string; translation?: string; scenario?: string }>; suggestionId?: string } }>('/api/ai/examples', {
         method: 'POST',
         body: {
           expression: entry.headword!.display,
           definition: entry.senses[0].definition,
-          region: 'hongkong'
+          region: 'hongkong',
+          clientEntryKey: entryKey,
+          entryId: getRealEntryId(entry),
+          field: 'senses.0.examples',
+          originalContent: entry.senses?.[0]?.examples ?? []
         }
       })
-      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+      const examplesData = response.data?.examples
+      if (response.success && Array.isArray(examplesData) && examplesData.length > 0) {
         if (!entry.senses?.length) entry.senses = [{ definition: '', examples: [] }]
         const firstSense = entry.senses[0]
         if (firstSense) {
           if (!firstSense.examples) firstSense.examples = []
           const examples = firstSense.examples
-          response.data.forEach((ex: any) => {
+          examplesData.forEach((ex: any) => {
             examples.push({
               text: ex.sentence || ex.text,
               translation: ex.explanation || ex.translation,
@@ -204,14 +351,22 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     const key = getEntryKey(entry)
     aiLoadingFor.value = { entryKey: key, action: 'definition' }
     try {
+      const entryKey = getEntryIdString(entry)
       const response: any = await $fetch('/api/ai/definitions', {
         method: 'POST',
-        body: { expression: entry.headword.display, region: 'hongkong' }
+        body: {
+          expression: entry.headword.display,
+          region: 'hongkong',
+          clientEntryKey: entryKey,
+          entryId: getRealEntryId(entry),
+          field: 'senses.0.definition',
+          originalContent: entry.senses?.[0]?.definition ?? ''
+        }
       })
       const data = response?.data
       if (response?.success === true && data && typeof data.definition === 'string') {
-        const entryKey = String(getEntryKey(entry))
         definitionAISuggestions.value.set(entryKey, {
+          suggestionId: data.suggestionId,
           definition: data.definition,
           usageNotes: data.usageNotes,
           formalityLevel: data.formalityLevel
@@ -236,8 +391,15 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     }
     aiLoadingFor.value = { entryKey: getEntryKey(entry), action: 'theme' }
     try {
+      const entryKey = getEntryIdString(entry)
       const firstDefinition = entry.senses?.[0]?.definition?.trim()
-      const body: any = { expression: entry.headword.display }
+      const body: any = {
+        expression: entry.headword.display,
+        clientEntryKey: entryKey,
+        entryId: getRealEntryId(entry),
+        field: 'theme',
+        originalContent: entry.theme ?? {}
+      }
       if (firstDefinition) {
         body.context = firstDefinition
       }
@@ -250,8 +412,8 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         const themeId = response.data.themeId
         const theme = getThemeById(themeId)
         if (theme) {
-          const entryKey = String(getEntryKey(entry))
           themeAISuggestions.value.set(entryKey, {
+            suggestionId: response.data.suggestionId,
             level1Name: theme.level1Name,
             level2Name: theme.level2Name,
             level3Name: theme.level3Name,
@@ -286,6 +448,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
   function acceptAISuggestion() {
     if (!aiSuggestion.value) return
     const isDefinition = aiSuggestionForField.value === 'definition'
+    const suggestionId = aiSuggestionId.value
     let defText = aiSuggestion.value
     const defMatch = aiSuggestion.value.match(/^建議釋義: (.+)$/s)
     if (defMatch) defText = defMatch[1]?.trim() ?? aiSuggestion.value
@@ -293,6 +456,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     if (isDefinition && editingCell.value?.entryId !== undefined) {
       const entry = currentPageEntries.value.find(e => getEntryIdString(e) === String(editingCell.value!.entryId))
       if (entry) {
+        const entryKey = getEntryIdString(entry)
         if (!entry.senses || entry.senses.length === 0) {
           entry.senses = [{ definition: defText, examples: [] }]
         } else {
@@ -300,6 +464,21 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
           if (first) first.definition = defText
         }
         ;(entry as any)._isDirty = true
+        logAISuggestionAction(suggestionId, 'accepted', {
+          entryId: getRealEntryId(entry),
+          clientEntryKey: entryKey,
+          field: 'senses.0.definition',
+          acceptedContent: defText
+        })
+        if (suggestionId) {
+          trackAcceptedAISuggestion({
+            suggestionId,
+            entryKey,
+            entryId: getRealEntryId(entry),
+            field: 'definition',
+            acceptedContent: defText
+          })
+        }
       }
       editValue.value = defText
     } else {
@@ -307,12 +486,20 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     }
     clearPendingSuggestionForCurrentCell()
     aiSuggestion.value = null
+    aiSuggestionId.value = null
     aiSuggestionForField.value = null
   }
 
   function dismissAISuggestion() {
+    const entryId = editingCell.value?.entryId ? String(editingCell.value.entryId) : undefined
+    const field = aiSuggestionForField.value
+    logAISuggestionAction(aiSuggestionId.value, 'rejected', {
+      clientEntryKey: entryId,
+      field: field === 'definition' ? 'senses.0.definition' : field || undefined
+    })
     clearPendingSuggestionForCurrentCell()
     aiSuggestion.value = null
+    aiSuggestionId.value = null
     aiSuggestionForField.value = null
   }
 
@@ -328,6 +515,22 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
       entry.theme.level2Id = suggestion.level2Id
       entry.theme.level3Id = suggestion.level3Id
       ;(entry as any)._isDirty = true
+      const acceptedContent = getThemeActionContent(entry)
+      logAISuggestionAction(suggestion.suggestionId, 'accepted', {
+        entryId: getRealEntryId(entry),
+        clientEntryKey: keyStr,
+        field: 'theme',
+        acceptedContent
+      })
+      if (suggestion.suggestionId) {
+        trackAcceptedAISuggestion({
+          suggestionId: suggestion.suggestionId,
+          entryKey: keyStr,
+          entryId: getRealEntryId(entry),
+          field: 'theme',
+          acceptedContent
+        })
+      }
       if (editingCell.value && String(editingCell.value.entryId) === keyStr && editingCell.value.field === 'theme') {
         editValue.value = suggestion.level3Id as any
       }
@@ -337,7 +540,14 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
   }
 
   function dismissThemeAI(entry: Entry) {
-    themeAISuggestions.value.delete(String(getEntryKey(entry)))
+    const key = String(getEntryKey(entry))
+    const suggestion = themeAISuggestions.value.get(key)
+    logAISuggestionAction(suggestion?.suggestionId, 'rejected', {
+      entryId: getRealEntryId(entry),
+      clientEntryKey: key,
+      field: 'theme'
+    })
+    themeAISuggestions.value.delete(key)
     themeAISuggestions.value = new Map(themeAISuggestions.value)
   }
 
@@ -375,17 +585,44 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
       entry.meta.register = (formalityMap[suggestion.formalityLevel] || '中性') as Register
     }
     ;(entry as any)._isDirty = true
+    logAISuggestionAction(suggestion.suggestionId, 'accepted', {
+      entryId: getRealEntryId(entry),
+      clientEntryKey: key,
+      field: 'senses.0.definition',
+      acceptedContent: {
+        definition: suggestion.definition,
+        usageNotes: suggestion.usageNotes,
+        formalityLevel: suggestion.formalityLevel
+      }
+    })
+    if (suggestion.suggestionId) {
+      trackAcceptedAISuggestion({
+        suggestionId: suggestion.suggestionId,
+        entryKey: key,
+        entryId: getRealEntryId(entry),
+        field: 'definition',
+        acceptedContent: suggestion.definition
+      })
+    }
     definitionAISuggestions.value.delete(key)
     definitionAISuggestions.value = new Map(definitionAISuggestions.value)
   }
 
   function dismissDefinitionAI(entry: Entry) {
-    definitionAISuggestions.value.delete(String(getEntryKey(entry)))
+    const key = String(getEntryKey(entry))
+    const suggestion = definitionAISuggestions.value.get(key)
+    logAISuggestionAction(suggestion?.suggestionId, 'rejected', {
+      entryId: getRealEntryId(entry),
+      clientEntryKey: key,
+      field: 'senses.0.definition'
+    })
+    definitionAISuggestions.value.delete(key)
     definitionAISuggestions.value = new Map(definitionAISuggestions.value)
   }
 
   return {
     aiSuggestion,
+    aiSuggestionId,
     aiSuggestionForField,
     pendingAISuggestions,
     themeAISuggestions,
@@ -407,6 +644,9 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     dismissThemeAI,
     clearThemeSuggestionForEntry,
     acceptDefinitionAI,
-    dismissDefinitionAI
+    dismissDefinitionAI,
+    markModifiedAISuggestionsForEntry,
+    clearAcceptedAITrackersForEntry,
+    migrateAcceptedAITrackersEntryId
   }
 }

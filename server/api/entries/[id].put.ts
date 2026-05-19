@@ -209,7 +209,7 @@ export default defineEventHandler(async (event) => {
             jyutping: ex.jyutping,
             translation: convertToHongKongTraditional(ex.translation || ''),
             scenario: ex.scenario,
-            source: 'user_generated' as const
+            source: ex.source || 'user_generated' as const
           })),
           images: Array.isArray(sense.images) ? sense.images.slice(0, 3) : undefined,
           subSenses: sense.subSenses?.map((sub: any) => ({
@@ -220,7 +220,7 @@ export default defineEventHandler(async (event) => {
               jyutping: ex.jyutping,
               translation: convertToHongKongTraditional(ex.translation || ''),
               scenario: ex.scenario,
-              source: 'user_generated' as const
+              source: ex.source || 'user_generated' as const
             }))
           }))
         }))

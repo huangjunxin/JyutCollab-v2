@@ -1705,6 +1705,7 @@ const {
 
 const {
   aiSuggestion,
+  aiSuggestionId,
   aiSuggestionForField,
   pendingAISuggestions,
   themeAISuggestions,
@@ -1726,7 +1727,10 @@ const {
   dismissThemeAI,
   clearThemeSuggestionForEntry,
   acceptDefinitionAI,
-  dismissDefinitionAI
+  dismissDefinitionAI,
+  markModifiedAISuggestionsForEntry,
+  clearAcceptedAITrackersForEntry,
+  migrateAcceptedAITrackersEntryId
 } = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
 
 const rowHints = useEntriesRowHints({ editableColumns, editingCell, editValue })
@@ -1856,7 +1860,7 @@ function renameInputRefsEntryId(prevId: string, nextId: string) {
 }
 
 function renamePendingAISuggestionsEntryId(prevId: string, nextId: string) {
-  const nextPending = new Map<string, { entryId: string; field: string; text: string }>()
+  const nextPending = new Map<string, { entryId: string; field: string; text: string; suggestionId?: string }>()
   pendingAISuggestions.value.forEach((suggestion, key) => {
     if (key.startsWith(`${prevId}-`)) {
       nextPending.set(`${nextId}-${key.slice(prevId.length + 1)}`, { ...suggestion, entryId: nextId })
@@ -1878,6 +1882,7 @@ function migrateSavedEntryTransientState(prevId: string, nextId: string) {
 
   renameInputRefsEntryId(prevId, nextId)
   renamePendingAISuggestionsEntryId(prevId, nextId)
+  migrateAcceptedAITrackersEntryId(prevId, nextId)
 
   const themeSuggestion = themeAISuggestions.value.get(prevId)
   if (themeSuggestion) {
@@ -2099,6 +2104,7 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
   const pending = pendingAISuggestions.value.get(pendingKey)
   if (pending) {
     aiSuggestion.value = pending.text
+    aiSuggestionId.value = pending.suggestionId || null
     aiSuggestionForField.value = pending.field
   }
 
@@ -2229,11 +2235,12 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
   // 未採納/忽略嘅建議暫存（按「建議目標列」存），等用戶點返該列時再顯示
   if (aiSuggestion.value && aiSuggestionForField.value) {
     const key = `${String(entryId)}-${aiSuggestionForField.value}`
-    pendingAISuggestions.value.set(key, { entryId: String(entryId), field: aiSuggestionForField.value, text: aiSuggestion.value })
+    pendingAISuggestions.value.set(key, { entryId: String(entryId), field: aiSuggestionForField.value, text: aiSuggestion.value, suggestionId: aiSuggestionId.value || undefined })
     pendingAISuggestions.value = new Map(pendingAISuggestions.value)
   }
   editingCell.value = null
   aiSuggestion.value = null
+  aiSuggestionId.value = null
   aiSuggestionForField.value = null
   if ((field === 'headword' || field === 'dialect') && entry && entry.headword?.display?.trim() && entry.dialect?.name) {
     runDuplicateCheck(entry)
@@ -2545,11 +2552,13 @@ async function saveNewEntry(entry: Entry) {
         if (prevTempId && savedId) {
           migrateSavedEntryTransientState(prevTempId, savedId)
         }
+        markModifiedAISuggestionsForEntry(saved)
         entries.value[index] = saved
         // 從本地儲存中移除已保存嘅詞條
         removeEntryFromLocalStorage(prev?._tempId || entry.id || '')
         // 更新 baseline（之後「取消編輯」應回滾到最新已保存狀態）
         setBaselineForEntry(saved)
+        clearAcceptedAITrackersForEntry(saved)
       }
       pagination.total++
       // 聚合／按詞語視圖下保存新條目後重新拉取，使新條目歸入對應詞形組或詞語組
@@ -2587,6 +2596,7 @@ async function saveAllChanges() {
       entry.status = getStatusForSave(entry)
     })
     await Promise.all(dirtyEntries.map(entry => {
+      markModifiedAISuggestionsForEntry(entry)
       const putBody: Record<string, unknown> = {
         headword: entry.headword,
         dialect: entry.dialect,
@@ -2614,6 +2624,7 @@ async function saveAllChanges() {
       entry._isDirty = false
       removeEntryFromLocalStorage(entry.id || '')
       setBaselineForEntry(entry)
+      clearAcceptedAITrackersForEntry(entry)
     })
   } catch (error: any) {
     console.error('Failed to save changes:', error)
@@ -2642,6 +2653,7 @@ async function saveEntryChanges(entry: Entry) {
   // 先更新本地狀態（如審核員保存→已發佈），再發送請求，避免保存後比對仍顯示「有修改」
   entry.status = statusToSave
   try {
+    markModifiedAISuggestionsForEntry(entry)
     const putBody: Record<string, unknown> = {
       headword: entry.headword,
       dialect: entry.dialect,
@@ -2673,6 +2685,7 @@ async function saveEntryChanges(entry: Entry) {
       removeEntryFromLocalStorage(entry.id || '')
       // 更新 baseline（之後「取消編輯」應回滾到最新已保存狀態）
       setBaselineForEntry(entry)
+      clearAcceptedAITrackersForEntry(entry)
     }
   } catch (error: any) {
     console.error('Failed to save entry changes:', error)

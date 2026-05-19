@@ -4,28 +4,45 @@ import type { SuggestionType, UserAction } from './types'
 export interface IAISuggestion {
   _id: string
   entryId?: string
-  suggestionType: SuggestionType
-  originalContent?: string
-  suggestedContent: string
-  confidenceScore: number
+  clientEntryKey?: string
+  suggestedTo: string
+  actionBy?: string
+  suggestionType: Extract<SuggestionType, 'theme_classification' | 'definition' | 'example'>
+  field: string
+  originalContent?: unknown
+  suggestedContent: unknown
+  acceptedContent?: unknown
+  finalContent?: unknown
+  confidenceScore?: number
   modelName: string
   promptVersion: string
   userAction: UserAction
+  acceptedAt?: Date
+  rejectedAt?: Date
+  modifiedAt?: Date
+  metadata?: unknown
   createdAt: Date
+  updatedAt: Date
 }
 
 const AISuggestionSchema = new mongoose.Schema<IAISuggestion>({
   entryId: { type: String },
+  clientEntryKey: { type: String },
+  suggestedTo: { type: String, required: true },
+  actionBy: { type: String },
   suggestionType: {
     type: String,
     enum: ['theme_classification', 'definition', 'example'],
     required: true
   },
-  originalContent: { type: String },
+  field: { type: String, required: true },
+  originalContent: { type: mongoose.Schema.Types.Mixed },
   suggestedContent: {
     type: mongoose.Schema.Types.Mixed,
     required: true
   },
+  acceptedContent: { type: mongoose.Schema.Types.Mixed },
+  finalContent: { type: mongoose.Schema.Types.Mixed },
   confidenceScore: {
     type: Number,
     min: 0,
@@ -44,15 +61,21 @@ const AISuggestionSchema = new mongoose.Schema<IAISuggestion>({
     type: String,
     enum: ['accepted', 'rejected', 'modified', 'pending'],
     default: 'pending'
-  }
+  },
+  acceptedAt: { type: Date },
+  rejectedAt: { type: Date },
+  modifiedAt: { type: Date },
+  metadata: { type: mongoose.Schema.Types.Mixed }
 }, {
-  timestamps: { createdAt: true, updatedAt: false },
+  timestamps: true,
   collection: 'ai_suggestions'
 })
 
 // Indexes
-AISuggestionSchema.index({ entryId: 1 })
-AISuggestionSchema.index({ suggestionType: 1 })
-AISuggestionSchema.index({ userAction: 1 })
+AISuggestionSchema.index({ suggestedTo: 1, createdAt: -1 })
+AISuggestionSchema.index({ entryId: 1, createdAt: -1 })
+AISuggestionSchema.index({ clientEntryKey: 1 })
+AISuggestionSchema.index({ suggestionType: 1, userAction: 1 })
+AISuggestionSchema.index({ field: 1 })
 
 export const AISuggestion = mongoose.models.AISuggestion || mongoose.model<IAISuggestion>('AISuggestion', AISuggestionSchema)

@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { AISuggestion } from '../../utils/AISuggestion'
+import { connectDB } from '../../utils/db'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
 const RequestSchema = z.object({
@@ -9,7 +11,11 @@ const RequestSchema = z.object({
     definition: z.string().optional(),
     usage_notes: z.string().optional(),
     region: z.string()
-  })).optional()
+  })).optional(),
+  entryId: z.string().optional(),
+  clientEntryKey: z.string().optional(),
+  field: z.string().optional(),
+  originalContent: z.unknown().optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -39,9 +45,31 @@ export default defineEventHandler(async (event) => {
       validated.data.referenceExpressions
     )
 
+    await connectDB()
+
+    const suggestion = await AISuggestion.create({
+      entryId: validated.data.entryId,
+      clientEntryKey: validated.data.clientEntryKey,
+      suggestedTo: event.context.auth.id,
+      suggestionType: 'theme_classification',
+      field: validated.data.field || 'theme',
+      originalContent: validated.data.originalContent,
+      suggestedContent: result,
+      confidenceScore: result.confidence ?? 0.5,
+      userAction: 'pending',
+      metadata: {
+        expression: validated.data.expression,
+        context: validated.data.context,
+        themeId: result.themeId
+      }
+    })
+
     return {
       success: true,
-      data: result
+      data: {
+        ...result,
+        suggestionId: suggestion._id.toString()
+      }
     }
   } catch (error: any) {
     console.error('Categorize error:', error)
