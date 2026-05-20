@@ -52,10 +52,8 @@ export default defineEventHandler(async (event) => {
       field: validated.data.field || 'senses.0.examples',
       originalContent: validated.data.originalContent,
       suggestedContent: result,
-      acceptedContent: result,
       confidenceScore: 0.5,
-      userAction: 'accepted',
-      acceptedAt: new Date(),
+      userAction: 'pending',
       metadata: {
         expression: validated.data.expression,
         region: validated.data.region,

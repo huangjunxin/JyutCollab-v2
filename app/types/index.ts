@@ -244,6 +244,9 @@ export interface SiteStats {
   approved: number
   pending: number
   rejected: number
+  contributors: number
+  activeContributors: number
+  recentContributions: number
 }
 
 export interface UserStats {

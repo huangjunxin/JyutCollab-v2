@@ -31,7 +31,7 @@ interface PendingAISuggestion {
 }
 
 type AISuggestionAction = 'accepted' | 'rejected' | 'modified'
-type AcceptedAIField = 'definition' | 'theme'
+type AcceptedAIField = 'definition' | 'theme' | 'examples'
 
 interface AcceptedAITracker {
   suggestionId: string
@@ -145,12 +145,27 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         })
       }
     }
+
+    const examplesTracker = acceptedAITrackers.value.get(`${entryKey}:examples`)
+    if (examplesTracker) {
+      const currentExamples = entry.senses?.[0]?.examples ?? []
+      if (JSON.stringify(currentExamples) !== JSON.stringify(examplesTracker.acceptedContent)) {
+        logAISuggestionAction(examplesTracker.suggestionId, 'modified', {
+          entryId: realEntryId,
+          clientEntryKey: entryKey,
+          field: 'senses.0.examples',
+          finalContent: currentExamples,
+          metadata: { previousAction: 'accepted' }
+        })
+      }
+    }
   }
 
   function clearAcceptedAITrackersForEntry(entry: Entry) {
     const entryKey = getEntryIdString(entry)
     acceptedAITrackers.value.delete(`${entryKey}:definition`)
     acceptedAITrackers.value.delete(`${entryKey}:theme`)
+    acceptedAITrackers.value.delete(`${entryKey}:examples`)
     acceptedAITrackers.value = new Map(acceptedAITrackers.value)
   }
 
@@ -324,14 +339,29 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         if (firstSense) {
           if (!firstSense.examples) firstSense.examples = []
           const examples = firstSense.examples
-          examplesData.forEach((ex: any) => {
-            examples.push({
-              text: ex.sentence || ex.text,
-              translation: ex.explanation || ex.translation,
-              scenario: ex.scenario,
-              source: 'ai_generated'
-            })
+          const acceptedExamples = examplesData.map((ex: any) => ({
+            text: ex.sentence || ex.text,
+            translation: ex.explanation || ex.translation,
+            scenario: ex.scenario,
+            source: 'ai_generated'
+          }))
+          examples.push(...acceptedExamples)
+          logAISuggestionAction(response.data?.suggestionId, 'accepted', {
+            entryId: getRealEntryId(entry),
+            clientEntryKey: entryKey,
+            field: 'senses.0.examples',
+            acceptedContent: acceptedExamples,
+            metadata: { source: 'entries_table' }
           })
+          if (response.data?.suggestionId) {
+            trackAcceptedAISuggestion({
+              suggestionId: response.data.suggestionId,
+              entryKey,
+              entryId: getRealEntryId(entry),
+              field: 'examples',
+              acceptedContent: acceptedExamples
+            })
+          }
         }
         ;(entry as any)._isDirty = true
       }

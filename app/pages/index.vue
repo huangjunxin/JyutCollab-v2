@@ -199,6 +199,44 @@
           </div>
         </div>
       </UCard>
+
+      <!-- Contributor Activity Card -->
+      <UCard class="shadow-sm border border-gray-200 dark:border-gray-700">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-users" class="w-5 h-5 text-gray-500" />
+            <span class="font-semibold text-gray-900 dark:text-white">貢獻者活躍度</span>
+          </div>
+        </template>
+        <div v-if="statsLoading" class="space-y-3">
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+        </div>
+        <div v-else class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <UIcon name="i-heroicons-user-group" class="w-4 h-4" />
+              註冊貢獻者
+            </span>
+            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ siteStats.contributors }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <UIcon name="i-heroicons-bolt" class="w-4 h-4" />
+              近7天活躍
+            </span>
+            <span class="text-lg font-bold text-primary">{{ siteStats.activeContributors }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" />
+              近7天貢獻
+            </span>
+            <span class="text-lg font-bold text-green-600 dark:text-green-400">{{ siteStats.recentContributions }}</span>
+          </div>
+        </div>
+      </UCard>
     </div>
 
     <!-- Enhanced Stats Section -->

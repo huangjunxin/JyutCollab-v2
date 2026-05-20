@@ -11,7 +11,7 @@ export const useStats = () => {
       ttl: CACHE_TTL.stats,
       lazy: true,
       immediate: false,
-      default: () => ({ total: 0, approved: 0, pending: 0, rejected: 0 })
+      default: () => ({ total: 0, approved: 0, pending: 0, rejected: 0, contributors: 0, activeContributors: 0, recentContributions: 0 })
     }
   )
 

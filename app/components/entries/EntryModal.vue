@@ -233,7 +233,7 @@
                   <p class="text-purple-600 dark:text-purple-300 mt-2 text-sm whitespace-pre-wrap">{{ aiSuggestion }}</p>
                   <div class="flex gap-2 mt-3">
                     <UButton size="xs" color="purple" @click="applyAISuggestion">採納</UButton>
-                    <UButton size="xs" color="gray" variant="ghost" @click="aiSuggestion = ''">忽略</UButton>
+                    <UButton size="xs" color="gray" variant="ghost" @click="dismissAISuggestion">忽略</UButton>
                   </div>
                 </div>
               </div>
@@ -583,7 +583,7 @@ async function getAIExamples() {
         `${e.sentence || e.text} (${e.scenario})`
       ).join('\n')
       aiSuggestion.value = `建議例句:\n${examples}`
-      pendingAIData.value = { type: 'examples', examples: data }
+      pendingAIData.value = { type: 'examples', examples: data, suggestionId: response.data?.suggestionId }
     }
   } catch (err) {
     console.error('AI examples error:', err)
@@ -592,24 +592,51 @@ async function getAIExamples() {
   }
 }
 
+function logAISuggestionAction(action: 'accepted' | 'rejected', acceptedContent?: unknown) {
+  const suggestionId = pendingAIData.value?.suggestionId
+  if (!suggestionId) return
+  void $fetch(`/api/ai/suggestions/${suggestionId}/action`, {
+    method: 'POST',
+    body: {
+      action,
+      entryId: props.entryId,
+      field: pendingAIData.value.type === 'examples' ? 'senses.0.examples' : undefined,
+      acceptedContent,
+      metadata: { source: 'entry_modal' }
+    }
+  }).catch((err) => {
+    console.warn('Failed to log AI suggestion action:', err)
+  })
+}
+
+function dismissAISuggestion() {
+  logAISuggestionAction('rejected')
+  aiSuggestion.value = ''
+  pendingAIData.value = null
+}
+
 function applyAISuggestion() {
   if (!pendingAIData.value) return
 
   if (pendingAIData.value.type === 'categorize') {
     form.theme.level3Id = pendingAIData.value.themeIdL3
+    logAISuggestionAction('accepted', form.theme)
   } else if (pendingAIData.value.type === 'definition') {
     form.senses[0].definition = pendingAIData.value.definition
     form.meta.usage = pendingAIData.value.usageNotes
     if (pendingAIData.value.register) {
       form.meta.register = pendingAIData.value.register
     }
+    logAISuggestionAction('accepted', form.senses[0].definition)
   } else if (pendingAIData.value.type === 'examples') {
-    form.senses[0].examples = pendingAIData.value.examples.map((e: any) => ({
+    const examples = pendingAIData.value.examples.map((e: any) => ({
       text: e.text || e.sentence,
       jyutping: e.jyutping || '',
       translation: e.translation || e.explanation || '',
       scenario: e.scenario || ''
     }))
+    form.senses[0].examples = examples
+    logAISuggestionAction('accepted', examples)
   }
 
   aiSuggestion.value = ''
