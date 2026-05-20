@@ -41,7 +41,7 @@ const CreateEntrySchema = z.object({
     variants: z.array(z.string()).optional()
   }).optional(),
   dialect: z.object({
-    name: z.string(),
+    name: z.enum(DIALECT_IDS as unknown as [string, ...string[]]),
     regionCode: z.string().optional()
   }).optional(),
   phonetic: z.object({
