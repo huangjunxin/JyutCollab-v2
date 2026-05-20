@@ -382,31 +382,31 @@
               <p class="text-xl font-bold text-gray-900 dark:text-white">{{ aiSuggestionStats.total }}</p>
             </div>
             <div>
-              <p class="text-xs text-green-700 dark:text-green-300">接受率</p>
-              <p class="text-xl font-bold text-green-700 dark:text-green-300">{{ formatPercent(aiSuggestionStats.acceptanceRate) }}</p>
+              <p class="text-xs text-green-700 dark:text-green-300">採納率</p>
+              <p class="text-xl font-bold text-green-700 dark:text-green-300">{{ formatPercent(aiAdoptionRate) }}</p>
             </div>
             <div>
-              <p class="text-xs text-blue-700 dark:text-blue-300">修改率</p>
-              <p class="text-xl font-bold text-blue-700 dark:text-blue-300">{{ formatPercent(aiSuggestionStats.modificationRate) }}</p>
+              <p class="text-xs text-blue-700 dark:text-blue-300">審閱率</p>
+              <p class="text-xl font-bold text-blue-700 dark:text-blue-300">{{ formatPercent(aiReviewRate) }}</p>
             </div>
           </div>
 
           <div class="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800">
             <div class="grid grid-cols-2 gap-x-4 gap-y-2">
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-600 dark:text-gray-400">已接受</span>
-                <span class="font-bold text-green-600 dark:text-green-400">{{ aiSuggestionStats.accepted }}</span>
+                <span class="text-gray-600 dark:text-gray-400">已採納</span>
+                <span class="font-bold text-green-600 dark:text-green-400">{{ aiAdoptedCount }}</span>
               </div>
               <div class="flex items-center justify-between text-sm">
                 <span class="text-gray-600 dark:text-gray-400">已拒絕</span>
                 <span class="font-bold text-red-600 dark:text-red-400">{{ aiSuggestionStats.rejected }}</span>
               </div>
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-600 dark:text-gray-400">接受後修改</span>
-                <span class="font-bold text-blue-600 dark:text-blue-400">{{ aiSuggestionStats.modified }}</span>
+                <span class="text-gray-600 dark:text-gray-400">已審閱</span>
+                <span class="font-bold text-blue-600 dark:text-blue-400">{{ aiReviewedCount }}</span>
               </div>
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-600 dark:text-gray-400">待處理</span>
+                <span class="text-gray-600 dark:text-gray-400">待審閱</span>
                 <span class="font-bold text-amber-600 dark:text-amber-400">{{ aiSuggestionStats.pending }}</span>
               </div>
             </div>
@@ -421,7 +421,7 @@
                 >
                   <span class="text-gray-600 dark:text-gray-400">{{ item.label }}</span>
                   <span class="font-medium text-gray-900 dark:text-white">
-                    {{ item.total }} · 接受 {{ formatPercent(item.acceptanceRate) }}
+                    {{ item.total }} · 採納 {{ formatPercent(getTypeAdoptionRate(item)) }}
                   </span>
                 </div>
               </div>
@@ -697,6 +697,19 @@ const displayedUserStats = computed(() => userStats.value || fallbackUserStats)
 const displayedReviewerStats = computed(() => reviewerStats.value || fallbackReviewerStats)
 const displayedEnhancedUserStats = computed(() => enhancedUserStats.value || fallbackEnhancedUserStats)
 const displayedEnhancedReviewerStats = computed(() => enhancedReviewerStats.value || fallbackEnhancedReviewerStats)
+const aiReviewedCount = computed(() => {
+  const stats = aiSuggestionStats.value
+  return stats ? stats.accepted + stats.modified + stats.rejected : 0
+})
+const aiAdoptedCount = computed(() => {
+  const stats = aiSuggestionStats.value
+  return stats ? stats.accepted + stats.modified : 0
+})
+const aiAdoptionRate = computed(() => aiReviewedCount.value > 0 ? aiAdoptedCount.value / aiReviewedCount.value : 0)
+const aiReviewRate = computed(() => {
+  const total = aiSuggestionStats.value?.total || 0
+  return total > 0 ? aiReviewedCount.value / total : 0
+})
 
 async function refreshAll() {
   isRefreshing.value = true
@@ -716,6 +729,11 @@ async function refreshAll() {
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`
+}
+
+function getTypeAdoptionRate(item: { accepted: number; modified: number; rejected: number }): number {
+  const reviewed = item.accepted + item.modified + item.rejected
+  return reviewed > 0 ? (item.accepted + item.modified) / reviewed : 0
 }
 
 function getActionIcon(action: EditHistoryAction): string {
