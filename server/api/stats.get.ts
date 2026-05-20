@@ -4,7 +4,6 @@
  */
 import { Entry } from '../utils/Entry'
 import { EditHistory } from '../utils/EditHistory'
-import { User } from '../utils/User'
 import { connectDB } from '../utils/db'
 
 export default defineEventHandler(async () => {
@@ -19,8 +18,8 @@ export default defineEventHandler(async () => {
       Entry.countDocuments({ status: 'approved' }),
       Entry.countDocuments({ status: 'pending_review' }),
       Entry.countDocuments({ status: 'rejected' }),
-      User.countDocuments({ isActive: true }),
-      EditHistory.distinct('userId', { createdAt: { $gte: sevenDaysAgo } }).then(userIds => userIds.length),
+      Entry.distinct('createdBy').then(userIds => userIds.filter(Boolean).length),
+      EditHistory.distinct('userId', { createdAt: { $gte: sevenDaysAgo } }).then(userIds => userIds.filter(Boolean).length),
       EditHistory.countDocuments({ createdAt: { $gte: sevenDaysAgo } })
     ])
 

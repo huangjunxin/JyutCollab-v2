@@ -346,11 +346,12 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             source: 'ai_generated'
           }))
           examples.push(...acceptedExamples)
+          const acceptedContent = [...examples]
           logAISuggestionAction(response.data?.suggestionId, 'accepted', {
             entryId: getRealEntryId(entry),
             clientEntryKey: entryKey,
             field: 'senses.0.examples',
-            acceptedContent: acceptedExamples,
+            acceptedContent,
             metadata: { source: 'entries_table' }
           })
           if (response.data?.suggestionId) {
@@ -359,7 +360,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
               entryKey,
               entryId: getRealEntryId(entry),
               field: 'examples',
-              acceptedContent: acceptedExamples
+              acceptedContent
             })
           }
         }
