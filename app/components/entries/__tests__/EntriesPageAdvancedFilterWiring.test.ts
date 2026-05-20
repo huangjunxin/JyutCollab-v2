@@ -16,8 +16,11 @@ describe('entries page advanced filter wiring', () => {
     expect(source).toContain('id="entries-advanced-filter-host"')
     expect(source).toContain('v-model:expanded="advancedFilters.advancedFilterExpanded.value"')
     expect(source).toContain('v-model:formula-input="advancedFilters.formulaInput.value"')
-    expect(source).toContain('v-model:regex-field="advancedFilters.regexField.value"')
-    expect(source).toContain('v-model:regex-pattern="advancedFilters.regexPattern.value"')
+    expect(source).toContain(':regex-rows="advancedFilters.regexRows.value"')
+    expect(source).toContain(':regex-row-errors="advancedFilters.advancedFilterErrors.regexRows"')
+    expect(source).toContain('@add-regex-row="advancedFilters.addRegexRow"')
+    expect(source).toContain('@remove-regex-row="advancedFilters.removeRegexRow"')
+    expect(source).toContain('@update-regex-row="advancedFilters.updateRegexRow"')
   })
 
   it('instantiates filters with entries, groups, view mode, columns, and display helpers', () => {

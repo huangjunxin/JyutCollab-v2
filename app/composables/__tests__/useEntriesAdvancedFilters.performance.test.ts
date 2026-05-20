@@ -56,8 +56,7 @@ describe('useEntriesAdvancedFilters performance hardening', () => {
     const filters = useEntriesAdvancedFilters(args)
 
     // Apply regex
-    filters.regexField.value = 'any'
-    filters.regexPattern.value = '香港'
+    filters.updateRegexRow(filters.regexRows.value[0].id, { field: 'any', pattern: '香港' })
     const applyResult = filters.applyAdvancedFilters()
     expect(applyResult).toBe(true)
 
@@ -126,20 +125,36 @@ describe('useEntriesAdvancedFilters performance hardening', () => {
     const filters = useEntriesAdvancedFilters(args)
 
     // Apply first regex
-    filters.regexField.value = 'any'
-    filters.regexPattern.value = '香港'
+    filters.updateRegexRow(filters.regexRows.value[0].id, { field: 'any', pattern: '香港' })
     filters.applyAdvancedFilters()
     const filtered1 = filters.filteredEntries.value
     expect(filtered1.length).toBe(1)
 
     // Apply different regex
-    filters.regexPattern.value = '廣州'
+    filters.updateRegexRow(filters.regexRows.value[0].id, { pattern: '廣州' })
     filters.applyAdvancedFilters()
     const filtered2 = filters.filteredEntries.value
     expect(filtered2.length).toBe(1)
 
     // Cache should be invalidated - different entry matched
     expect(filtered1[0].id).not.toBe(filtered2[0].id)
+  })
+
+  it('applies multiple regex rows deterministically', () => {
+    const entries = [
+      mockEntry('1', { headword: '香港', definition: '城市', status: '草稿' }),
+      mockEntry('2', { headword: '香港', definition: '地名', status: '已批准' }),
+      mockEntry('3', { headword: '廣州', definition: '城市', status: '草稿' })
+    ]
+    const args = createMockArgs(entries)
+    const filters = useEntriesAdvancedFilters(args)
+
+    filters.updateRegexRow(filters.regexRows.value[0].id, { field: 'headword', pattern: '香港' })
+    filters.addRegexRow()
+    filters.updateRegexRow(filters.regexRows.value[1].id, { field: 'definition', pattern: '城市' })
+    filters.applyAdvancedFilters()
+
+    expect(filters.filteredEntries.value.map(entry => entry.id)).toEqual(['1'])
   })
 
   it('does not expose cache properties on returned object', () => {

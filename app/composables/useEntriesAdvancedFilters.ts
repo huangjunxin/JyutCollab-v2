@@ -13,14 +13,33 @@ const { buildSearchableRowText, compileAdvancedRegex, parseAdvancedFormula, eval
 type EntryGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type ViewModeRef = Ref<string> | ComputedRef<string>
 
+type LegacyAdvancedFilterState = {
+  regex?: AdvancedFilterRegexConditionPayload & { applied: AdvancedFilterRegexConditionPayload }
+  globalRegex?: {
+    enabled?: boolean
+    input?: string
+    applied?: string
+    flags?: string
+  }
+  columnRegex?: {
+    field?: string
+    pattern?: string
+    flags?: string
+  }
+}
+
 function getEntryCountFromGroups(groups: EntryGroup[]): number {
   return groups.reduce((sum, group) => sum + group.entries.length, 0)
 }
 
-export interface AdvancedFilterRegexState {
+export interface AdvancedFilterRegexConditionPayload {
   field: AdvancedFilterFieldKey | 'any'
   pattern: string
   flags: string
+}
+
+export interface AdvancedFilterRegexRowState extends AdvancedFilterRegexConditionPayload {
+  id: string
 }
 
 export interface ExportedAdvancedFilterState {
@@ -28,12 +47,38 @@ export interface ExportedAdvancedFilterState {
     input: string
     applied: string
   }
-  regex: AdvancedFilterRegexState & { applied: AdvancedFilterRegexState }
+  regexRows: AdvancedFilterRegexConditionPayload[]
+  appliedRegexRows: AdvancedFilterRegexConditionPayload[]
 }
 
 interface AdvancedFilterErrors {
   formula: AdvancedFilterError | null
   regex: AdvancedFilterError | null
+  regexRows: Record<string, AdvancedFilterError | null>
+}
+
+let regexRowId = 0
+
+function createRegexRowId(): string {
+  regexRowId += 1
+  return `regex-row-${regexRowId}`
+}
+
+function createRegexRow(overrides: Partial<AdvancedFilterRegexConditionPayload> = {}): AdvancedFilterRegexRowState {
+  return {
+    id: createRegexRowId(),
+    field: overrides.field ?? 'any',
+    pattern: overrides.pattern ?? '',
+    flags: overrides.flags ?? 'i'
+  }
+}
+
+function cloneRegexPayload(row: AdvancedFilterRegexConditionPayload): AdvancedFilterRegexConditionPayload {
+  return {
+    field: row.field,
+    pattern: row.pattern,
+    flags: row.flags
+  }
 }
 
 export function useEntriesAdvancedFilters(args: {
@@ -47,20 +92,32 @@ export function useEntriesAdvancedFilters(args: {
   const advancedFilterExpanded = ref(false)
   const formulaInput = ref('')
   const appliedFormula = ref('')
-  const regexField = ref<AdvancedFilterFieldKey | 'any'>('any')
-  const regexPattern = ref('')
-  const regexFlags = ref('i')
-  const appliedRegex = reactive<AdvancedFilterRegexState>({ field: 'any', pattern: '', flags: 'i' })
-  const advancedFilterErrors = reactive<AdvancedFilterErrors>({ formula: null, regex: null })
+  const regexRows = ref<AdvancedFilterRegexRowState[]>([createRegexRow()])
+  const appliedRegexRows = ref<AdvancedFilterRegexConditionPayload[]>([])
+  const advancedFilterErrors = reactive<AdvancedFilterErrors>({ formula: null, regex: null, regexRows: {} })
 
   // Performance optimization: cache parsed formula AST
   let cachedFormulaAst: { formula: string; ast: FormulaNode } | null = null
 
-  // Performance optimization: cache compiled regex
-  let cachedRegex: { field: AdvancedFilterFieldKey | 'any'; pattern: string; flags: string; regex: RegExp } | null = null
+  // Performance optimization: cache compiled regexes
+  const cachedRegexes = new Map<string, RegExp>()
 
   function isAdvancedFilterField(key: string): key is AdvancedFilterFieldKey {
     return ADVANCED_FILTER_FIELDS.includes(key as AdvancedFilterFieldKey)
+  }
+
+  function normalizeRegexField(field: unknown): AdvancedFilterFieldKey | 'any' {
+    return typeof field === 'string' && (field === 'any' || isAdvancedFilterField(field)) ? field : 'any'
+  }
+
+  function normalizeRegexPayload(value: unknown): AdvancedFilterRegexConditionPayload | null {
+    if (!value || typeof value !== 'object') return null
+    const row = value as Partial<AdvancedFilterRegexConditionPayload>
+    return {
+      field: normalizeRegexField(row.field),
+      pattern: String(row.pattern ?? ''),
+      flags: String(row.flags || 'i')
+    }
   }
 
   function createEmptyRowContext(): RowFilterContext {
@@ -80,7 +137,7 @@ export function useEntriesAdvancedFilters(args: {
   }
 
   const hasAppliedFormula = computed(() => appliedFormula.value.trim().length > 0)
-  const hasAppliedRegex = computed(() => appliedRegex.pattern.trim().length > 0)
+  const hasAppliedRegex = computed(() => appliedRegexRows.value.some(row => row.pattern.trim().length > 0))
   const hasActiveAdvancedFilters = computed(() => hasAppliedFormula.value || hasAppliedRegex.value)
   const loadedEntryCount = computed(() => {
     if (args.viewMode.value === 'flat') return args.entries.value.length
@@ -94,9 +151,25 @@ export function useEntriesAdvancedFilters(args: {
     return ungroupedNewEntryCount + getEntryCountFromGroups(groups)
   })
 
+  function clearRegexRowErrors() {
+    advancedFilterErrors.regex = null
+    for (const key of Object.keys(advancedFilterErrors.regexRows)) delete advancedFilterErrors.regexRows[key]
+  }
+
   function clearInactiveAppliedFilterErrors() {
     if (!hasAppliedFormula.value) advancedFilterErrors.formula = null
-    if (!hasAppliedRegex.value) advancedFilterErrors.regex = null
+    if (!hasAppliedRegex.value) clearRegexRowErrors()
+  }
+
+  function getCachedRegex(row: AdvancedFilterRegexConditionPayload): RegExp | AdvancedFilterError {
+    const key = JSON.stringify([row.field, row.pattern, row.flags])
+    const cached = cachedRegexes.get(key)
+    if (cached) return cached
+
+    const compiled = compileAdvancedRegex(row.pattern, row.flags)
+    if (!compiled.ok) return compiled.error
+    cachedRegexes.set(key, compiled.regex)
+    return compiled.regex
   }
 
   function matchEntry(entry: Entry): boolean {
@@ -127,27 +200,18 @@ export function useEntriesAdvancedFilters(args: {
       }
     }
 
-    if (hasAppliedRegex.value) {
-      const field = appliedRegex.field
-      const pattern = appliedRegex.pattern
-      const flags = appliedRegex.flags
-
-      let regex: RegExp
-      if (cachedRegex && cachedRegex.field === field && cachedRegex.pattern === pattern && cachedRegex.flags === flags) {
-        regex = cachedRegex.regex
-      } else {
-        const compiled = compileAdvancedRegex(pattern, flags)
-        if (!compiled.ok) {
-          advancedFilterErrors.regex = compiled.error
-          return false
-        }
-        regex = compiled.regex
-        cachedRegex = { field, pattern, flags, regex }
+    for (const row of appliedRegexRows.value) {
+      if (!row.pattern.trim()) continue
+      const regex = getCachedRegex(row)
+      if (regex instanceof RegExp) {
+        advancedFilterErrors.regex = null
+        const value = row.field === 'any' ? buildSearchableRowText(context) : context[row.field]
+        if (!testAdvancedRegex(regex, value)) return false
+        continue
       }
 
-      advancedFilterErrors.regex = null
-      const value = field === 'any' ? buildSearchableRowText(context) : context[field]
-      if (!testAdvancedRegex(regex, value)) return false
+      advancedFilterErrors.regex = regex
+      return false
     }
 
     return true
@@ -180,7 +244,7 @@ export function useEntriesAdvancedFilters(args: {
 
   function clearAdvancedFilterErrors() {
     advancedFilterErrors.formula = null
-    advancedFilterErrors.regex = null
+    clearRegexRowErrors()
   }
 
   function validateAdvancedFilterInputs(): boolean {
@@ -200,10 +264,12 @@ export function useEntriesAdvancedFilters(args: {
       }
     }
 
-    if (regexPattern.value.trim().length > 0) {
-      const compiled = compileAdvancedRegex(regexPattern.value, regexFlags.value)
+    for (const row of regexRows.value) {
+      if (!row.pattern.trim()) continue
+      const compiled = compileAdvancedRegex(row.pattern, row.flags)
       if (!compiled.ok) {
-        advancedFilterErrors.regex = compiled.error
+        advancedFilterErrors.regexRows[row.id] = compiled.error
+        advancedFilterErrors.regex ??= compiled.error
         valid = false
       }
     }
@@ -216,13 +282,13 @@ export function useEntriesAdvancedFilters(args: {
     if (!validateAdvancedFilterInputs()) return false
 
     appliedFormula.value = formulaInput.value
-    appliedRegex.field = regexField.value
-    appliedRegex.pattern = regexPattern.value
-    appliedRegex.flags = regexFlags.value
+    appliedRegexRows.value = regexRows.value
+      .filter(row => row.pattern.trim().length > 0)
+      .map(cloneRegexPayload)
 
     // Invalidate caches when applying new filters
     cachedFormulaAst = null
-    cachedRegex = null
+    cachedRegexes.clear()
 
     clearInactiveAppliedFilterErrors()
     return true
@@ -231,17 +297,36 @@ export function useEntriesAdvancedFilters(args: {
   function clearAdvancedFilters() {
     formulaInput.value = ''
     appliedFormula.value = ''
-    regexField.value = 'any'
-    regexPattern.value = ''
-    regexFlags.value = 'i'
-    appliedRegex.field = 'any'
-    appliedRegex.pattern = ''
-    appliedRegex.flags = 'i'
+    regexRows.value = [createRegexRow()]
+    appliedRegexRows.value = []
     clearAdvancedFilterErrors()
 
     // Clear caches when clearing filters
     cachedFormulaAst = null
-    cachedRegex = null
+    cachedRegexes.clear()
+  }
+
+  function addRegexRow() {
+    regexRows.value = [...regexRows.value, createRegexRow()]
+  }
+
+  function removeRegexRow(id: string) {
+    regexRows.value = regexRows.value.filter(row => row.id !== id)
+    if (regexRows.value.length === 0) regexRows.value = [createRegexRow()]
+    delete advancedFilterErrors.regexRows[id]
+  }
+
+  function updateRegexRow(id: string, patch: Partial<AdvancedFilterRegexConditionPayload>) {
+    regexRows.value = regexRows.value.map(row => row.id === id
+      ? {
+          ...row,
+          ...(patch.field !== undefined ? { field: normalizeRegexField(patch.field) } : {}),
+          ...(patch.pattern !== undefined ? { pattern: String(patch.pattern) } : {}),
+          ...(patch.flags !== undefined ? { flags: String(patch.flags) } : {})
+        }
+      : row)
+    delete advancedFilterErrors.regexRows[id]
+    if (Object.keys(advancedFilterErrors.regexRows).length === 0) advancedFilterErrors.regex = null
   }
 
   function exportAdvancedFilterState(): ExportedAdvancedFilterState {
@@ -250,16 +335,8 @@ export function useEntriesAdvancedFilters(args: {
         input: formulaInput.value,
         applied: appliedFormula.value
       },
-      regex: {
-        field: regexField.value,
-        pattern: regexPattern.value,
-        flags: regexFlags.value,
-        applied: {
-          field: appliedRegex.field,
-          pattern: appliedRegex.pattern,
-          flags: appliedRegex.flags
-        }
-      }
+      regexRows: regexRows.value.map(cloneRegexPayload),
+      appliedRegexRows: appliedRegexRows.value.map(cloneRegexPayload)
     }
   }
 
@@ -267,36 +344,50 @@ export function useEntriesAdvancedFilters(args: {
     formulaInput.value = state.formula.input
     appliedFormula.value = state.formula.applied
 
-    // Backward compatibility: old saved views may have globalRegex/columnRegex instead of unified regex
-    const legacyState = state as any
-    if (state.regex) {
-      regexField.value = state.regex.field
-      regexPattern.value = state.regex.pattern
-      regexFlags.value = state.regex.flags
-      appliedRegex.field = state.regex.applied.field
-      appliedRegex.pattern = state.regex.applied.pattern
-      appliedRegex.flags = state.regex.applied.flags
+    const legacyState = state as ExportedAdvancedFilterState & LegacyAdvancedFilterState
+    if (Array.isArray(state.regexRows) || Array.isArray(state.appliedRegexRows)) {
+      const restoredRows = Array.isArray(state.regexRows)
+        ? state.regexRows.map(row => createRegexRow(normalizeRegexPayload(row) ?? undefined))
+        : []
+      const restoredAppliedRows = Array.isArray(state.appliedRegexRows)
+        ? state.appliedRegexRows.map(normalizeRegexPayload).filter((row): row is AdvancedFilterRegexConditionPayload => !!row)
+        : []
+      regexRows.value = restoredRows.length > 0
+        ? restoredRows
+        : (restoredAppliedRows.length > 0 ? restoredAppliedRows.map(row => createRegexRow(row)) : [createRegexRow()])
+      appliedRegexRows.value = restoredAppliedRows
+    } else if (legacyState.regex) {
+      const draft = normalizeRegexPayload(legacyState.regex) ?? createRegexRow()
+      const applied = normalizeRegexPayload(legacyState.regex.applied)
+      regexRows.value = [createRegexRow(draft)]
+      appliedRegexRows.value = applied && applied.pattern.trim() ? [applied] : []
     } else if (legacyState.globalRegex || legacyState.columnRegex) {
-      // Migrate old format: prefer column regex if field is set, otherwise global
       const col = legacyState.columnRegex
       const glob = legacyState.globalRegex
       if (col?.field && col?.pattern) {
-        regexField.value = col.field
-        regexPattern.value = col.pattern
-        regexFlags.value = col.flags || 'i'
-        appliedRegex.field = col.field
-        appliedRegex.pattern = col.pattern
-        appliedRegex.flags = col.flags || 'i'
+        const row = {
+          field: normalizeRegexField(col.field),
+          pattern: String(col.pattern),
+          flags: String(col.flags || 'i')
+        }
+        regexRows.value = [createRegexRow(row)]
+        appliedRegexRows.value = [row]
       } else if (glob?.enabled && glob?.applied) {
-        regexField.value = 'any'
-        regexPattern.value = glob.applied
-        regexFlags.value = glob.flags || 'i'
-        appliedRegex.field = 'any'
-        appliedRegex.pattern = glob.applied
-        appliedRegex.flags = glob.flags || 'i'
+        const row = {
+          field: 'any' as const,
+          pattern: String(glob.applied),
+          flags: String(glob.flags || 'i')
+        }
+        regexRows.value = [createRegexRow(row)]
+        appliedRegexRows.value = [row]
+      } else {
+        regexRows.value = [createRegexRow()]
+        appliedRegexRows.value = []
       }
     }
 
+    cachedFormulaAst = null
+    cachedRegexes.clear()
     clearAdvancedFilterErrors()
   }
 
@@ -304,10 +395,8 @@ export function useEntriesAdvancedFilters(args: {
     advancedFilterExpanded,
     formulaInput,
     appliedFormula,
-    regexField,
-    regexPattern,
-    regexFlags,
-    appliedRegex,
+    regexRows,
+    appliedRegexRows,
     advancedFilterErrors,
     hasAppliedFormula,
     hasAppliedRegex,
@@ -319,6 +408,9 @@ export function useEntriesAdvancedFilters(args: {
     visibleEntryCount,
     advancedEmptyStateActive,
     buildRowContext,
+    addRegexRow,
+    removeRegexRow,
+    updateRegexRow,
     applyAdvancedFilters,
     clearAdvancedFilters,
     clearAdvancedFilterErrors,

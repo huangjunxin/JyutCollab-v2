@@ -75,6 +75,18 @@ describe('saved views server API contract', () => {
     expect(deleteSource).toContain('無權刪除此視圖')
   })
 
+  it('normalizes saved view filters to canonical multi-regex state while accepting legacy shapes', () => {
+    const source = readSource('server/api/views/validation.ts')
+
+    expect(source).toContain('canonicalFilterStateSchema')
+    expect(source).toContain('singleRegexFilterStateSchema')
+    expect(source).toContain('legacyFilterStateSchema')
+    expect(source).toContain('regexRows')
+    expect(source).toContain('appliedRegexRows')
+    expect(source).not.toMatch(/globalRegex:\s*\{/)
+    expect(source).not.toMatch(/columnRegex:\s*\{/)
+  })
+
   it('allows only GET /api/views/:id publicly without making the list endpoint public', () => {
     const source = readSource('server/middleware/auth.ts')
 

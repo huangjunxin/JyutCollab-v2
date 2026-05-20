@@ -6,11 +6,11 @@ import { decodeEntriesSharedView, encodeEntriesSharedView, ENTRIES_SHARED_VIEW_V
 import { ADVANCED_FILTER_FIELDS } from '../../utils/entriesTableConstants'
 import { useEntriesAdvancedFilters, type ExportedAdvancedFilterState } from '../useEntriesAdvancedFilters'
 
-function createEntry(id: string, definition = '需要檢查的釋義'): Entry {
+function createEntry(id: string, definition = '需要檢查的釋義', headword = '測試詞'): Entry {
   return {
     id,
     dialect: { name: '香港' },
-    headword: { display: '測試詞', normalized: '測試詞', isPlaceholder: false },
+    headword: { display: headword, normalized: headword, isPlaceholder: false },
     phonetic: { jyutping: ['cak1 si3 ci4'] },
     entryType: 'word',
     senses: [{ definition }],
@@ -53,21 +53,19 @@ function createRestoredState(): ExportedAdvancedFilterState {
       input: '=CONTAINS(definition, "檢查")',
       applied: '=CONTAINS(definition, "檢查")'
     },
-    regex: {
-      field: 'headword',
-      pattern: '測試',
-      flags: 'i',
-      applied: {
-        field: 'headword',
-        pattern: '測試',
-        flags: 'i'
-      }
-    }
+    regexRows: [
+      { field: 'headword', pattern: '測試', flags: 'i' },
+      { field: 'definition', pattern: '釋義', flags: 'i' }
+    ],
+    appliedRegexRows: [
+      { field: 'headword', pattern: '測試', flags: 'i' },
+      { field: 'definition', pattern: '釋義', flags: 'i' }
+    ]
   }
 }
 
 describe('useEntriesAdvancedFilters shared view APIs', () => {
-  it('restores input and applied formula and regex state atomically', () => {
+  it('restores input and applied formula and regex rows atomically', () => {
     const advancedFilters = createComposable()
     advancedFilters.advancedFilterErrors.formula = { code: 'empty_formula', message: '請輸入公式。' }
 
@@ -75,13 +73,32 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
 
     expect(advancedFilters.formulaInput.value).toBe('=CONTAINS(definition, "檢查")')
     expect(advancedFilters.appliedFormula.value).toBe('=CONTAINS(definition, "檢查")')
-    expect(advancedFilters.regexField.value).toBe('headword')
-    expect(advancedFilters.regexPattern.value).toBe('測試')
-    expect(advancedFilters.regexFlags.value).toBe('i')
-    expect(advancedFilters.appliedRegex).toMatchObject({ field: 'headword', pattern: '測試', flags: 'i' })
+    expect(advancedFilters.regexRows.value.map(({ field, pattern, flags }) => ({ field, pattern, flags }))).toEqual([
+      { field: 'headword', pattern: '測試', flags: 'i' },
+      { field: 'definition', pattern: '釋義', flags: 'i' }
+    ])
+    expect(advancedFilters.appliedRegexRows.value).toEqual([
+      { field: 'headword', pattern: '測試', flags: 'i' },
+      { field: 'definition', pattern: '釋義', flags: 'i' }
+    ])
     expect(advancedFilters.advancedFilterErrors.formula).toBeNull()
     expect(advancedFilters.hasActiveAdvancedFilters.value).toBe(true)
     expect(advancedFilters.filteredEntries.value).toHaveLength(1)
+  })
+
+  it('applies multiple regex rows with AND semantics', () => {
+    const advancedFilters = createComposable([
+      createEntry('entry-1', '需要檢查的釋義', '測試詞'),
+      createEntry('entry-2', '其他釋義', '測試詞'),
+      createEntry('entry-3', '需要檢查的釋義', '其他詞')
+    ])
+
+    advancedFilters.updateRegexRow(advancedFilters.regexRows.value[0].id, { field: 'headword', pattern: '測試', flags: 'i' })
+    advancedFilters.addRegexRow()
+    advancedFilters.updateRegexRow(advancedFilters.regexRows.value[1].id, { field: 'definition', pattern: '檢查', flags: 'i' })
+
+    expect(advancedFilters.applyAdvancedFilters()).toBe(true)
+    expect(advancedFilters.filteredEntries.value.map(entry => entry.id)).toEqual(['entry-1'])
   })
 
   it('exports state that round-trips through the shared-view utility without mutating entries', () => {
@@ -105,16 +122,17 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     expect(entry).not.toHaveProperty('__ruleOverlayMeta')
   })
 
-  it('exports applied regex state instead of an unsaved draft', () => {
+  it('exports applied regex rows instead of unsaved drafts', () => {
     const advancedFilters = createComposable()
     advancedFilters.restoreAdvancedFilterState(createRestoredState())
-    advancedFilters.regexField.value = 'definition'
-    advancedFilters.regexPattern.value = '未套用草稿'
-    advancedFilters.regexFlags.value = 'u'
+    advancedFilters.updateRegexRow(advancedFilters.regexRows.value[0].id, { field: 'definition', pattern: '未套用草稿', flags: 'u' })
 
     const exported = advancedFilters.exportAdvancedFilterState()
 
-    expect(exported.regex.applied).toEqual({ field: 'headword', pattern: '測試', flags: 'i' })
+    expect(exported.appliedRegexRows).toEqual([
+      { field: 'headword', pattern: '測試', flags: 'i' },
+      { field: 'definition', pattern: '釋義', flags: 'i' }
+    ])
     expect(advancedFilters.filteredEntries.value).toHaveLength(1)
   })
 
@@ -123,13 +141,43 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     advancedFilters.restoreAdvancedFilterState(createRestoredState())
 
     const exported = advancedFilters.exportAdvancedFilterState()
-    exported.regex.field = 'definition'
-    exported.regex.pattern = '已改變'
+    exported.regexRows[0].field = 'definition'
+    exported.regexRows[0].pattern = '已改變'
+    exported.appliedRegexRows[0].pattern = '已改變'
 
-    expect(advancedFilters.appliedRegex.field).toBe('headword')
-    expect(advancedFilters.appliedRegex.pattern).toBe('測試')
+    expect(advancedFilters.regexRows.value[0]).toMatchObject({ field: 'headword', pattern: '測試' })
+    expect(advancedFilters.appliedRegexRows.value[0]).toEqual({ field: 'headword', pattern: '測試', flags: 'i' })
     const forbiddenMethodPattern = new RegExp(['sa', 've|dele', 'te|bu', 'lk|fe', 'tch'].join(''), 'i')
     expect(Object.keys(advancedFilters).some(key => forbiddenMethodPattern.test(key))).toBe(false)
+  })
+
+  it('restores current single regex state into one regex row', () => {
+    const advancedFilters = createComposable()
+    advancedFilters.restoreAdvancedFilterState({
+      formula: { input: '', applied: '' },
+      regex: {
+        field: 'definition',
+        pattern: '檢查',
+        flags: 'i',
+        applied: { field: 'definition', pattern: '檢查', flags: 'i' }
+      }
+    } as any)
+
+    expect(advancedFilters.regexRows.value).toHaveLength(1)
+    expect(advancedFilters.regexRows.value[0]).toMatchObject({ field: 'definition', pattern: '檢查', flags: 'i' })
+    expect(advancedFilters.appliedRegexRows.value).toEqual([{ field: 'definition', pattern: '檢查', flags: 'i' }])
+  })
+
+  it('restores legacy column regex state into one regex row', () => {
+    const advancedFilters = createComposable()
+    advancedFilters.restoreAdvancedFilterState({
+      formula: { input: '', applied: '' },
+      globalRegex: { enabled: false, input: '', applied: '', flags: 'i' },
+      columnRegex: { field: 'headword', pattern: '測試', flags: 'i' }
+    } as any)
+
+    expect(advancedFilters.regexRows.value[0]).toMatchObject({ field: 'headword', pattern: '測試', flags: 'i' })
+    expect(advancedFilters.appliedRegexRows.value).toEqual([{ field: 'headword', pattern: '測試', flags: 'i' }])
   })
 
   it('preserves Entry object identity and cleanliness through filter restore, evaluation, and clear operations', () => {
@@ -144,12 +192,8 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
 
     advancedFilters.restoreAdvancedFilterState({
       formula: { input: '=CONTAINS(definition, "測試")', applied: '=CONTAINS(definition, "測試")' },
-      regex: {
-        field: 'any',
-        pattern: '',
-        flags: 'i',
-        applied: { field: 'any', pattern: '', flags: 'i' }
-      }
+      regexRows: [],
+      appliedRegexRows: []
     })
 
     const filteredAfterRestore = advancedFilters.filteredEntries.value
@@ -160,6 +204,8 @@ describe('useEntriesAdvancedFilters shared view APIs', () => {
     advancedFilters.clearAdvancedFilters()
     const filteredAfterClear = advancedFilters.filteredEntries.value
     expect(filteredAfterClear.length).toBe(2)
+    expect(advancedFilters.regexRows.value).toHaveLength(1)
+    expect(advancedFilters.appliedRegexRows.value).toEqual([])
     expect(toRaw(filteredAfterClear.find(e => e.id === 'entry-1'))).toBe(entry1Ref)
     expect(toRaw(filteredAfterClear.find(e => e.id === 'entry-2'))).toBe(entry2Ref)
 

@@ -18,16 +18,14 @@ function createState(overrides: Partial<EntriesSharedViewState> = {}): EntriesSh
         input: '=CONTAINS(definition, "檢查")',
         applied: '=CONTAINS(definition, "檢查")'
       },
-      regex: {
-        field: 'headword',
-        pattern: '測試',
-        flags: 'i',
-        applied: {
-          field: 'headword',
-          pattern: '測試',
-          flags: 'i'
-        }
-      }
+      regexRows: [
+        { field: 'headword', pattern: '測試', flags: 'i' },
+        { field: 'definition', pattern: '釋義', flags: 'i' }
+      ],
+      appliedRegexRows: [
+        { field: 'headword', pattern: '測試', flags: 'i' },
+        { field: 'definition', pattern: '釋義', flags: 'i' }
+      ]
     },
     rules: [
       {
@@ -86,10 +84,50 @@ describe('entries shared view utility', () => {
     if (!decoded.ok) return
     expect(decoded.data).toEqual(state)
     expect(summarizeEntriesSharedView(decoded.data)).toEqual({
-      filterCount: 2,
+      filterCount: 3,
       ruleCount: 2,
-      message: '已還原 2 項篩選和 2 項規則。'
+      message: '已還原 3 項篩選和 2 項規則。'
     })
+  })
+
+  it('decodes current single-regex payloads into canonical regex rows', () => {
+    const singleRegexPayload = {
+      ...createState(),
+      filters: {
+        formula: { input: '', applied: '' },
+        regex: {
+          field: 'headword',
+          pattern: '測試',
+          flags: 'i',
+          applied: { field: 'headword', pattern: '測試', flags: 'i' }
+        }
+      }
+    }
+
+    const decoded = decodeEntriesSharedView(encodeRaw(singleRegexPayload))
+
+    expect(decoded.ok).toBe(true)
+    if (!decoded.ok) return
+    expect(decoded.data.filters.regexRows).toEqual([{ field: 'headword', pattern: '測試', flags: 'i' }])
+    expect(decoded.data.filters.appliedRegexRows).toEqual([{ field: 'headword', pattern: '測試', flags: 'i' }])
+  })
+
+  it('decodes legacy global and column regex payloads into canonical regex rows', () => {
+    const legacyPayload = {
+      ...createState(),
+      filters: {
+        formula: { input: '', applied: '' },
+        globalRegex: { enabled: false, input: '', applied: '', flags: 'i' },
+        columnRegex: { field: 'definition', pattern: '檢查', flags: 'i' }
+      }
+    }
+
+    const decoded = decodeEntriesSharedView(encodeRaw(legacyPayload))
+
+    expect(decoded.ok).toBe(true)
+    if (!decoded.ok) return
+    expect(decoded.data.filters.regexRows).toEqual([{ field: 'definition', pattern: '檢查', flags: 'i' }])
+    expect(decoded.data.filters.appliedRegexRows).toEqual([{ field: 'definition', pattern: '檢查', flags: 'i' }])
   })
 
   it('preserves Hong Kong Traditional Unicode content via UTF-8 base64url', () => {
@@ -176,7 +214,7 @@ describe('entries shared view utility', () => {
     })
 
     const withUnknownNestedField = createState()
-    ;(withUnknownNestedField.filters.regex as any).secretToken = 'sk-secret'
+    ;(withUnknownNestedField.filters.regexRows[0] as any).secretToken = 'sk-secret'
     expect(decodeEntriesSharedView(encodeRaw(withUnknownNestedField))).toMatchObject({
       ok: false,
       code: 'schema_mismatch',
@@ -186,7 +224,7 @@ describe('entries shared view utility', () => {
 
   it('rejects unsupported fields, rule kinds, and condition kinds with explicit copy', () => {
     const unsupportedField = createState()
-    unsupportedField.filters.regex.field = 'unknown' as any
+    unsupportedField.filters.regexRows[0].field = 'unknown' as any
     expect(decodeEntriesSharedView(encodeRaw(unsupportedField))).toMatchObject({
       ok: false,
       code: 'unsupported_field',
@@ -236,11 +274,9 @@ describe('entries shared view utility', () => {
     const invalidRegex = createState({
       filters: {
         ...createState().filters,
-        regex: {
-          ...createState().filters.regex,
-          pattern: '(',
-          flags: 'i'
-        }
+        regexRows: [
+          { ...createState().filters.regexRows[0], pattern: '(', flags: 'i' }
+        ]
       }
     })
     expect(decodeEntriesSharedView(encodeRaw(invalidRegex))).toMatchObject({
@@ -252,6 +288,7 @@ describe('entries shared view utility', () => {
   it('does not serialize local IDs, secrets, entry data, or dirty draft state', () => {
     const suspicious = createState()
     ;(suspicious.rules[0] as any).id = 'local-rule-id'
+    ;(suspicious.filters.regexRows[0] as any).id = 'local-regex-row-id'
     ;(suspicious as any).entries = [{ id: 'entry-1', headword: '秘密詞條' }]
     ;(suspicious as any).token = 'sk-secret'
     ;(suspicious as any)._isDirty = true
@@ -259,6 +296,7 @@ describe('entries shared view utility', () => {
     const encoded = encodeEntriesSharedView(suspicious)
     const raw = JSON.stringify(decodeRaw(encoded))
     expect(raw).not.toContain('local-rule-id')
+    expect(raw).not.toContain('local-regex-row-id')
     expect(raw).not.toContain('秘密詞條')
     expect(raw).not.toContain('sk-secret')
     expect(raw).not.toContain('_isDirty')

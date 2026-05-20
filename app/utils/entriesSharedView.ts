@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ADVANCED_FILTER_FIELDS } from '~/utils/entriesTableConstants'
 import { compileAdvancedRegex, parseAdvancedFormula, type AdvancedFilterFieldKey } from '~/utils/entriesAdvancedFilter'
+import type { AdvancedFilterRegexConditionPayload } from '~/composables/useEntriesAdvancedFilters'
 import type { EntriesRuleDraft } from '~/composables/useEntriesRuleOverlays'
 
 export const ENTRIES_SHARED_VIEW_VERSION = 1
@@ -25,16 +26,8 @@ export interface EntriesSharedViewAdvancedFilterState {
     input: string
     applied: string
   }
-  regex: {
-    field: AdvancedFilterFieldKey | 'any'
-    pattern: string
-    flags: string
-    applied: {
-      field: AdvancedFilterFieldKey | 'any'
-      pattern: string
-      flags: string
-    }
-  }
+  regexRows: AdvancedFilterRegexConditionPayload[]
+  appliedRegexRows: AdvancedFilterRegexConditionPayload[]
 }
 
 export type EntriesSharedViewRule = EntriesRuleDraft
@@ -69,8 +62,22 @@ const regexFieldSchema = z.enum(REGEX_FIELD_VALUES)
 const ruleKindSchema = z.enum(RULE_KIND_VALUES)
 const conditionKindSchema = z.enum(CONDITION_KIND_VALUES)
 const colorHexSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/)
+const regexConditionSchema = z.strictObject({
+  field: regexFieldSchema,
+  pattern: z.string(),
+  flags: z.string()
+})
 
-const filterStateSchema = z.strictObject({
+const canonicalFilterStateSchema = z.strictObject({
+  formula: z.strictObject({
+    input: z.string(),
+    applied: z.string()
+  }),
+  regexRows: z.array(regexConditionSchema),
+  appliedRegexRows: z.array(regexConditionSchema)
+})
+
+const singleRegexFilterStateSchema = z.strictObject({
   formula: z.strictObject({
     input: z.string(),
     applied: z.string()
@@ -79,11 +86,25 @@ const filterStateSchema = z.strictObject({
     field: regexFieldSchema,
     pattern: z.string(),
     flags: z.string(),
-    applied: z.strictObject({
-      field: regexFieldSchema,
-      pattern: z.string(),
-      flags: z.string()
-    })
+    applied: regexConditionSchema
+  })
+})
+
+const legacyFilterStateSchema = z.strictObject({
+  formula: z.strictObject({
+    input: z.string(),
+    applied: z.string()
+  }),
+  globalRegex: z.strictObject({
+    enabled: z.boolean(),
+    input: z.string(),
+    applied: z.string(),
+    flags: z.string()
+  }),
+  columnRegex: z.strictObject({
+    field: z.union([z.literal(''), fieldSchema]),
+    pattern: z.string(),
+    flags: z.string()
   })
 })
 
@@ -107,10 +128,10 @@ const ruleSchema = z.strictObject({
 
 const viewModeSchema = z.enum(['flat', 'aggregated', 'lexeme'])
 
-const sharedViewSchema = z.strictObject({
+const sharedViewEnvelopeSchema = z.strictObject({
   version: z.literal(ENTRIES_SHARED_VIEW_VERSION),
   viewMode: viewModeSchema.optional(),
-  filters: filterStateSchema,
+  filters: z.unknown(),
   rules: z.array(ruleSchema)
 })
 
@@ -144,25 +165,76 @@ function isSupportedField(value: unknown): value is AdvancedFilterFieldKey {
   return typeof value === 'string' && ADVANCED_FILTER_FIELDS.includes(value as AdvancedFilterFieldKey)
 }
 
-function normalizeState(state: EntriesSharedViewState): EntriesSharedViewState {
+function cloneRegexRow(row: AdvancedFilterRegexConditionPayload): AdvancedFilterRegexConditionPayload {
+  return {
+    field: row.field,
+    pattern: row.pattern,
+    flags: row.flags
+  }
+}
+
+function normalizeFilterState(filters: unknown): EntriesSharedViewAdvancedFilterState | null {
+  const canonical = canonicalFilterStateSchema.safeParse(filters)
+  if (canonical.success) {
+    return {
+      formula: { ...canonical.data.formula },
+      regexRows: canonical.data.regexRows.map(cloneRegexRow),
+      appliedRegexRows: canonical.data.appliedRegexRows.map(cloneRegexRow)
+    }
+  }
+
+  const single = singleRegexFilterStateSchema.safeParse(filters)
+  if (single.success) {
+    return {
+      formula: { ...single.data.formula },
+      regexRows: [cloneRegexRow(single.data.regex)],
+      appliedRegexRows: single.data.regex.applied.pattern.trim() ? [cloneRegexRow(single.data.regex.applied)] : []
+    }
+  }
+
+  const legacy = legacyFilterStateSchema.safeParse(filters)
+  if (legacy.success) {
+    const regexRows: AdvancedFilterRegexConditionPayload[] = []
+    const appliedRegexRows: AdvancedFilterRegexConditionPayload[] = []
+    const col = legacy.data.columnRegex
+    const glob = legacy.data.globalRegex
+
+    if (col.field && col.pattern) {
+      const row = { field: col.field, pattern: col.pattern, flags: col.flags }
+      regexRows.push(row)
+      appliedRegexRows.push(row)
+    } else if (glob.enabled && glob.applied) {
+      const row = { field: 'any' as const, pattern: glob.applied, flags: glob.flags }
+      regexRows.push(row)
+      appliedRegexRows.push(row)
+    } else if (glob.input) {
+      regexRows.push({ field: 'any', pattern: glob.input, flags: glob.flags })
+    }
+
+    return {
+      formula: { ...legacy.data.formula },
+      regexRows,
+      appliedRegexRows
+    }
+  }
+
+  return null
+}
+
+function normalizeState(state: { version: number; viewMode?: EntriesSharedViewMode; filters: unknown; rules: EntriesSharedViewRule[] }): EntriesSharedViewState | null {
+  const filters = normalizeFilterState(state.filters)
+  if (!filters) return null
+
   return {
     version: ENTRIES_SHARED_VIEW_VERSION,
     ...(state.viewMode ? { viewMode: state.viewMode } : {}),
     filters: {
       formula: {
-        input: state.filters.formula.input,
-        applied: state.filters.formula.applied
+        input: filters.formula.input,
+        applied: filters.formula.applied
       },
-      regex: {
-        field: state.filters.regex.field,
-        pattern: state.filters.regex.pattern,
-        flags: state.filters.regex.flags,
-        applied: {
-          field: state.filters.regex.applied.field,
-          pattern: state.filters.regex.applied.pattern,
-          flags: state.filters.regex.applied.flags
-        }
-      }
+      regexRows: filters.regexRows.map(cloneRegexRow),
+      appliedRegexRows: filters.appliedRegexRows.map(cloneRegexRow)
     },
     rules: state.rules.map(rule => ({
       name: rule.name,
@@ -199,20 +271,41 @@ function decodeUtf8Base64Url(encoded: string): unknown {
   return JSON.parse(new TextDecoder().decode(bytes))
 }
 
+function checkRegexField(value: unknown): EntriesSharedViewDecodeResult | null {
+  if (typeof value === 'string' && value !== 'any' && value !== '' && !isSupportedField(value)) return createDecodeError('unsupported_field', value)
+  return null
+}
+
 function findUnsupportedSemanticValue(payload: unknown): EntriesSharedViewDecodeResult | null {
   if (!isPlainObject(payload)) return null
 
   const filters = payload.filters
   if (isPlainObject(filters)) {
-    const regex = filters.regex
-    if (isPlainObject(regex)) {
-      for (const key of ['field', 'applied']) {
-        const section = isPlainObject(regex[key as string]) ? regex[key as string] : regex
-        if (isPlainObject(section)) {
-          const field = section.field
-          if (typeof field === 'string' && field !== 'any' && !isSupportedField(field)) return createDecodeError('unsupported_field', field)
+    for (const key of ['regexRows', 'appliedRegexRows']) {
+      const rows = filters[key]
+      if (Array.isArray(rows)) {
+        for (const row of rows) {
+          if (!isPlainObject(row)) continue
+          const error = checkRegexField(row.field)
+          if (error) return error
         }
       }
+    }
+
+    const regex = filters.regex
+    if (isPlainObject(regex)) {
+      const fieldError = checkRegexField(regex.field)
+      if (fieldError) return fieldError
+      if (isPlainObject(regex.applied)) {
+        const appliedFieldError = checkRegexField(regex.applied.field)
+        if (appliedFieldError) return appliedFieldError
+      }
+    }
+
+    const columnRegex = filters.columnRegex
+    if (isPlainObject(columnRegex)) {
+      const fieldError = checkRegexField(columnRegex.field)
+      if (fieldError) return fieldError
     }
   }
 
@@ -226,8 +319,8 @@ function findUnsupportedSemanticValue(payload: unknown): EntriesSharedViewDecode
       if (typeof condition.kind === 'string' && !CONDITION_KIND_VALUES.includes(condition.kind as any)) return createDecodeError('unsupported_condition_kind', condition.kind)
       const regex = condition.regex
       if (isPlainObject(regex)) {
-        const regexField = regex.field
-        if (typeof regexField === 'string' && regexField !== 'any' && !isSupportedField(regexField)) return createDecodeError('unsupported_field', regexField)
+        const fieldError = checkRegexField(regex.field)
+        if (fieldError) return fieldError
       }
     }
     const targetFields = rule.targetFields
@@ -254,12 +347,19 @@ function validateRegex(pattern: string, flags: string): EntriesSharedViewDecodeR
   return null
 }
 
+function validateRegexRows(rows: AdvancedFilterRegexConditionPayload[]): EntriesSharedViewDecodeResult | null {
+  for (const row of rows) {
+    const error = validateRegex(row.pattern, row.flags)
+    if (error) return error
+  }
+  return null
+}
+
 function validateSharedViewSemantics(state: EntriesSharedViewState): EntriesSharedViewDecodeResult | null {
   const formulaError = validateFormula(state.filters.formula.input) ?? validateFormula(state.filters.formula.applied)
   if (formulaError) return formulaError
 
-  const regexError = validateRegex(state.filters.regex.pattern, state.filters.regex.flags)
-    ?? validateRegex(state.filters.regex.applied.pattern, state.filters.regex.applied.flags)
+  const regexError = validateRegexRows(state.filters.regexRows) ?? validateRegexRows(state.filters.appliedRegexRows)
   if (regexError) return regexError
 
   for (const rule of state.rules) {
@@ -275,8 +375,40 @@ function validateSharedViewSemantics(state: EntriesSharedViewState): EntriesShar
   return null
 }
 
+function sanitizeStateForEncode(state: EntriesSharedViewState): EntriesSharedViewState {
+  return {
+    version: ENTRIES_SHARED_VIEW_VERSION,
+    ...(state.viewMode ? { viewMode: state.viewMode } : {}),
+    filters: {
+      formula: {
+        input: state.filters.formula.input,
+        applied: state.filters.formula.applied
+      },
+      regexRows: state.filters.regexRows.map(cloneRegexRow),
+      appliedRegexRows: state.filters.appliedRegexRows.map(cloneRegexRow)
+    },
+    rules: state.rules.map(rule => ({
+      name: rule.name,
+      kind: rule.kind,
+      enabled: rule.enabled,
+      targetFields: [...rule.targetFields],
+      condition: {
+        kind: rule.condition.kind,
+        formula: rule.condition.formula,
+        regex: {
+          pattern: rule.condition.regex.pattern,
+          flags: rule.condition.regex.flags,
+          field: rule.condition.regex.field
+        }
+      },
+      stylePreset: rule.stylePreset,
+      colorHex: rule.colorHex
+    }))
+  }
+}
+
 export function encodeEntriesSharedView(state: EntriesSharedViewState): string {
-  return encodeUtf8Base64Url(normalizeState(state))
+  return encodeUtf8Base64Url(sanitizeStateForEncode(state))
 }
 
 export function decodeEntriesSharedView(payload: string | null | undefined): EntriesSharedViewDecodeResult {
@@ -298,13 +430,16 @@ export function decodeEntriesSharedView(payload: string | null | undefined): Ent
   const unsupported = findUnsupportedSemanticValue(decoded)
   if (unsupported) return unsupported
 
-  const parsed = sharedViewSchema.safeParse(decoded)
+  const parsed = sharedViewEnvelopeSchema.safeParse(decoded)
   if (!parsed.success) return createDecodeError('schema_mismatch')
 
-  const semanticError = validateSharedViewSemantics(parsed.data)
+  const normalized = normalizeState(parsed.data)
+  if (!normalized) return createDecodeError('schema_mismatch')
+
+  const semanticError = validateSharedViewSemantics(normalized)
   if (semanticError) return semanticError
 
-  return { ok: true, data: normalizeState(parsed.data) }
+  return { ok: true, data: normalized }
 }
 
 export function buildEntriesSharedViewUrl(baseUrl: string, state: EntriesSharedViewState): string {
@@ -316,7 +451,7 @@ export function buildEntriesSharedViewUrl(baseUrl: string, state: EntriesSharedV
 export function summarizeEntriesSharedView(state: EntriesSharedViewState): EntriesSharedViewSummary {
   const filterCount = [
     state.filters.formula.applied.trim(),
-    state.filters.regex.applied.pattern.trim()
+    ...state.filters.appliedRegexRows.map(row => row.pattern.trim())
   ].filter(Boolean).length
   const ruleCount = state.rules.length
 
