@@ -970,7 +970,7 @@ definePageMeta({
   name: 'entries-index'
 })
 
-const { isAuthenticated, user } = useAuth()
+const { isAuthenticated, user, refreshUser } = useAuth()
 const profileUpdatedUser = useProfileUpdatedUser()
 
 const canEditExternalEtymons = computed(() => {
@@ -2863,6 +2863,9 @@ onMounted(async () => {
   // Apply URL parameters (search, filter=mine)
   await applySharedViewQuery()
   applyUrlParams()
+
+  // 從 DB 刷新 dialectPermissions，避免使用登入時的 session snapshot
+  await refreshUser()
 
   await fetchEntries()
 

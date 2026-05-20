@@ -3,6 +3,8 @@ import { nanoid } from 'nanoid'
 import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
+import { connectDB } from '../../utils/db'
+import { User } from '../../utils/User'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -160,6 +162,11 @@ export default defineEventHandler(async (event) => {
 
     // 方案 A：貢獻者僅能在其方言權限內建立詞條
     const auth = event.context.auth
+    // 從 DB 刷新 dialectPermissions，避免 session snapshot 過期
+    const freshUser = await User.findById(auth.id).select('dialectPermissions').lean()
+    if (freshUser) {
+      auth.dialectPermissions = (freshUser.dialectPermissions || []) as any
+    }
     if (!canContributeToDialect(auth, dialect.name)) {
       throw createError({
         statusCode: 403,

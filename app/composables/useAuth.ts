@@ -18,7 +18,7 @@ export function useProfileUpdatedUser() {
 }
 
 export const useAuth = () => {
-  const { user, loggedIn, fetch: fetchSession, clear: clearSession } = useUserSession()
+  const { user, session, loggedIn, fetch: fetchSession, clear: clearSession } = useUserSession()
   const profileUpdatedUser = useProfileUpdatedUser()
   const router = useRouter()
   const getRoute = () => useRoute()
@@ -26,6 +26,21 @@ export const useAuth = () => {
   /** 拉取當前 session（nuxt-auth-utils 管理，SSR 時會帶請求 cookie） */
   const initAuth = async () => {
     await fetchSession()
+  }
+
+  /** 從 DB 刷新當前用戶資料（含 dialectPermissions），避免 session snapshot 過期 */
+  const refreshUser = async () => {
+    try {
+      const res = await $fetch<{ success: boolean; data: any }>('/api/auth/me')
+      if (res.success && res.data && session.value) {
+        session.value = { ...session.value, user: res.data }
+        profileUpdatedUser.value = { id: res.data.id, dialectPermissions: res.data.dialectPermissions ?? [] }
+        return res.data
+      }
+    } catch (_) {
+      // 非關鍵操作，失敗時沿用 session 資料
+    }
+    return null
   }
 
   const login = async (email: string, password: string) => {
@@ -117,6 +132,7 @@ export const useAuth = () => {
     loading: computed(() => false),
     initialized: computed(() => true),
     initAuth,
+    refreshUser,
     login,
     register,
     logout,
