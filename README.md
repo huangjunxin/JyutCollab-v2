@@ -19,6 +19,14 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **主題分類**——AI 三層主題自動分類（共 439 個類別）
 - **釋義生成**——自動生成香港繁體中文釋義建議
 - **例句生成**——生成附帶解釋的情境例句
+- **建議成效追蹤**——記錄 AI 建議的採納、拒絕、接受後修改與待處理狀態
+
+### 儀表板與分析
+- **全站統計**——顯示詞條總量、發佈狀態與審核狀態
+- **貢獻者活躍度**——統計實際貢獻者、近 7 天活躍人數與近期貢獻數
+- **方言覆蓋率**——追蹤已覆蓋方言點及詞條最多的方言
+- **AI 輔助成效**——供審核者檢視 AI 建議接受率、拒絕率與修改率
+- **活動時間軸**——顯示個人及全站最近編輯活動
 
 ### 詞典管理
 - **190 多個方言點**——涵蓋珠江三角洲、五邑、廣西及海外地區
@@ -52,7 +60,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 | UI | @nuxt/ui、Tailwind CSS、Radix Vue |
 | 數據庫 | MongoDB、Mongoose ODM |
 | 認證 | nuxt-auth-utils、HttpOnly Cookie |
-| AI | OpenRouter API（qwen/qwen3-235b） |
+| AI | OpenRouter API（deepseek-v4-flash，可透過 `OPENROUTER_MODEL` 調整） |
 | 狀態管理 | Pinia |
 | 驗證 | Zod |
 | 圖片儲存 | Cloudinary |
@@ -70,8 +78,8 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 
 1. 複製儲存庫：
 ```bash
-git clone https://github.com/your-username/jyutcollab-v2.git
-cd jyutcollab-v2
+git clone https://github.com/huangjunxin/JyutCollab-v2.git
+cd JyutCollab-v2
 ```
 
 2. 安裝依賴項目：
@@ -92,8 +100,9 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jyutcollab
 # Session 密鑰（至少 32 個字元）
 NUXT_SESSION_PASSWORD=your-session-password-at-least-32-chars-long
 
-# OpenRouter API 金鑰
+# OpenRouter API 金鑰與模型
 OPENROUTER_API_KEY=sk-or-your-api-key
+OPENROUTER_MODEL=deepseek-v4-flash
 
 # Cloudinary 設定
 NUXT_CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -143,8 +152,14 @@ JyutCollab-v2/
 │       ├── User.ts             # 用戶模型
 │       ├── Theme.ts            # 主題模型
 │       ├── EditHistory.ts      # 歷史模型
+│       ├── AISuggestion.ts     # AI 建議成效記錄
+│       ├── SavedView.ts        # 已儲存視圖模型
+│       ├── Lexeme.ts           # 詞位分組模型
+│       ├── ExternalEtymon.ts   # 外部詞源參照模型
+│       ├── Notification.ts     # 通知模型
 │       ├── ai.ts               # AI 服務
 │       ├── auth.ts             # 認證工具
+│       ├── cloudinary.ts       # 圖片上傳工具
 │       ├── db.ts               # 數據庫連線
 │       └── textConversion.ts   # 中文文字轉換
 ├── shared/                       # 共用程式碼
@@ -187,6 +202,47 @@ JyutCollab-v2/
 | POST | /api/ai/categorize | 主題分類 |
 | POST | /api/ai/definitions | 生成釋義 |
 | POST | /api/ai/examples | 生成例句 |
+| POST | /api/ai/suggestions/:id/action | 記錄 AI 建議採納、拒絕或修改 |
+
+### 統計與儀表板
+| 方法 | 端點 | 說明 |
+|------|------|------|
+| GET | /api/stats | 全站詞條與貢獻者統計 |
+| GET | /api/stats/mine | 我的詞條統計 |
+| GET | /api/stats/mine/enhanced | 我的進階貢獻統計 |
+| GET | /api/stats/reviewer | 審核者統計 |
+| GET | /api/stats/reviewer/enhanced | 審核進度與效率統計 |
+| GET | /api/stats/ai-suggestions | AI 建議成效統計 |
+| GET | /api/stats/dialects | 方言覆蓋統計 |
+
+### 歷史、視圖與通知
+| 方法 | 端點 | 說明 |
+|------|------|------|
+| GET | /api/histories | 編輯歷史列表 |
+| GET | /api/histories/:entryId | 單一詞條編輯歷史 |
+| POST | /api/histories/:id/revert | 還原歷史版本 |
+| GET | /api/views | 已儲存視圖列表 |
+| POST | /api/views | 建立已儲存視圖 |
+| GET | /api/views/:id | 取得已儲存視圖 |
+| PUT | /api/views/:id | 更新已儲存視圖 |
+| DELETE | /api/views/:id | 刪除已儲存視圖 |
+| GET | /api/notifications | 通知列表 |
+| PUT | /api/notifications/:id/read | 標記單一通知為已讀 |
+| PUT | /api/notifications/read-all | 標記所有通知為已讀 |
+
+### 其他整合
+| 方法 | 端點 | 說明 |
+|------|------|------|
+| POST | /api/upload/image | 上傳釋義配圖 |
+| GET | /api/entries/search-morphemes | 搜尋語素參照 |
+| PATCH | /api/entries/:id/lexeme | 更新詞位關聯 |
+| GET | /api/lexemes/:lexemeId/external-etymons | 取得外部詞源參照 |
+| POST | /api/lexemes/:lexemeId/external-etymons | 新增外部詞源參照 |
+| PUT | /api/external-etymons/:id | 更新外部詞源參照 |
+| DELETE | /api/external-etymons/:id | 刪除外部詞源參照 |
+| GET | /api/jyutdict/general | 查詢粵典 general 資料 |
+| GET | /api/jyutdict/sheet | 查詢粵典 sheet 資料 |
+| GET | /api/jyutjyu/search | 搜尋粵語資料 |
 
 ## 用戶角色
 

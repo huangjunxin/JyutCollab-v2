@@ -23,7 +23,7 @@ const getOpenAIClient = () => {
 }
 
 // Unified model
-const DEFAULT_MODEL = 'qwen/qwen3-235b-a22b-07-25'
+const DEFAULT_MODEL = 'deepseek-v4-flash'
 
 const getLLMModel = () => {
   const config = useRuntimeConfig()

@@ -51,7 +51,7 @@ const AISuggestionSchema = new mongoose.Schema<IAISuggestion>({
   },
   modelName: {
     type: String,
-    default: 'qwen/qwen3-235b-a22b-07-25'
+    default: 'deepseek-v4-flash'
   },
   promptVersion: {
     type: String,

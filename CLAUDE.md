@@ -56,8 +56,9 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jyutcollab
 # Session (nuxt-auth-utils) - at least 32 characters
 NUXT_SESSION_PASSWORD=your-session-password-at-least-32-chars-long
 
-# OpenRouter API Key (for AI features)
+# OpenRouter API Key and model (for AI features)
 OPENROUTER_API_KEY=sk-or-your-api-key
+OPENROUTER_MODEL=deepseek-v4-flash
 
 # Cloudinary (sense images)
 NUXT_CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -77,7 +78,7 @@ NUXT_PUBLIC_SITE_NAME=JyutCollab v2
 - **UI**: @nuxt/ui (Tailwind CSS + Radix Vue components)
 - **Database**: MongoDB with Mongoose ODM
 - **Auth**: nuxt-auth-utils with HttpOnly cookie sessions
-- **AI**: OpenRouter API (qwen/qwen3-235b-a22b-07-25 model)
+- **AI**: OpenRouter API (`deepseek-v4-flash` by default, configurable via `OPENROUTER_MODEL`)
 - **State**: Pinia stores
 - **Validation**: Zod schemas
 - **Image**: Cloudinary for upload and optimization
@@ -194,7 +195,7 @@ The entries table (`app/pages/entries/index.vue`) is a 2000+ line component with
 
 ### AI Integration (`server/utils/ai.ts`)
 
-Uses OpenRouter with qwen/qwen3-235b-a22b-07-25 model:
+Uses OpenRouter with `deepseek-v4-flash` by default:
 - **Categorization** (temp 0.2): Returns themeId (60-498), confidence, explanation
 - **Definitions** (temp 0.4): Returns definition, usageNotes, formalityLevel, frequency
 - **Examples** (temp 0.6): Returns 3 examples with sentence, explanation, scenario
