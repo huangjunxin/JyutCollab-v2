@@ -262,7 +262,8 @@ export default defineEventHandler(async (event) => {
         theme: entry.theme,
         meta: entry.meta,
         status: entry.status,
-        createdAt: entry.createdAt
+        createdAt: entry.createdAt,
+        createdBy: entry.createdBy
       }
     }
   } catch (error: any) {

@@ -2546,7 +2546,7 @@ async function saveNewEntry(entry: Entry) {
       const index = entries.value.findIndex(e => e.id === entry.id || (e as any)._tempId === (entry as any)._tempId)
       if (index !== -1) {
         const prev = entries.value[index] as any
-        const saved = { ...response.data, _isNew: false, _isDirty: false } as unknown as Entry
+        const saved = { ...response.data, createdBy: response.data.createdBy ?? (prev as any).createdBy, _isNew: false, _isDirty: false } as unknown as Entry
         const prevTempId = prev?._tempId ? String(prev._tempId) : ''
         const savedId = String(saved.id || '')
         if (prevTempId && savedId) {
