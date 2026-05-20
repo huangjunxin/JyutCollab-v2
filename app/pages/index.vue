@@ -68,7 +68,7 @@
     </div>
 
     <!-- Stats Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- My Stats Card -->
       <UCard
         v-if="isAuthenticated"
@@ -240,7 +240,7 @@
     </div>
 
     <!-- Enhanced Stats Section -->
-    <div v-if="isAuthenticated" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div v-if="isAuthenticated" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- My Contribution Stats (Enhanced) -->
       <UCard
         class="shadow-sm border border-gray-200 dark:border-gray-700"
