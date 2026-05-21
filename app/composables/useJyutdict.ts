@@ -134,7 +134,7 @@ function extractFromSheetData(
   }
 
   const dataEntries = entries.filter(
-    (entry) => entry && typeof entry === 'object' && (entry.繁 || entry.綜 || entry.釋)
+    (entry) => entry && typeof entry === 'object' && entry.id
   )
 
   // 構建列映射
@@ -151,7 +151,7 @@ function extractFromSheetData(
       const column = columnMap.get(key)
       if (!column || column.is_city !== 1) continue
 
-      const val = value as string
+      const val = typeof value === 'string' ? value.trim() : ''
       if (!val || val === '' || val === '_') continue
 
       const locationName = column.sub
