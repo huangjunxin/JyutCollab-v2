@@ -52,8 +52,12 @@
     </div>
 
     <!-- Loading state -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-primary" />
+    <div v-if="loading" class="flex-1 flex flex-col items-center justify-center py-12">
+      <div class="relative">
+        <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+        <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+      </div>
+      <p class="mt-4 text-gray-500 dark:text-gray-400">加載中...</p>
     </div>
 
     <!-- Error state -->

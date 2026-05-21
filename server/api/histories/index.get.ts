@@ -31,7 +31,21 @@ export default defineEventHandler(async (event): Promise<PaginatedResponse<EditH
 
     const filter: Record<string, unknown> = {}
     if (entryId) {
-      filter.entryId = entryId
+      const escapedEntryId = entryId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const searchRegex = new RegExp(escapedEntryId, 'i')
+      filter.$or = [
+        { entryId },
+        { 'beforeSnapshot.id': entryId },
+        { 'afterSnapshot.id': entryId },
+        { 'beforeSnapshot.headword.display': searchRegex },
+        { 'afterSnapshot.headword.display': searchRegex },
+        { 'beforeSnapshot.headword.normalized': searchRegex },
+        { 'afterSnapshot.headword.normalized': searchRegex },
+        { 'beforeSnapshot.headword.variants': searchRegex },
+        { 'afterSnapshot.headword.variants': searchRegex },
+        { 'beforeSnapshot.text': searchRegex },
+        { 'afterSnapshot.text': searchRegex }
+      ]
     }
     if (action && ['create', 'update', 'delete', 'status_change'].includes(action)) {
       filter.action = action
