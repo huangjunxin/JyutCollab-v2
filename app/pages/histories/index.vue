@@ -348,9 +348,9 @@
     </UModal>
 
     <!-- Revert Confirmation Modal -->
-    <UModal v-model:open="revertConfirmOpen">
+    <UModal v-model:open="revertConfirmOpen" class="max-w-md">
       <template #content>
-        <UCard class="max-w-md">
+        <UCard class="w-full">
           <template #header>
             <div class="flex items-center gap-2 text-warning">
               <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5" />
