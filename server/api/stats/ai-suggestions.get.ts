@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   try {
     await connectDB()
 
-    const suggestionTypeFilter = { suggestionType: { $in: ['definition', 'theme_classification', 'example'] } }
+    const suggestionTypeFilter = { suggestionType: { $in: ['definition', 'theme_classification', 'example', 'register'] } }
     const [byAction, byType, total] = await Promise.all([
       AISuggestion.aggregate([
         { $match: suggestionTypeFilter },
@@ -55,7 +55,8 @@ export default defineEventHandler(async (event) => {
     const typeLabels = {
       definition: '釋義',
       theme_classification: '分類',
-      example: '例句'
+      example: '例句',
+      register: '語域'
     }
 
     const byTypeMap = new Map<string, {
@@ -71,7 +72,7 @@ export default defineEventHandler(async (event) => {
       rejectionRate: number
     }>()
 
-    ;(['definition', 'theme_classification', 'example'] as const).forEach((type) => {
+    ;(['definition', 'theme_classification', 'example', 'register'] as const).forEach((type) => {
       byTypeMap.set(type, {
         type,
         label: typeLabels[type],

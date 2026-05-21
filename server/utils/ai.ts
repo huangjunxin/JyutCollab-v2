@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { convertToHongKongTraditional } from './textConversion'
+import type { Register } from './types'
 
 // Configure OpenRouter client
 const getOpenAIClient = () => {
@@ -50,6 +51,12 @@ const ExampleSchema = z.object({
     explanation: z.string(),
     scenario: z.string()
   }))
+})
+
+const RegisterSchema = z.object({
+  register: z.enum(['口語', '書面', '粗俗', '文雅', '中性']),
+  explanation: z.string(),
+  confidence: z.number().min(0).max(1)
 })
 
 // Theme list for categorization
@@ -396,6 +403,102 @@ ${context ? `語境：${context}` : ''}${referenceText}
     return {
       definition: convertToHongKongTraditional(`${expression}的含義需要進一步確認`),
       usageNotes: convertToHongKongTraditional('請根據具體語境使用')
+    }
+  }
+}
+
+export async function generateRegisterSuggestion(
+  expression: string,
+  region: string = '香港',
+  definition?: string,
+  usageNotes?: string,
+  context?: string,
+  referenceExpressions?: Array<{
+    text: string
+    definition?: string
+    usage_notes?: string
+    region: string
+    register?: Register
+  }>
+): Promise<{ register: Register; explanation: string; confidence: number }> {
+  try {
+    const openai = getOpenAIClient()
+
+    let referenceText = ''
+    if (referenceExpressions && referenceExpressions.length > 0) {
+      referenceText = `
+
+**參考相關詞條的語域**：
+${referenceExpressions.map((ref, index) => `
+${index + 1}. 詞條: ${ref.text} (${ref.region})
+   釋義: ${ref.definition || '無'}
+   用法: ${ref.usage_notes || '無'}
+   語域: ${ref.register || '未標註'}`).join('')}
+
+請參考以上詞條，但要為當前表達選擇最準確的語域。`
+    }
+
+    const prompt = `請判斷以下${region}粵語表達的語域。
+
+表達：${expression}
+地區：${region}
+${definition ? `釋義：${definition}` : ''}
+${usageNotes ? `用法説明：${usageNotes}` : ''}
+${context ? `語境：${context}` : ''}${referenceText}
+
+只能從以下五個語域中選擇一個：
+- 口語：日常口頭交流常用，不一定適合正式書面語
+- 書面：較常見於書面表述或較正式記錄
+- 粗俗：帶粗鄙、冒犯、髒話或不雅色彩
+- 文雅：較斯文、典雅、委婉或禮貌
+- 中性：沒有明顯口語、書面、粗俗或文雅傾向
+
+考慮因素：
+1. 詞語本身的社會接受度
+2. 使用場合是否正式
+3. 是否帶粗俗、貶損或冒犯意味
+4. 是否主要出現在口頭或書面語境
+5. 當地粵語使用習慣
+
+請返回JSON格式，包含：
+- register: 必須是「口語」「書面」「粗俗」「文雅」「中性」其中一個
+- explanation: 判斷理由
+- confidence: 置信度（0-1之間）`
+
+    const completion = await openai.chat.completions.create({
+      model: getLLMModel(),
+      messages: [
+        {
+          role: 'system',
+          content: '你是一個粵語語域判斷專家，熟悉粵語詞彙在口語、書面、粗俗、文雅、中性等語域中的使用。請只輸出指定JSON格式。'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.2
+    })
+
+    const result = completion.choices[0]?.message?.content
+    if (!result) {
+      throw new Error('No response from AI')
+    }
+
+    const parsed = RegisterSchema.parse(JSON.parse(result))
+
+    return {
+      register: parsed.register,
+      explanation: convertToHongKongTraditional(parsed.explanation),
+      confidence: parsed.confidence
+    }
+  } catch (error) {
+    console.error('Error generating register suggestion:', error)
+    return {
+      register: '中性',
+      explanation: convertToHongKongTraditional('語域判斷失敗，使用中性作為預設語域'),
+      confidence: 0.1
     }
   }
 }

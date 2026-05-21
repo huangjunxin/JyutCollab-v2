@@ -357,6 +357,12 @@ export interface ExampleResult {
   scenario?: string
 }
 
+export interface RegisterSuggestionResult {
+  register: Register
+  explanation: string
+  confidence: number
+}
+
 export interface PolishResult {
   polished: string
   changes: string[]

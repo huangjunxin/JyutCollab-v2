@@ -463,8 +463,10 @@
                 :review-notes="col.key === 'status' && row.entry.status === 'rejected' ? row.entry.reviewNotes : undefined"
                 :show-ai-definition="col.key === 'definition' && !!row.entry.headword?.display && !row.entry.senses?.[0]?.definition"
                 :show-ai-theme="col.key === 'theme' && !!row.entry.headword?.display && !row.entry.theme?.level3Id"
+                :show-ai-register="col.key === 'register' && !!row.entry.headword?.display && !row.entry.meta?.register"
                 :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
                 :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
+                :ai-loading-register="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'register'"
                 :show-expand="col.key === 'definition'"
                 :is-expanded="expandedEntryId === getEntryIdString(row.entry)"
                 :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
@@ -478,6 +480,7 @@
                 @blur="handleBlur(row.entry, col.key)"
                 @ai-definition="generateAIDefinition(row.entry)"
                 @ai-theme="generateAICategorization(row.entry)"
+                @ai-register="focusedCell = { rowIndex, colIndex }; generateAIRegister(row.entry)"
                 @expand-click="toggleSensesExpand(row.entry)"
                 @theme-expand-click="toggleThemeExpand(row.entry)"
                 @accept-theme-ai="acceptThemeAI(row.entry)"
@@ -515,6 +518,15 @@
               :colspan="editableColumns.length + 2"
               @accept="acceptThemeAI(row.entry)"
               @dismiss="dismissThemeAI(row.entry)"
+            />
+            <!-- 行內 AI 語域建議 -->
+            <AISuggestionRow
+              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === registerColIndex && registerAISuggestions.get(getEntryIdString(row.entry))"
+              :text="formatRegisterSuggestion(registerAISuggestions.get(getEntryIdString(row.entry)))"
+              title="AI 語域建議"
+              :colspan="editableColumns.length + 2"
+              @accept="acceptRegisterAI(row.entry)"
+              @dismiss="dismissRegisterAI(row.entry)"
             />
             <!-- 泛粵典粵拼建議 -->
             <JyutdictSuggestionRow
@@ -1362,7 +1374,7 @@ const {
   getUserDefaultDialect
 } = useNewEntryDialect(isReviewerOrAdmin, userDialectOptions, user, effectiveDialectPermissions)
 
-const { editableColumns, themeColIndex, phoneticColIndex, headwordColIndex } = useEntriesTableColumns(userDialectOptions, themeOptions, statusOptionsForTable)
+const { editableColumns, themeColIndex, phoneticColIndex, headwordColIndex, registerColIndex } = useEntriesTableColumns(userDialectOptions, themeOptions, statusOptionsForTable)
 
 // 欄寬調整：預設寬度從 editableColumns 的 width 字段讀取
 const defaultColumnWidths = computed(() =>
@@ -1713,6 +1725,7 @@ const {
   pendingAISuggestions,
   themeAISuggestions,
   definitionAISuggestions,
+  registerAISuggestions,
   aiLoadingFor,
   aiLoading,
   aiLoadingInlineFor,
@@ -1722,12 +1735,16 @@ const {
   generateAIExamples,
   generateAIDefinition,
   generateAICategorization,
+  generateAIRegister,
   clearPendingSuggestionForCurrentCell,
   retryInlineAISuggestion,
   acceptAISuggestion,
   dismissAISuggestion,
   acceptThemeAI,
   dismissThemeAI,
+  formatRegisterSuggestion,
+  acceptRegisterAI,
+  dismissRegisterAI,
   clearThemeSuggestionForEntry,
   acceptDefinitionAI,
   dismissDefinitionAI,
@@ -1790,6 +1807,10 @@ function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
   }
   if (colIndex === themeColIndex.value && themeAISuggestions.value.get(entryId)) {
     dismissThemeAI(entry)
+    return true
+  }
+  if (colIndex === registerColIndex.value && registerAISuggestions.value.get(entryId)) {
+    dismissRegisterAI(entry)
     return true
   }
   if (colIndex === phoneticColIndex.value && getJyutdictVisible(entryId)) {

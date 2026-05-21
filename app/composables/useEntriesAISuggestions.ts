@@ -23,6 +23,13 @@ export interface DefinitionAISuggestion {
   formalityLevel?: string
 }
 
+export interface RegisterAISuggestion {
+  suggestionId?: string
+  register: Register
+  explanation?: string
+  confidence?: number
+}
+
 interface PendingAISuggestion {
   entryId: string
   field: string
@@ -31,7 +38,7 @@ interface PendingAISuggestion {
 }
 
 type AISuggestionAction = 'accepted' | 'rejected' | 'modified'
-type AcceptedAIField = 'definition' | 'theme' | 'examples'
+type AcceptedAIField = 'definition' | 'theme' | 'examples' | 'register'
 
 interface AcceptedAITracker {
   suggestionId: string
@@ -57,8 +64,9 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
   const aiDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
   const themeAISuggestions = ref<Map<string, ThemeAISuggestion>>(new Map())
   const definitionAISuggestions = ref<Map<string, DefinitionAISuggestion>>(new Map())
+  const registerAISuggestions = ref<Map<string, RegisterAISuggestion>>(new Map())
   const acceptedAITrackers = ref<Map<string, AcceptedAITracker>>(new Map())
-  const aiLoadingFor = ref<{ entryKey: string | number; action: 'definition' | 'theme' | 'examples' } | null>(null)
+  const aiLoadingFor = ref<{ entryKey: string | number; action: 'definition' | 'theme' | 'examples' | 'register' } | null>(null)
   const aiLoading = ref(false)
   const aiSuggestAbortController = ref<AbortController | null>(null)
   const aiLoadingInlineFor = ref<{ entryId: string; field: string } | null>(null)
@@ -159,6 +167,20 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         })
       }
     }
+
+    const registerTracker = acceptedAITrackers.value.get(`${entryKey}:register`)
+    if (registerTracker) {
+      const currentRegister = entry.meta?.register
+      if (normalizeAICompareValue(currentRegister) !== normalizeAICompareValue(registerTracker.acceptedContent)) {
+        logAISuggestionAction(registerTracker.suggestionId, 'modified', {
+          entryId: realEntryId,
+          clientEntryKey: entryKey,
+          field: 'meta.register',
+          finalContent: currentRegister,
+          metadata: { previousAction: 'accepted' }
+        })
+      }
+    }
   }
 
   function clearAcceptedAITrackersForEntry(entry: Entry) {
@@ -166,6 +188,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     acceptedAITrackers.value.delete(`${entryKey}:definition`)
     acceptedAITrackers.value.delete(`${entryKey}:theme`)
     acceptedAITrackers.value.delete(`${entryKey}:examples`)
+    acceptedAITrackers.value.delete(`${entryKey}:register`)
     acceptedAITrackers.value = new Map(acceptedAITrackers.value)
   }
 
@@ -228,8 +251,18 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
           if (firstDefinition) {
             categorizeBody.context = firstDefinition
           }
+          const registerBody: any = {
+            expression: headword,
+            region: entry.dialect?.name || 'hongkong',
+            definition: firstDefinition,
+            usageNotes: entry.meta?.usage,
+            clientEntryKey: entryId,
+            entryId: getRealEntryId(entry),
+            field: 'meta.register',
+            originalContent: entry.meta?.register ?? ''
+          }
 
-          const [definitionResponse, categorizeResponse] = await Promise.all([
+          const [definitionResponse, categorizeResponse, registerResponse] = await Promise.all([
             $fetch<{ success: boolean; data?: { definition?: string; suggestionId?: string } }>('/api/ai/definitions', {
               method: 'POST',
               body: {
@@ -249,6 +282,15 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             }).catch(e => {
               if (e?.name === 'AbortError') throw e
               console.error('AI categorization error:', e)
+              return null
+            }),
+            $fetch<{ success: boolean; data?: { register?: Register; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/register', {
+              method: 'POST',
+              body: registerBody,
+              signal
+            }).catch(e => {
+              if (e?.name === 'AbortError') throw e
+              console.error('AI register error:', e)
               return null
             })
           ])
@@ -291,6 +333,16 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
               })
               themeAISuggestions.value = new Map(themeAISuggestions.value)
             }
+          }
+
+          if (!currentEntry?.meta?.register && registerResponse?.success && registerResponse.data?.register) {
+            registerAISuggestions.value.set(entryId, {
+              suggestionId: registerResponse.data.suggestionId,
+              register: registerResponse.data.register,
+              confidence: registerResponse.data.confidence,
+              explanation: registerResponse.data.explanation
+            })
+            registerAISuggestions.value = new Map(registerAISuggestions.value)
           }
         } catch (error: any) {
           const isAborted =
@@ -467,6 +519,48 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     }
   }
 
+  async function generateAIRegister(entry: Entry) {
+    if (!entry.headword?.display) {
+      alert('請先填寫詞條文本')
+      return
+    }
+    const key = getEntryKey(entry)
+    aiLoadingFor.value = { entryKey: key, action: 'register' }
+    try {
+      const entryKey = getEntryIdString(entry)
+      const response: any = await $fetch('/api/ai/register', {
+        method: 'POST',
+        body: {
+          expression: entry.headword.display,
+          region: entry.dialect?.name || 'hongkong',
+          definition: entry.senses?.[0]?.definition || entry.definition,
+          usageNotes: entry.meta?.usage,
+          clientEntryKey: entryKey,
+          entryId: getRealEntryId(entry),
+          field: 'meta.register',
+          originalContent: entry.meta?.register ?? ''
+        }
+      })
+      const data = response?.data
+      if (response?.success === true && data?.register) {
+        registerAISuggestions.value.set(entryKey, {
+          suggestionId: data.suggestionId,
+          register: data.register,
+          explanation: data.explanation,
+          confidence: data.confidence
+        })
+        registerAISuggestions.value = new Map(registerAISuggestions.value)
+      } else {
+        alert('AI 未能生成語域建議，請重試或手動選擇')
+      }
+    } catch (error: any) {
+      console.error('AI register generation error:', error)
+      alert(`AI語域建議失敗: ${error?.data?.message || error?.message || '未知錯誤'}`)
+    } finally {
+      aiLoadingFor.value = null
+    }
+  }
+
   function retryInlineAISuggestion(entry: Entry) {
     const entryId = getEntryIdString(entry)
     if (aiInlineError.value?.entryId === entryId) {
@@ -582,6 +676,57 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     themeAISuggestions.value = new Map(themeAISuggestions.value)
   }
 
+  function formatRegisterSuggestion(s: RegisterAISuggestion | undefined): string {
+    if (!s) return ''
+    const confidenceText = typeof s.confidence === 'number' ? ` · ${Math.round(s.confidence * 100)}%` : ''
+    return `${s.register}${confidenceText}${s.explanation ? `：${s.explanation}` : ''}`
+  }
+
+  function acceptRegisterAI(entry: Entry) {
+    const key = String(getEntryKey(entry))
+    const suggestion = registerAISuggestions.value.get(key)
+    if (!suggestion) return
+    if (!entry.meta) entry.meta = {}
+    entry.meta.register = suggestion.register
+    ;(entry as any)._isDirty = true
+    logAISuggestionAction(suggestion.suggestionId, 'accepted', {
+      entryId: getRealEntryId(entry),
+      clientEntryKey: key,
+      field: 'meta.register',
+      acceptedContent: suggestion.register,
+      metadata: {
+        explanation: suggestion.explanation,
+        confidence: suggestion.confidence
+      }
+    })
+    if (suggestion.suggestionId) {
+      trackAcceptedAISuggestion({
+        suggestionId: suggestion.suggestionId,
+        entryKey: key,
+        entryId: getRealEntryId(entry),
+        field: 'register',
+        acceptedContent: suggestion.register
+      })
+    }
+    if (editingCell.value && String(editingCell.value.entryId) === key && editingCell.value.field === 'register') {
+      editValue.value = suggestion.register
+    }
+    registerAISuggestions.value.delete(key)
+    registerAISuggestions.value = new Map(registerAISuggestions.value)
+  }
+
+  function dismissRegisterAI(entry: Entry) {
+    const key = String(getEntryKey(entry))
+    const suggestion = registerAISuggestions.value.get(key)
+    logAISuggestionAction(suggestion?.suggestionId, 'rejected', {
+      entryId: getRealEntryId(entry),
+      clientEntryKey: key,
+      field: 'meta.register'
+    })
+    registerAISuggestions.value.delete(key)
+    registerAISuggestions.value = new Map(registerAISuggestions.value)
+  }
+
   function clearThemeSuggestionForEntry(entry: Entry) {
     themeAISuggestions.value.delete(String(getEntryKey(entry)))
     themeAISuggestions.value = new Map(themeAISuggestions.value)
@@ -658,6 +803,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     pendingAISuggestions,
     themeAISuggestions,
     definitionAISuggestions,
+    registerAISuggestions,
     aiLoadingFor,
     aiLoading,
     aiLoadingInlineFor,
@@ -667,12 +813,16 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     generateAIExamples,
     generateAIDefinition,
     generateAICategorization,
+    generateAIRegister,
     clearPendingSuggestionForCurrentCell,
     retryInlineAISuggestion,
     acceptAISuggestion,
     dismissAISuggestion,
     acceptThemeAI,
     dismissThemeAI,
+    formatRegisterSuggestion,
+    acceptRegisterAI,
+    dismissRegisterAI,
     clearThemeSuggestionForEntry,
     acceptDefinitionAI,
     dismissDefinitionAI,

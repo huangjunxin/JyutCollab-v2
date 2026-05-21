@@ -211,6 +211,17 @@
               @click="$emit('ai-theme')"
             />
             <UButton
+              v-if="showAiRegister"
+              color="primary"
+              variant="ghost"
+              size="xs"
+              icon="i-heroicons-sparkles"
+              title="AI 語域"
+              class="flex-shrink-0"
+              :loading="aiLoadingRegister"
+              @click="$emit('ai-register')"
+            />
+            <UButton
               v-if="showExpand && !expandHint"
               color="neutral"
               variant="ghost"
@@ -296,10 +307,12 @@ const props = withDefaults(
     reviewNotes?: string
     showAiDefinition?: boolean
     showAiTheme?: boolean
+    showAiRegister?: boolean
     aiLoadingDefinition?: boolean
     /** 行內釋義建議正在加載（輸入粵拼時後台拉取） */
     aiLoadingInlineDefinition?: boolean
     aiLoadingTheme?: boolean
+    aiLoadingRegister?: boolean
     showExpand?: boolean
     isExpanded?: boolean
     expandHint?: string
@@ -324,9 +337,11 @@ const props = withDefaults(
     reviewNotes: '',
     showAiDefinition: false,
     showAiTheme: false,
+    showAiRegister: false,
     aiLoadingDefinition: false,
     aiLoadingInlineDefinition: false,
     aiLoadingTheme: false,
+    aiLoadingRegister: false,
     showExpand: false,
     isExpanded: false,
     expandHint: '',
@@ -386,6 +401,7 @@ const emit = defineEmits<{
   setRef: [el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null]
   'ai-definition': []
   'ai-theme': []
+  'ai-register': []
   'expand-click': []
   'headword-expand-click': []
   'theme-expand-click': []

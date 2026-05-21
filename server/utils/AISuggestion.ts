@@ -7,7 +7,7 @@ export interface IAISuggestion {
   clientEntryKey?: string
   suggestedTo: string
   actionBy?: string
-  suggestionType: Extract<SuggestionType, 'theme_classification' | 'definition' | 'example'>
+  suggestionType: Extract<SuggestionType, 'theme_classification' | 'definition' | 'example' | 'register'>
   field: string
   originalContent?: unknown
   suggestedContent: unknown
@@ -32,7 +32,7 @@ const AISuggestionSchema = new mongoose.Schema<IAISuggestion>({
   actionBy: { type: String },
   suggestionType: {
     type: String,
-    enum: ['theme_classification', 'definition', 'example'],
+    enum: ['theme_classification', 'definition', 'example', 'register'],
     required: true
   },
   field: { type: String, required: true },

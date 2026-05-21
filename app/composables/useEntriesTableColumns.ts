@@ -23,6 +23,7 @@ export function useEntriesTableColumns(
   themeColIndex: ComputedRef<number>
   phoneticColIndex: ComputedRef<number>
   headwordColIndex: ComputedRef<number>
+  registerColIndex: ComputedRef<number>
 } {
   const editableColumns = computed<EditableColumnDef[]>(() => [
     {
@@ -189,11 +190,13 @@ export function useEntriesTableColumns(
   const themeColIndex = computed(() => editableColumns.value.findIndex(c => c.key === 'theme'))
   const phoneticColIndex = computed(() => editableColumns.value.findIndex(c => c.key === 'phonetic'))
   const headwordColIndex = computed(() => editableColumns.value.findIndex(c => c.key === 'headword'))
+  const registerColIndex = computed(() => editableColumns.value.findIndex(c => c.key === 'register'))
 
   return {
     editableColumns,
     themeColIndex,
     phoneticColIndex,
-    headwordColIndex
+    headwordColIndex,
+    registerColIndex
   }
 }
