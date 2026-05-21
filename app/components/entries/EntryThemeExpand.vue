@@ -14,52 +14,11 @@
       </UButton>
     </div>
 
-    <!-- AI 建議區域 -->
-    <div
-      v-if="aiSuggestion"
-      class="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20"
-    >
-      <div class="flex items-start gap-2">
-        <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
-            AI 建議: {{ aiSuggestion.level3Name }}
-          </div>
-          <div class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-            {{ aiSuggestion.level1Name }} > {{ aiSuggestion.level2Name }}
-          </div>
-          <div v-if="aiSuggestion.confidence" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            置信度: {{ Math.round(aiSuggestion.confidence * 100) }}%
-          </div>
-          <div v-if="aiSuggestion.explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {{ aiSuggestion.explanation }}
-          </div>
-        </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <UButton
-            color="primary"
-            size="xs"
-            @click="acceptAISuggestion"
-          >
-            接受
-          </UButton>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            @click="$emit('dismiss-ai')"
-          >
-            忽略
-          </UButton>
-        </div>
-      </div>
-    </div>
-
     <!-- 手動選擇區域 -->
-    <div class="space-y-3">
+    <div class="space-y-3" :class="aiSuggestion ? 'mb-4' : ''">
       <div class="flex items-center justify-between">
         <div class="text-xs text-gray-500 dark:text-gray-400">
-          {{ aiSuggestion ? '或手動選擇：' : '選擇分類：' }}
+          選擇分類：
         </div>
         <UButton
           v-if="entry.headword?.display"
@@ -124,6 +83,47 @@
       <!-- 當前選擇預覽 -->
       <div v-if="selectedThemePreview" class="text-xs text-gray-500 dark:text-gray-400">
         已選擇: {{ selectedThemePreview }}
+      </div>
+    </div>
+
+    <!-- AI 建議區域 -->
+    <div
+      v-if="aiSuggestion"
+      class="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20"
+    >
+      <div class="flex items-start gap-2">
+        <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
+            AI 建議: {{ aiSuggestion.level3Name }}
+          </div>
+          <div class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+            {{ aiSuggestion.level1Name }} > {{ aiSuggestion.level2Name }}
+          </div>
+          <div v-if="aiSuggestion.confidence" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            置信度: {{ Math.round(aiSuggestion.confidence * 100) }}%
+          </div>
+          <div v-if="aiSuggestion.explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {{ aiSuggestion.explanation }}
+          </div>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <UButton
+            color="primary"
+            size="xs"
+            @click="acceptAISuggestion"
+          >
+            接受
+          </UButton>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="$emit('dismiss-ai')"
+          >
+            忽略
+          </UButton>
+        </div>
       </div>
     </div>
   </div>
