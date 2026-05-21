@@ -69,6 +69,24 @@ export default defineNuxtConfig({
 
   // Nitro configuration
   nitro: {
+    prerender: {
+      routes: [
+        '/docs',
+        '/docs/quick-start',
+        '/docs/account-and-permissions',
+        '/docs/entries-table',
+        '/docs/entry-fields',
+        '/docs/workflows',
+        '/docs/ai-assistance',
+        '/docs/dialect-and-lexeme',
+        '/docs/review-workflow',
+        '/docs/history-and-revert',
+        '/docs/views-filters-and-labels',
+        '/docs/images-senses-and-examples',
+        '/docs/keyboard-shortcuts',
+        '/docs/faq'
+      ]
+    },
     // 開發模式下 API 服務端口配置
     devStorage: {
       storage: {
