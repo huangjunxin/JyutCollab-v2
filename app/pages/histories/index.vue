@@ -11,7 +11,7 @@
             編輯歷史
           </h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ pagination.total }}</span> 條記錄
+            共 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ historyTotal }}</span> 條記錄
           </p>
         </div>
       </div>
@@ -55,6 +55,17 @@
     <div v-if="loading" class="flex justify-center py-12">
       <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-primary" />
     </div>
+
+    <!-- Error state -->
+    <UAlert
+      v-else-if="historyError"
+      color="error"
+      variant="soft"
+      icon="i-heroicons-exclamation-triangle"
+      title="載入編輯歷史失敗"
+      :description="historyError"
+      class="my-6"
+    />
 
     <!-- Empty state -->
     <div v-else-if="historyList.length === 0" class="text-center py-12">
@@ -146,14 +157,18 @@
       <div class="flex justify-center mt-6">
         <UPagination
           v-model:page="currentPage"
-          :total="pagination.total"
+          :total="historyTotal"
           :items-per-page="pagination.perPage"
         />
       </div>
     </div>
 
     <!-- Diff Modal -->
-    <UModal v-model:open="diffModalOpen">
+    <UModal
+      v-model:open="diffModalOpen"
+      title="修改詳情"
+      description="查看此筆編輯歷史的變更字段、修改前內容和修改後內容。"
+    >
       <template #content>
         <UCard class="max-w-3xl max-h-[90vh] overflow-y-auto">
           <template #header>
@@ -213,11 +228,12 @@
 
             <!-- Diff view toggle -->
             <div class="flex items-center gap-2 mb-3">
-              <UButtonGroup>
+              <div class="inline-flex rounded-md shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <UButton
                   :color="diffViewMode === 'unified' ? 'primary' : 'gray'"
                   :variant="diffViewMode === 'unified' ? 'solid' : 'ghost'"
                   size="xs"
+                  class="rounded-none"
                   @click="diffViewMode = 'unified'"
                 >
                   差異視圖
@@ -226,11 +242,12 @@
                   :color="diffViewMode === 'split' ? 'primary' : 'gray'"
                   :variant="diffViewMode === 'split' ? 'solid' : 'ghost'"
                   size="xs"
+                  class="rounded-none border-l border-gray-200 dark:border-gray-700"
                   @click="diffViewMode = 'split'"
                 >
                   對比視圖
                 </UButton>
-              </UButtonGroup>
+              </div>
             </div>
 
             <!-- Unified diff view (only show changes) -->
@@ -348,7 +365,12 @@
     </UModal>
 
     <!-- Revert Confirmation Modal -->
-    <UModal v-model:open="revertConfirmOpen" class="max-w-md">
+    <UModal
+      v-model:open="revertConfirmOpen"
+      class="max-w-md"
+      title="確認撤銷"
+      description="確認是否撤銷此更改並將詞條恢復到修改前的狀態。"
+    >
       <template #content>
         <UCard class="w-full">
           <template #header>
@@ -379,9 +401,6 @@
         </UCard>
       </template>
     </UModal>
-
-    <!-- Notification -->
-    <UNotifications />
   </div>
 </template>
 
@@ -394,6 +413,7 @@ definePageMeta({
 })
 
 const toast = useToast()
+const requestFetch = useRequestFetch()
 const { user, isReviewer } = useAuth()
 
 const currentPage = ref(1)
@@ -417,8 +437,8 @@ const cacheKey = computed(() => {
   return `histories:${currentPage.value}:${entryId}:${action}:${userId}`
 })
 
-const { data: histories, pending: loading, refresh: refreshHistories } = useCachedAsyncData<EditHistory[]>(
-  cacheKey.value,
+const { data: historyResponse, pending: loading, error, refresh: refreshHistories } = useAsyncData<PaginatedResponse<EditHistory>>(
+  'histories',
   async () => {
     const query: Record<string, any> = {
       page: currentPage.value,
@@ -437,23 +457,30 @@ const { data: histories, pending: loading, refresh: refreshHistories } = useCach
       query.userId = filterUser.value
     }
 
-    const response = await $fetch<PaginatedResponse<EditHistory>>('/api/histories', {
+    const response = await requestFetch<PaginatedResponse<EditHistory>>('/api/histories', {
       query
     })
 
-    pagination.total = response.total
-    pagination.totalPages = response.totalPages
-
-    return response.data
+    return response
   },
   {
-    ttl: CACHE_TTL.histories,
     watch: [cacheKey],
-    default: () => []
+    default: () => ({
+      data: [],
+      total: 0,
+      page: 1,
+      perPage: pagination.perPage,
+      totalPages: 0
+    })
   }
 )
 
-const historyList = computed(() => histories.value ?? [])
+const historyList = computed(() => historyResponse.value?.data ?? [])
+const historyTotal = computed(() => historyResponse.value?.total ?? 0)
+const historyError = computed(() => {
+  const data = error.value?.data as { message?: string } | undefined
+  return data?.message || error.value?.message || null
+})
 
 const userFilterOptions = [
   { value: undefined, label: '全部歷史' },

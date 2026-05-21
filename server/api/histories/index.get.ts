@@ -16,8 +16,18 @@ export default defineEventHandler(async (event): Promise<PaginatedResponse<EditH
     const entryId = getQuery(event).entryId as string | undefined
     const action = getQuery(event).action as string | undefined
     const userIdParam = getQuery(event).userId as string | undefined
-    const userRole = event.context.auth.role
-    const userId = event.context.auth.id
+    const authUser = await User.findById(event.context.auth.id)
+      .select('_id role')
+      .lean()
+    if (!authUser) {
+      throw createError({
+        statusCode: 401,
+        message: '請先登錄'
+      })
+    }
+
+    const userRole = authUser.role
+    const userId = authUser._id.toString()
 
     const filter: Record<string, unknown> = {}
     if (entryId) {

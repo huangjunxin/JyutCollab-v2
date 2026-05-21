@@ -21,8 +21,18 @@ export default defineEventHandler(async (event): Promise<PaginatedResponse<EditH
 
     const page = parseInt(getQuery(event).page as string) || 1
     const perPage = parseInt(getQuery(event).perPage as string) || 20
-    const userRole = event.context.auth.role
-    const userId = event.context.auth.id
+    const authUser = await User.findById(event.context.auth.id)
+      .select('_id role')
+      .lean()
+    if (!authUser) {
+      throw createError({
+        statusCode: 401,
+        message: '請先登錄'
+      })
+    }
+
+    const userRole = authUser.role
+    const userId = authUser._id.toString()
 
     // 解析 entryId（可能為自定義 id 或 MongoDB _id），歷史記錄存的是 entry._id.toString()
     let entry = await Entry.findOne({ id: entryIdParam })
