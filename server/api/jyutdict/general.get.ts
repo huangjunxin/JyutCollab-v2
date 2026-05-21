@@ -32,8 +32,9 @@ export default defineEventHandler(async (event) => {
     const data = await response.json()
 
     return data
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to fetch from Jyutdict general API:', error)
+    if (error?.statusCode) throw error
     throw createError({
       statusCode: 500,
       message: 'Failed to fetch data from Jyutdict'

@@ -1,6 +1,6 @@
 /**
  * Jyutjyu 搜尋 API 代理
- * 代理 https://www.jyutjyu.com/api/search?q=...
+ * 代理 https://jyutjyu.com/api/search?q=...
  */
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const url = `https://www.jyutjyu.com/api/search?q=${encodeURIComponent(q)}`
+    const url = `https://jyutjyu.com/api/search?q=${encodeURIComponent(q)}`
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'JyutCollab/2.0'
@@ -30,8 +30,9 @@ export default defineEventHandler(async (event) => {
 
     const data = await response.json()
     return data
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to fetch from Jyutjyu API:', error)
+    if (error?.statusCode) throw error
     throw createError({
       statusCode: 500,
       message: 'Failed to fetch data from Jyutjyu'

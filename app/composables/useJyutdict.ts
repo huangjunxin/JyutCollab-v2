@@ -133,9 +133,8 @@ function extractFromSheetData(
     return []
   }
 
-  // 跳過第一行（表頭映射）
-  const dataEntries = entries.slice(1).filter(
-    (entry) => entry && typeof entry === 'object' && entry.id
+  const dataEntries = entries.filter(
+    (entry) => entry && typeof entry === 'object' && (entry.繁 || entry.綜 || entry.釋)
   )
 
   // 構建列映射
@@ -247,7 +246,7 @@ export async function queryJyutdict(
       )
       if (sheetResponse.ok) {
         const sheetData: JyutdictSheetEntry[] = await sheetResponse.json()
-        if (sheetData && sheetData.length > 1) {
+        if (sheetData && sheetData.length > 0) {
           charData.sheetEntries = extractFromSheetData(sheetData, columns, char)
         }
       }
