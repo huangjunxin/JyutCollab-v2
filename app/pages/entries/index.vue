@@ -1753,7 +1753,18 @@ const {
   migrateAcceptedAITrackersEntryId
 } = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
 
-const rowHints = useEntriesRowHints({ editableColumns, editingCell, editValue })
+const {
+  logReferenceHelperEvent,
+  logReferenceHelperAction
+} = useReferenceHelperTracking()
+
+const rowHints = useEntriesRowHints({
+  editableColumns,
+  editingCell,
+  editValue,
+  onReferenceHelperEvent: logReferenceHelperEvent,
+  onReferenceHelperAction: logReferenceHelperAction
+})
 const jyutdictData = rowHints.jyutdictData
 const jyutdictLoading = rowHints.jyutdictLoading
 const jyutdictSuggested = rowHints.jyutdictSuggested
@@ -2016,7 +2027,9 @@ const {
   openMorphemeSearch,
   addMorphemeRef,
   removeMorphemeRef
-} = useEntryMorphemeRefs(getEntryIdString)
+} = useEntryMorphemeRefs(getEntryIdString, {
+  onReferenceHelperEvent: logReferenceHelperEvent
+})
 
 function toggleThemeExpand(entry: Entry) {
   const key = getEntryIdString(entry)

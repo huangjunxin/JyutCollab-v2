@@ -24,7 +24,7 @@
 
         <div v-if="loading" class="flex flex-col items-center justify-center py-10">
           <div class="w-10 h-10 border-2 border-gray-200 dark:border-gray-700 border-t-primary rounded-full animate-spin" />
-          <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">加載中...</p>
+          <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">載入中...</p>
         </div>
 
         <div v-else class="flex-1 min-h-0 overflow-y-auto">
@@ -63,7 +63,7 @@
                     value-key="value"
                     size="sm"
                     searchable
-                    searchable-placeholder="搜索語言..."
+                    searchable-placeholder="搜尋語言..."
                   />
                   <p v-if="editDraft.languageCode && !LANGUAGE_OPTIONS.some(o => o.value === editDraft.languageCode)" class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
                     已使用自定義代碼：{{ editDraft.languageCode }}
@@ -176,7 +176,7 @@
                         value-key="value"
                         size="sm"
                         searchable
-                        searchable-placeholder="搜索語言..."
+                        searchable-placeholder="搜尋語言..."
                       />
                       <p v-if="editDraft.languageCode && !LANGUAGE_OPTIONS.some(o => o.value === editDraft.languageCode)" class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
                         已使用自定義代碼：{{ editDraft.languageCode }}
@@ -301,6 +301,7 @@ const editingId = ref<string | null>(null)
 const savingNew = ref(false)
 const savingEdit = ref(false)
 const deletingId = ref<string | null>(null)
+const { logReferenceHelperEvent } = useReferenceHelperTracking()
 
 const editDraft = reactive<Partial<ExternalEtymonDto>>({})
 
@@ -391,7 +392,22 @@ async function saveEdit() {
           note: (editDraft.note || '').trim() || undefined
         }
       })
-      if (res?.data) items.value = [res.data, ...items.value]
+      if (res?.data) {
+        items.value = [res.data, ...items.value]
+        void logReferenceHelperEvent({
+          lexemeId: props.lexemeId,
+          helperType: 'external_etymon',
+          sourceProvider: 'external_etymon',
+          acceptedContent: res.data,
+          userAction: 'accepted',
+          metadata: {
+            operation: 'create',
+            lexemeLabel: props.lexemeLabel,
+            languageCode: res.data.languageCode,
+            sourceType: res.data.sourceType
+          }
+        })
+      }
     } else {
       const id = editingId.value
       if (!id) return
@@ -410,6 +426,20 @@ async function saveEdit() {
       })
       const next = items.value.map((r) => (r.id === id ? (res.data || r) : r))
       items.value = next
+      void logReferenceHelperEvent({
+        lexemeId: props.lexemeId,
+        helperType: 'external_etymon',
+        sourceProvider: 'external_etymon',
+        finalContent: res.data,
+        userAction: 'modified',
+        metadata: {
+          operation: 'update',
+          externalEtymonId: id,
+          lexemeLabel: props.lexemeLabel,
+          languageCode: res.data?.languageCode,
+          sourceType: res.data?.sourceType
+        }
+      })
     }
     cancelEdit()
   } catch (e: any) {
@@ -428,6 +458,20 @@ async function removeRow(row: ExternalEtymonDto) {
   try {
     await $fetch(`/api/external-etymons/${row.id}`, { method: 'DELETE' })
     items.value = items.value.filter((r) => r.id !== row.id)
+    void logReferenceHelperEvent({
+      lexemeId: props.lexemeId || undefined,
+      helperType: 'external_etymon',
+      sourceProvider: 'external_etymon',
+      suggestedContent: row,
+      userAction: 'rejected',
+      metadata: {
+        operation: 'delete',
+        externalEtymonId: row.id,
+        lexemeLabel: props.lexemeLabel,
+        languageCode: row.languageCode,
+        sourceType: row.sourceType
+      }
+    })
     if (editingId.value === row.id) cancelEdit()
   } catch (e: any) {
     errorMessage.value = e?.data?.message || e?.message || '刪除失敗'

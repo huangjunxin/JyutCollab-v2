@@ -360,22 +360,42 @@
         </div>
       </UCard>
 
-      <!-- AI Suggestion Analytics Card -->
+      <!-- Filling Assistance Analytics Card -->
       <UCard
         v-if="canReview"
         class="shadow-sm border border-gray-200 dark:border-gray-700"
       >
         <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-heroicons-sparkles" class="w-5 h-5 text-violet-500" />
-            <span class="font-semibold text-gray-900 dark:text-white">AI 輔助成效</span>
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-sparkles" class="w-5 h-5 text-violet-500" />
+              <span class="font-semibold text-gray-900 dark:text-white">填寫輔助成效</span>
+            </div>
+            <UButtonGroup size="xs">
+              <UButton
+                :color="assistanceStatsTab === 'ai' ? 'primary' : 'neutral'"
+                :variant="assistanceStatsTab === 'ai' ? 'solid' : 'ghost'"
+                size="xs"
+                @click="assistanceStatsTab = 'ai'"
+              >
+                AI 建議
+              </UButton>
+              <UButton
+                :color="assistanceStatsTab === 'references' ? 'primary' : 'neutral'"
+                :variant="assistanceStatsTab === 'references' ? 'solid' : 'ghost'"
+                size="xs"
+                @click="assistanceStatsTab = 'references'"
+              >
+                參考資料
+              </UButton>
+            </UButtonGroup>
           </div>
         </template>
-        <div v-if="aiSuggestionStatsLoading || !aiSuggestionStats" class="space-y-3">
+        <div v-if="assistanceStatsTab === 'ai' && (aiSuggestionStatsLoading || !aiSuggestionStats)" class="space-y-3">
           <USkeleton class="h-6 w-full" />
           <USkeleton class="h-6 w-full" />
         </div>
-        <div v-else class="space-y-3">
+        <div v-else-if="assistanceStatsTab === 'ai'" class="space-y-3">
           <div class="grid grid-cols-3 gap-3">
             <div>
               <p class="text-xs text-gray-500 dark:text-gray-400">總建議</p>
@@ -422,6 +442,63 @@
                   <span class="text-gray-600 dark:text-gray-400">{{ item.label }}</span>
                   <span class="font-medium text-gray-900 dark:text-white">
                     {{ item.total }} · 採納 {{ formatPercent(getTypeAdoptionRate(item)) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="assistanceStatsTab === 'references' && (referenceHelperStatsLoading || !referenceHelperStats)" class="space-y-3">
+          <USkeleton class="h-6 w-full" />
+          <USkeleton class="h-6 w-full" />
+        </div>
+        <div v-else class="space-y-3">
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">總參考</p>
+              <p class="text-xl font-bold text-gray-900 dark:text-white">{{ referenceHelperStats.total }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-green-700 dark:text-green-300">採用率</p>
+              <p class="text-xl font-bold text-green-700 dark:text-green-300">{{ formatPercent(referenceAdoptionRate) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-blue-700 dark:text-blue-300">待處理</p>
+              <p class="text-xl font-bold text-blue-700 dark:text-blue-300">{{ referenceHelperStats.pending }}</p>
+            </div>
+          </div>
+
+          <div class="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">直接採用</span>
+                <span class="font-bold text-green-600 dark:text-green-400">{{ referenceHelperStats.accepted }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">修改採用</span>
+                <span class="font-bold text-blue-600 dark:text-blue-400">{{ referenceHelperStats.modified }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">已略過</span>
+                <span class="font-bold text-red-600 dark:text-red-400">{{ referenceHelperStats.rejected }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">已決策</span>
+                <span class="font-bold text-gray-900 dark:text-white">{{ referenceReviewedCount }}</span>
+              </div>
+            </div>
+
+            <div v-if="displayedReferenceHelperTypes.length > 0">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">按參考類型</p>
+              <div class="space-y-2">
+                <div
+                  v-for="item in displayedReferenceHelperTypes"
+                  :key="item.type"
+                  class="flex items-center justify-between text-sm"
+                >
+                  <span class="text-gray-600 dark:text-gray-400">{{ item.label }}</span>
+                  <span class="font-medium text-gray-900 dark:text-white">
+                    {{ item.total }} · 採用 {{ formatPercent(getReferenceTypeAdoptionRate(item)) }}
                   </span>
                 </div>
               </div>
@@ -629,6 +706,11 @@ const {
   loading: aiSuggestionStatsLoading,
   fetchStats: fetchAISuggestionStats
 } = useAISuggestionStats()
+const {
+  stats: referenceHelperStats,
+  loading: referenceHelperStatsLoading,
+  fetchStats: fetchReferenceHelperStats
+} = useReferenceHelperStats()
 
 // 增強統計
 const {
@@ -665,6 +747,7 @@ const welcomeTitle = computed(() => {
 })
 
 const isRefreshing = ref(false)
+const assistanceStatsTab = ref<'ai' | 'references'>('ai')
 const fallbackUserStats = { total: 0, pending: 0, approved: 0, rejected: 0 }
 const fallbackReviewerStats = { pending: 0, reviewedByMe: 0 }
 const fallbackEnhancedUserStats = {
@@ -706,6 +789,16 @@ const aiAdoptedCount = computed(() => {
   return stats ? stats.accepted + stats.modified : 0
 })
 const aiAdoptionRate = computed(() => aiReviewedCount.value > 0 ? aiAdoptedCount.value / aiReviewedCount.value : 0)
+const referenceReviewedCount = computed(() => {
+  const stats = referenceHelperStats.value
+  return stats ? stats.accepted + stats.modified + stats.rejected : 0
+})
+const referenceAdoptedCount = computed(() => {
+  const stats = referenceHelperStats.value
+  return stats ? stats.accepted + stats.modified : 0
+})
+const referenceAdoptionRate = computed(() => referenceReviewedCount.value > 0 ? referenceAdoptedCount.value / referenceReviewedCount.value : 0)
+const displayedReferenceHelperTypes = computed(() => referenceHelperStats.value?.byType || [])
 
 async function refreshAll() {
   isRefreshing.value = true
@@ -716,7 +809,8 @@ async function refreshAll() {
       fetchEnhancedStats(),
       fetchMyActivities(),
       canReview.value ? fetchAllActivities() : Promise.resolve(),
-      canReview.value ? fetchAISuggestionStats() : Promise.resolve()
+      canReview.value ? fetchAISuggestionStats() : Promise.resolve(),
+      canReview.value ? fetchReferenceHelperStats() : Promise.resolve()
     ])
   } finally {
     isRefreshing.value = false
@@ -728,6 +822,11 @@ function formatPercent(value: number): string {
 }
 
 function getTypeAdoptionRate(item: { accepted: number; modified: number; rejected: number }): number {
+  const reviewed = item.accepted + item.modified + item.rejected
+  return reviewed > 0 ? (item.accepted + item.modified) / reviewed : 0
+}
+
+function getReferenceTypeAdoptionRate(item: { accepted: number; modified: number; rejected: number }): number {
   const reviewed = item.accepted + item.modified + item.rejected
   return reviewed > 0 ? (item.accepted + item.modified) / reviewed : 0
 }
@@ -801,6 +900,7 @@ onMounted(() => {
     if (canReview.value) {
       fetchAllActivities()
       fetchAISuggestionStats()
+      fetchReferenceHelperStats()
     }
   }
 })

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { Entry } from '~/types'
+import type { ReferenceHelperEventPayload } from '~/composables/useReferenceHelperTracking'
 
 export type MorphemeSearchResult = {
   id: string
@@ -17,13 +18,26 @@ export type UnlinkedMorphemeCandidate = {
   note: string
 }
 
-export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string) {
+export interface UseEntryMorphemeRefsOptions {
+  onReferenceHelperEvent?: (payload: ReferenceHelperEventPayload) => Promise<string | null> | string | null
+}
+
+export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string, options: UseEntryMorphemeRefsOptions = {}) {
+  const { onReferenceHelperEvent } = options
   const morphemeSearchModalOpen = ref(false)
   const morphemeSearchTargetEntry = ref<Entry | null>(null)
   const morphemeSearchResults = ref<MorphemeSearchResult[]>([])
   const morphemeSearchLoading = ref(false)
   const unlinkedMorphemeEntryId = ref<string | null>(null)
   const unlinkedMorphemeCandidates = ref<UnlinkedMorphemeCandidate[]>([])
+
+  function getTrackingEntryId(entry: Entry): string | undefined {
+    return (entry as any)._isNew ? undefined : getEntryIdString(entry)
+  }
+
+  function logReferenceHelperEvent(payload: ReferenceHelperEventPayload) {
+    void onReferenceHelperEvent?.(payload)
+  }
 
   function openUnlinkedMorphemeForm(entry: Entry) {
     unlinkedMorphemeEntryId.value = getEntryIdString(entry)
@@ -58,6 +72,21 @@ export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string)
     }
     ;(entry as any).morphemeRefs = list
     entry._isDirty = true
+    logReferenceHelperEvent({
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: getEntryIdString(entry),
+      helperType: 'morpheme_unlinked',
+      sourceProvider: 'morpheme',
+      field: 'morphemeRefs',
+      resultCount: unlinkedMorphemeCandidates.value.length,
+      acceptedContent: unlinkedMorphemeCandidates.value.map(candidate => ({
+        position: candidate.position,
+        char: candidate.char,
+        jyutping: candidate.jyutping,
+        note: candidate.note
+      })),
+      userAction: 'accepted'
+    })
     closeUnlinkedMorphemeForm()
   }
 
@@ -84,6 +113,21 @@ export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string)
       const response = await $fetch<{ success: boolean; data: Array<any> }>('/api/entries/search-morphemes', { query })
       if (response.success && Array.isArray(response.data)) {
         morphemeSearchResults.value = response.data
+        logReferenceHelperEvent({
+          entryId: getTrackingEntryId(entry),
+          clientEntryKey: getEntryIdString(entry),
+          helperType: 'morpheme_search',
+          sourceProvider: 'morpheme',
+          field: 'morphemeRefs',
+          query: query.headword,
+          resultCount: response.data.length,
+          suggestedContent: response.data.slice(0, 5).map(item => ({
+            id: item.id,
+            headword: item.headword,
+            jyutping: item.jyutping,
+            dialect: item.dialect
+          }))
+        })
       }
     } catch (e: any) {
       console.error('Failed to search morphemes:', e)
@@ -111,13 +155,43 @@ export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string)
       jyutping: morphemeEntry.jyutping || undefined
     })
     entry._isDirty = true
+    logReferenceHelperEvent({
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: getEntryIdString(entry),
+      helperType: 'morpheme_linked',
+      sourceProvider: 'morpheme',
+      field: 'morphemeRefs',
+      sourceEntryId: targetEntryId,
+      acceptedContent: {
+        targetEntryId,
+        position,
+        char: morphemeEntry.headword,
+        jyutping: morphemeEntry.jyutping || undefined
+      },
+      userAction: 'accepted'
+    })
     morphemeSearchModalOpen.value = false
   }
 
   function removeMorphemeRef(entry: Entry, refIdx: number) {
     if (!entry.morphemeRefs || refIdx < 0 || refIdx >= entry.morphemeRefs.length) return
+    const removed = entry.morphemeRefs[refIdx]
     entry.morphemeRefs.splice(refIdx, 1)
     entry._isDirty = true
+    logReferenceHelperEvent({
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: getEntryIdString(entry),
+      helperType: removed?.targetEntryId ? 'morpheme_linked' : 'morpheme_unlinked',
+      sourceProvider: 'morpheme',
+      field: 'morphemeRefs',
+      sourceEntryId: removed?.targetEntryId,
+      finalContent: {
+        removed,
+        morphemeRefs: entry.morphemeRefs
+      },
+      userAction: 'modified',
+      metadata: { operation: 'remove' }
+    })
   }
 
   return {

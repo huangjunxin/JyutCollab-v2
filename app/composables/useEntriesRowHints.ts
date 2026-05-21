@@ -8,6 +8,10 @@ import { deepCopy } from '~/composables/useEntryBaseline'
 import type { Entry } from '~/types'
 import type { CharPronunciationData } from '~/types/jyutdict'
 import type { EditableColumnDef } from '~/composables/useEntriesTableColumns'
+import type { ReferenceHelperActionPayload, ReferenceHelperEventPayload } from '~/composables/useReferenceHelperTracking'
+
+type ReferenceHelperEventLogger = (payload: ReferenceHelperEventPayload) => Promise<string | null> | string | null
+type ReferenceHelperActionLogger = (id: string | null | undefined, action: 'accepted' | 'rejected' | 'modified', payload?: ReferenceHelperActionPayload) => void
 
 export interface OtherDialectEntryRaw {
   id: string
@@ -46,10 +50,12 @@ export interface UseEntriesRowHintsOptions {
   editableColumns: ComputedRef<EditableColumnDef[]>
   editingCell: Ref<{ entryId: string; field: string } | null>
   editValue: Ref<any>
+  onReferenceHelperEvent?: ReferenceHelperEventLogger
+  onReferenceHelperAction?: ReferenceHelperActionLogger
 }
 
 export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
-  const { editableColumns, editingCell, editValue } = options
+  const { editableColumns, editingCell, editValue, onReferenceHelperEvent, onReferenceHelperAction } = options
 
   const jyutdictData = ref<Map<string, CharPronunciationData[]>>(new Map())
   const jyutdictLoading = ref<Map<string, boolean>>(new Map())
@@ -77,6 +83,48 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
   }>>(new Map())
   const jyutjyuRefVisible = ref<Map<string, boolean>>(new Map())
   const jyutjyuRefHandled = ref<Set<string>>(new Set())
+  const referenceHelperEventIds = ref<Map<string, string>>(new Map())
+
+  function getTrackingEntryId(entry: Entry): string | undefined {
+    return (entry as any)._isNew ? undefined : getEntryIdString(entry)
+  }
+
+  function setReferenceEventId(key: string, id: string | null | undefined) {
+    if (!id) return
+    referenceHelperEventIds.value.set(key, id)
+    referenceHelperEventIds.value = new Map(referenceHelperEventIds.value)
+  }
+
+  function createReferenceEvent(key: string, payload: ReferenceHelperEventPayload) {
+    if (!onReferenceHelperEvent) return
+    const result = onReferenceHelperEvent(payload)
+    if (result && typeof result === 'object' && 'then' in result) {
+      void result.then(id => setReferenceEventId(key, id))
+      return
+    }
+    setReferenceEventId(key, result)
+  }
+
+  function updateReferenceEvent(key: string, action: 'accepted' | 'rejected' | 'modified', payload?: ReferenceHelperActionPayload) {
+    const id = referenceHelperEventIds.value.get(key)
+    onReferenceHelperAction?.(id, action, payload)
+    if (id) {
+      referenceHelperEventIds.value.delete(key)
+      referenceHelperEventIds.value = new Map(referenceHelperEventIds.value)
+    }
+  }
+
+  function getJyutdictEventKey(entryId: string) {
+    return `jyutdict:${entryId}`
+  }
+
+  function getJyutjyuEventKey(entryId: string, q: string) {
+    return `jyutjyu:${entryId}:${q}`
+  }
+
+  function getInternalTemplateEventKey(entryId: string) {
+    return `internal-template:${entryId}`
+  }
 
   function getJyutdictData(entryId: string): CharPronunciationData[] {
     return jyutdictData.value.get(entryId) || []
@@ -167,13 +215,31 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
 
     try {
       const res = await $fetch<any>('/api/jyutjyu/search', { query: { q } })
+      const results = Array.isArray(res?.results) ? res.results : []
+      const total = typeof res?.total === 'number' ? res.total : results.length
       jyutjyuRefResult.value.set(entryId, {
         loading: false,
         q,
-        total: typeof res?.total === 'number' ? res.total : (Array.isArray(res?.results) ? res.results.length : 0),
-        results: Array.isArray(res?.results) ? res.results : [],
+        total,
+        results,
         errorMessage: ''
       })
+      if (total > 0) {
+        createReferenceEvent(getJyutjyuEventKey(entryId, q), {
+          entryId: getTrackingEntryId(entry),
+          clientEntryKey: entryId,
+          helperType: 'jyutjyu_template',
+          sourceProvider: 'jyutjyu',
+          query: q,
+          resultCount: total,
+          suggestedContent: results.slice(0, 5).map((item: any) => ({
+            id: String(item?.id || ''),
+            headword: item?.headword?.display,
+            jyutping: item?.phonetic?.jyutping,
+            definition: item?.senses?.[0]?.definition
+          }))
+        })
+      }
     } catch (e) {
       jyutjyuRefResult.value.set(entryId, {
         loading: false,
@@ -202,6 +268,22 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
       jyutdictData.value.set(entryId, data)
       const suggested = getSuggestedPronunciation(data, dialectLabel)
       jyutdictSuggested.value.set(entryId, suggested)
+      if (suggested) {
+        createReferenceEvent(getJyutdictEventKey(entryId), {
+          entryId: getTrackingEntryId(entry),
+          clientEntryKey: entryId,
+          helperType: 'jyutdict_pronunciation',
+          sourceProvider: 'jyutdict',
+          field: 'phonetic.jyutping',
+          query: headword,
+          resultCount: data.length,
+          suggestedContent: {
+            pronunciation: suggested,
+            headword,
+            dialect: dialectLabel
+          }
+        })
+      }
     } catch (error) {
       console.error('Failed to query jyutdict:', error)
     } finally {
@@ -226,11 +308,29 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
       const res = await $fetch<{ sameDialect: OtherDialectEntryRaw[]; otherDialects: OtherDialectEntryRaw[] }>('/api/entries/check-duplicate', {
         query
       })
+      const sameDialect = res.sameDialect || []
+      const otherDialects = res.otherDialects || []
       duplicateCheckResult.value.set(entryId, {
         loading: false,
-        entries: res.sameDialect || [],
-        otherDialects: res.otherDialects || []
+        entries: sameDialect,
+        otherDialects
       })
+      if (otherDialects.length > 0) {
+        createReferenceEvent(getInternalTemplateEventKey(entryId), {
+          entryId: getTrackingEntryId(entry),
+          clientEntryKey: entryId,
+          helperType: 'internal_dialect_template',
+          sourceProvider: 'internal',
+          query: headword,
+          resultCount: otherDialects.length,
+          suggestedContent: otherDialects.map(item => ({
+            id: item.id,
+            headword: item.headword?.display,
+            dialect: item.dialect?.name,
+            definition: item.senses?.[0]?.definition
+          }))
+        })
+      }
     } catch (e) {
       duplicateCheckResult.value.set(entryId, { loading: false, entries: [], otherDialects: [] })
     }
@@ -288,6 +388,56 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
       jyutjyuRefResult.value = new Map(jyutjyuRefResult.value)
       jyutjyuRefVisible.value.set(entryId, true)
       jyutjyuRefVisible.value = new Map(jyutjyuRefVisible.value)
+
+      const jyutjyuTotal = typeof jyutjyuRes?.total === 'number' ? jyutjyuRes.total : jyutjyuList.length
+      void onReferenceHelperEvent?.({
+        entryId: getTrackingEntryId(entry),
+        clientEntryKey: entryId,
+        helperType: 'manual_reference_search',
+        sourceProvider: 'manual',
+        query: q,
+        resultCount: sameDialect.length + otherDialects.length + jyutjyuTotal,
+        userAction: 'accepted',
+        metadata: {
+          sameDialectCount: sameDialect.length,
+          otherDialectCount: otherDialects.length,
+          jyutjyuCount: jyutjyuTotal
+        }
+      })
+      if (otherDialects.length > 0) {
+        createReferenceEvent(getInternalTemplateEventKey(entryId), {
+          entryId: getTrackingEntryId(entry),
+          clientEntryKey: entryId,
+          helperType: 'internal_dialect_template',
+          sourceProvider: 'internal',
+          query: q,
+          resultCount: otherDialects.length,
+          suggestedContent: otherDialects.map(item => ({
+            id: item.id,
+            headword: item.headword?.display,
+            dialect: item.dialect?.name,
+            definition: item.senses?.[0]?.definition
+          })),
+          metadata: { initiatedBy: 'manual_reference_search' }
+        })
+      }
+      if (jyutjyuTotal > 0) {
+        createReferenceEvent(getJyutjyuEventKey(entryId, q), {
+          entryId: getTrackingEntryId(entry),
+          clientEntryKey: entryId,
+          helperType: 'jyutjyu_template',
+          sourceProvider: 'jyutjyu',
+          query: q,
+          resultCount: jyutjyuTotal,
+          suggestedContent: jyutjyuList.slice(0, 5).map((item: any) => ({
+            id: String(item?.id || ''),
+            headword: item?.headword?.display,
+            jyutping: item?.phonetic?.jyutping,
+            definition: item?.senses?.[0]?.definition
+          })),
+          metadata: { initiatedBy: 'manual_reference_search' }
+        })
+      }
     } catch (e) {
       duplicateCheckResult.value.set(entryId, { loading: false, entries: [], otherDialects: [] })
       duplicateCheckResult.value = new Map(duplicateCheckResult.value)
@@ -398,6 +548,23 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
       targetEntry.meta = clonedMeta as any
       if (source.lexemeId) (targetEntry as any).lexemeId = source.lexemeId
       ;(targetEntry as any)._isDirty = true
+      updateReferenceEvent(getInternalTemplateEventKey(getEntryIdString(targetEntry)), 'accepted', {
+        entryId: getTrackingEntryId(targetEntry),
+        clientEntryKey: getEntryIdString(targetEntry),
+        acceptedContent: {
+          sourceEntryId: sid,
+          entryType: clonedEntryType,
+          senses: clonedSenses,
+          theme: clonedTheme,
+          meta: clonedMeta,
+          refs: clonedRefs,
+          lexemeId: source.lexemeId
+        },
+        metadata: {
+          sourceHeadword: source.headword?.display,
+          sourceDialect: source.dialect?.name
+        }
+      })
     } catch (e) {
       console.error('Failed to apply other dialect template', e)
     }
@@ -446,6 +613,19 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
         targetEntry.phonetic!.jyutping = deepCopy(sourceJyutping)
       }
       ;(targetEntry as any)._isDirty = true
+      updateReferenceEvent(getJyutjyuEventKey(entryId, state?.q || ''), 'accepted', {
+        entryId: getTrackingEntryId(targetEntry),
+        clientEntryKey: entryId,
+        acceptedContent: {
+          sourceId: sid,
+          senses: targetEntry.senses,
+          jyutping: targetEntry.phonetic?.jyutping
+        },
+        metadata: {
+          sourceHeadword: source?.headword?.display,
+          query: state?.q || ''
+        }
+      })
     } catch (e) {
       console.error('Failed to apply Jyutjyu template', e)
     }
@@ -453,6 +633,10 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
 
   function dismissDuplicateCheck(entry: Entry) {
     const entryId = getEntryIdString(entry)
+    updateReferenceEvent(getInternalTemplateEventKey(entryId), 'rejected', {
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: entryId
+    })
     duplicateCheckResult.value.delete(entryId)
     duplicateCheckResult.value = new Map(duplicateCheckResult.value)
   }
@@ -484,6 +668,14 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     if (editingCell.value && String(editingCell.value.entryId) === entryId && editingCell.value.field === 'phonetic') {
       editValue.value = pronunciation
     }
+    updateReferenceEvent(getJyutdictEventKey(entryId), 'accepted', {
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: entryId,
+      field: 'phonetic.jyutping',
+      acceptedContent: {
+        pronunciation
+      }
+    })
     jyutdictHandled.value.add(entryId)
     jyutdictHandled.value = new Set(jyutdictHandled.value)
     jyutdictVisible.value.set(entryId, false)
@@ -491,6 +683,11 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
 
   function dismissJyutdict(entry: Entry) {
     const entryId = getEntryIdString(entry)
+    updateReferenceEvent(getJyutdictEventKey(entryId), 'rejected', {
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: entryId,
+      field: 'phonetic.jyutping'
+    })
     jyutdictHandled.value.add(entryId)
     jyutdictHandled.value = new Set(jyutdictHandled.value)
     jyutdictVisible.value.set(entryId, false)
@@ -501,6 +698,11 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     const q = getJyutjyuQuery(entryId).trim()
     if (!entryId || !q) return
     const key = getJyutjyuHandledKey(entryId, q)
+    updateReferenceEvent(getJyutjyuEventKey(entryId, q), 'rejected', {
+      entryId: getTrackingEntryId(entry),
+      clientEntryKey: entryId,
+      metadata: { query: q }
+    })
     jyutjyuRefHandled.value.add(key)
     jyutjyuRefHandled.value = new Set(jyutjyuRefHandled.value)
     jyutjyuRefVisible.value.set(entryId, false)
