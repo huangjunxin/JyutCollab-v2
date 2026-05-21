@@ -26,7 +26,8 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/ui',
     '@pinia/nuxt',
-    'nuxt-auth-utils'
+    'nuxt-auth-utils',
+    '@nuxt/content'
   ],
 
   // Global CSS (Nuxt UI + Tailwind)

@@ -27,5 +27,5 @@ logs
 .claude
 
 # Documentation
-docs
+/docs
 server/api/admin/import-gz-practical.post.ts

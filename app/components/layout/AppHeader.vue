@@ -26,6 +26,15 @@
             首頁
           </UButton>
           <UButton
+            to="/docs"
+            variant="ghost"
+            color="gray"
+            icon="i-heroicons-book-open"
+            :class="[$route.path.startsWith('/docs') ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+          >
+            使用指南
+          </UButton>
+          <UButton
             to="/entries"
             variant="ghost"
             color="gray"
