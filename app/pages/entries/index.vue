@@ -210,7 +210,7 @@
     </div>
 
     <!-- Loading state -->
-    <div v-if="loading" class="flex-1 flex flex-col items-center justify-center">
+    <div v-if="loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
       <div class="relative">
         <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
         <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
@@ -219,7 +219,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="isEmpty" class="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div v-else-if="isEmpty" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
         <UIcon name="i-heroicons-table-cells" class="w-10 h-10 text-gray-400" />
       </div>
