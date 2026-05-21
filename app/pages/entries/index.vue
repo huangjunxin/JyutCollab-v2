@@ -466,7 +466,7 @@
                 :show-ai-register="col.key === 'register' && !!row.entry.headword?.display && !row.entry.meta?.register"
                 :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
                 :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
-                :ai-loading-register="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'register'"
+                :ai-loading-register="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'register') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
                 :show-expand="col.key === 'definition'"
                 :is-expanded="expandedEntryId === getEntryIdString(row.entry)"
                 :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
@@ -2205,6 +2205,9 @@ function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
       if (field === 'theme' && themeAISuggestions.value.get(entryId)) {
         acceptThemeAI(entry)
       }
+      if (field === 'register' && registerAISuggestions.value.get(entryId)) {
+        acceptRegisterAI(entry)
+      }
       saveCellEdit({ focusWrapper: false })
       const opened = moveToNextCell(entry, field, event.shiftKey ? -1 : 1)
       if (!opened) {
@@ -2377,7 +2380,7 @@ function handleTableKeydown(event: KeyboardEvent) {
 
   const { rowIndex, colIndex } = focusedCell.value
   const currentEntry = getEntryAtTableRow(rowIndex)
-  const entryKeyForTheme = currentEntry ? String(currentEntry.id ?? (currentEntry as any)._tempId ?? '') : ''
+  const currentEntryKey = currentEntry ? getEntryIdString(currentEntry) : ''
   let nextRow = rowIndex
   let nextCol = colIndex
 
@@ -2400,9 +2403,12 @@ function handleTableKeydown(event: KeyboardEvent) {
       break
     case 'Tab':
       event.preventDefault()
-      // 若當前在分類列且有待採納的 AI 分類建議，Tab 先採納再移動（與釋義列一致）
-      if (colIndex === themeColIndex.value && currentEntry && themeAISuggestions.value.get(entryKeyForTheme)) {
+      // 若當前在分類或語域列且有待採納的 AI 建議，Tab 先採納再移動（與釋義列一致）
+      if (colIndex === themeColIndex.value && currentEntry && themeAISuggestions.value.get(currentEntryKey)) {
         acceptThemeAI(currentEntry)
+      }
+      if (colIndex === registerColIndex.value && currentEntry && registerAISuggestions.value.get(currentEntryKey)) {
+        acceptRegisterAI(currentEntry)
       }
       if (event.shiftKey) {
         nextCol = colIndex - 1
