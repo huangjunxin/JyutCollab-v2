@@ -1,3 +1,4 @@
+import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
 
 /** 當前登錄用戶的完整資料（不含密碼），供個人資料頁使用 */
@@ -22,6 +23,12 @@ export default defineEventHandler(async (event) => {
   const u = doc as Record<string, unknown>
   delete u.passwordHash
 
+  const userId = session.user.id
+  const [contributionCount, reviewCount] = await Promise.all([
+    Entry.countDocuments({ createdBy: userId }),
+    Entry.countDocuments({ reviewedBy: userId })
+  ])
+
   return {
     success: true,
     data: {
@@ -38,8 +45,8 @@ export default defineEventHandler(async (event) => {
         dialectName: p.dialectName,
         role: p.role ?? 'contributor'
       })) ?? [],
-      contributionCount: u.contributionCount ?? 0,
-      reviewCount: u.reviewCount ?? 0,
+      contributionCount,
+      reviewCount,
       createdAt: u.createdAt,
       updatedAt: u.updatedAt
     }

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DIALECT_IDS } from '../../../shared/dialects'
+import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
@@ -95,6 +96,12 @@ export default defineEventHandler(async (event) => {
     loggedInAt: (session as { loggedInAt?: number }).loggedInAt ?? Date.now()
   })
 
+  const userId = session.user.id
+  const [contributionCount, reviewCount] = await Promise.all([
+    Entry.countDocuments({ createdBy: userId }),
+    Entry.countDocuments({ reviewedBy: userId })
+  ])
+
   return {
     success: true,
     data: {
@@ -111,8 +118,8 @@ export default defineEventHandler(async (event) => {
         dialectName: p.dialectName,
         role: p.role ?? 'contributor'
       })) ?? [],
-      contributionCount: u.contributionCount ?? 0,
-      reviewCount: u.reviewCount ?? 0,
+      contributionCount,
+      reviewCount,
       updatedAt: u.updatedAt
     }
   }

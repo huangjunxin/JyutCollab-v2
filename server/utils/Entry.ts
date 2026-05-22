@@ -225,6 +225,7 @@ EntrySchema.index({ 'headword.display': 1, 'dialect.name': 1 })
 // 其他索引
 EntrySchema.index({ status: 1 })
 EntrySchema.index({ createdBy: 1 })
+EntrySchema.index({ reviewedBy: 1 })
 EntrySchema.index({ 'theme.level1Id': 1, 'theme.level2Id': 1, 'theme.level3Id': 1 })
 EntrySchema.index({ 'dialect.name': 1 })
 EntrySchema.index({ entryType: 1 })

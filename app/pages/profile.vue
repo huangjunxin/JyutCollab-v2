@@ -3,8 +3,12 @@
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">個人資料</h1>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 text-primary animate-spin" />
+    <div v-if="loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
+      <div class="relative">
+        <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+        <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+      </div>
+      <p class="mt-4 text-gray-500 dark:text-gray-400">加載中...</p>
     </div>
 
     <!-- Content -->
@@ -17,7 +21,7 @@
               :alt="profile.username"
               :src="profile.avatarUrl || undefined"
               size="xl"
-              class="bg-primary text-white ring-4 ring-gray-100 dark:ring-gray-800"
+              class="bg-primary text-white font-sans font-bold antialiased ring-4 ring-gray-100 dark:ring-gray-800 [&_span]:font-sans [&_span]:font-bold [&_span]:text-white"
             />
           </div>
           <div class="flex-1 min-w-0">
