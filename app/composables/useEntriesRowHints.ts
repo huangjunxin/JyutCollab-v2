@@ -291,11 +291,20 @@ export function useEntriesRowHints(options: UseEntriesRowHintsOptions) {
     }
   }
 
+  function isFullyUnknownHeadword(headword: string): boolean {
+    return /^□+$/.test(headword.trim())
+  }
+
   async function runDuplicateCheck(entry: Entry) {
     const entryId = getEntryIdString(entry)
     const headword = entry.headword?.display?.trim() || ''
     const dialect = entry.dialect?.name || ''
     if (!headword || !dialect) return
+    if (isFullyUnknownHeadword(headword)) {
+      duplicateCheckResult.value.set(entryId, { loading: false, entries: [], otherDialects: [] })
+      duplicateCheckResult.value = new Map(duplicateCheckResult.value)
+      return
+    }
 
     duplicateCheckResult.value.set(entryId, { loading: true })
     duplicateCheckResult.value = new Map(duplicateCheckResult.value)
