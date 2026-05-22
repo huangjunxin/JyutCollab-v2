@@ -74,7 +74,7 @@
         <div class="flex-1">
           <UInput
             v-model="searchQuery"
-            placeholder="搜索詞條、釋義..."
+            placeholder="搜索詞頭、粵拼、分類、釋義..."
             icon="i-heroicons-magnifying-glass"
             size="sm"
             class="w-full"

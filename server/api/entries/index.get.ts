@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 const ALL_MAX_LIMIT = 5000
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 const QuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   perPage: z.coerce.number().int().min(1).max(100).default(20),
@@ -69,15 +73,73 @@ export default defineEventHandler(async (event) => {
     // Build filter
     const filter: Record<string, any> = {}
 
-    if (searchQuery) {
+    const trimmedSearchQuery = searchQuery?.trim()
+    if (trimmedSearchQuery) {
+      const escapedSearchQuery = escapeRegex(trimmedSearchQuery)
       filter.$or = [
-        // 主詞頭
-        { 'headword.display': { $regex: searchQuery, $options: 'i' } },
-        // 異形詞（variants 為 string[]，Mongo 會對每個元素應用 regex）
-        { 'headword.variants': { $regex: searchQuery, $options: 'i' } },
-        // 釋義
-        { 'senses.definition': { $regex: searchQuery, $options: 'i' } }
+        { id: { $regex: escapedSearchQuery, $options: 'i' } },
+        { lexemeId: { $regex: escapedSearchQuery, $options: 'i' } },
+        { sourceBook: { $regex: escapedSearchQuery, $options: 'i' } },
+        { entryType: { $regex: escapedSearchQuery, $options: 'i' } },
+        { status: { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'dialect.name': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'dialect.regionCode': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'headword.display': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'headword.normalized': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'headword.variants': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'phonetic.original': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'phonetic.jyutping': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'phonetic.toneSandhi': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.definition': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.label': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.examples.text': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.examples.jyutping': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.examples.translation': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.examples.explanation': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.examples.scenario': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.examples.source': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.images': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.label': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.definition': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.examples.text': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.examples.jyutping': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.examples.translation': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.examples.explanation': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.examples.scenario': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'senses.subSenses.examples.source': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'refs.type': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'refs.target': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'refs.url': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'theme.level1': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'theme.level2': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'theme.level3': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.category': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.pos': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.etymology': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.register': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.region': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.usage': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'meta.notes': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'morphemeRefs.targetEntryId': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'morphemeRefs.char': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'morphemeRefs.jyutping': { $regex: escapedSearchQuery, $options: 'i' } },
+        { 'morphemeRefs.note': { $regex: escapedSearchQuery, $options: 'i' } },
+        { createdBy: { $regex: escapedSearchQuery, $options: 'i' } },
+        { updatedBy: { $regex: escapedSearchQuery, $options: 'i' } },
+        { reviewedBy: { $regex: escapedSearchQuery, $options: 'i' } }
       ]
+
+      const numericSearchQuery = Number(trimmedSearchQuery)
+      if (Number.isFinite(numericSearchQuery)) {
+        filter.$or.push(
+          { 'theme.level1Id': numericSearchQuery },
+          { 'theme.level2Id': numericSearchQuery },
+          { 'theme.level3Id': numericSearchQuery },
+          { viewCount: numericSearchQuery },
+          { likeCount: numericSearchQuery },
+          { 'morphemeRefs.position': numericSearchQuery }
+        )
+      }
     }
 
     // 方言篩選（兼容新舊字段）
