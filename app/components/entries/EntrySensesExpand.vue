@@ -337,7 +337,7 @@
     <!-- 釋義配圖預覽（點擊縮圖放大） -->
     <UModal v-model:open="imagePreviewVisible">
       <template #content>
-        <UCard class="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <UCard class="jc-modal-card max-w-4xl max-h-[90vh] overflow-y-auto rounded-none [&>*]:rounded-none">
           <div class="relative">
             <img
               v-if="imagePreviewPublicId"

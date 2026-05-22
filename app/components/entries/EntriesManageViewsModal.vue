@@ -1,7 +1,7 @@
 <template>
   <UModal :open="open" class="max-w-3xl" @update:open="handleOpenChange">
     <template #content>
-      <UCard class="w-full">
+      <UCard class="jc-modal-card w-full rounded-none [&>*]:rounded-none">
         <template #header>
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-2">
@@ -73,7 +73,7 @@
 
   <UModal v-model:open="deleteOpen" class="max-w-md">
     <template #content>
-      <UCard class="w-full">
+      <UCard class="jc-modal-card w-full rounded-none [&>*]:rounded-none">
         <template #header>
           <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
             刪除「{{ pendingDeleteView?.name }}」？此操作無法還原。

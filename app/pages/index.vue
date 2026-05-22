@@ -3,7 +3,7 @@
     <!-- Welcome Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+        <h1 class="jc-serif text-2xl font-bold text-gray-900 dark:text-white">
           {{ welcomeTitle }}
         </h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -35,7 +35,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <NuxtLink
         to="/entries"
-        class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        class="flex flex-col items-center gap-2 p-4 border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-800 hover:bg-[var(--jc-accent-soft)] dark:hover:bg-slate-700/70 shadow-[var(--jc-shadow-hard)] transition-colors"
       >
         <UIcon name="i-heroicons-document-text" class="w-6 h-6 text-primary" />
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">瀏覽詞條</span>
@@ -43,7 +43,7 @@
 
       <NuxtLink
         to="/entries?filter=mine"
-        class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        class="flex flex-col items-center gap-2 p-4 border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-800 hover:bg-[var(--jc-accent-soft)] dark:hover:bg-slate-700/70 shadow-[var(--jc-shadow-hard)] transition-colors"
       >
         <UIcon name="i-heroicons-user" class="w-6 h-6 text-primary" />
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">我的詞條</span>
@@ -52,7 +52,7 @@
       <NuxtLink
         v-if="canReview"
         to="/review"
-        class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        class="flex flex-col items-center gap-2 p-4 border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-800 hover:bg-[var(--jc-accent-soft)] dark:hover:bg-slate-700/70 shadow-[var(--jc-shadow-hard)] transition-colors"
       >
         <UIcon name="i-heroicons-clipboard-document-check" class="w-6 h-6 text-amber-500" />
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">審核隊列</span>
@@ -60,7 +60,7 @@
 
       <NuxtLink
         to="/histories"
-        class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        class="flex flex-col items-center gap-2 p-4 border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-800 hover:bg-[var(--jc-accent-soft)] dark:hover:bg-slate-700/70 shadow-[var(--jc-shadow-hard)] transition-colors"
       >
         <UIcon name="i-heroicons-clock" class="w-6 h-6 text-gray-500" />
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">編輯歷史</span>
@@ -72,7 +72,7 @@
       <!-- My Stats Card -->
       <UCard
         v-if="isAuthenticated"
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center gap-2">
@@ -121,7 +121,7 @@
       <!-- Reviewer Stats Card -->
       <UCard
         v-if="canReview"
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center gap-2">
@@ -155,7 +155,7 @@
       </UCard>
 
       <!-- Site Stats Card -->
-      <UCard class="shadow-sm border border-gray-200 dark:border-gray-700">
+      <UCard class="jc-card border border-[var(--jc-border)]">
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-chart-bar" class="w-5 h-5 text-gray-500" />
@@ -201,7 +201,7 @@
       </UCard>
 
       <!-- Contributor Activity Card -->
-      <UCard class="shadow-sm border border-gray-200 dark:border-gray-700">
+      <UCard class="jc-card border border-[var(--jc-border)]">
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-users" class="w-5 h-5 text-gray-500" />
@@ -243,7 +243,7 @@
     <div v-if="isAuthenticated" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- My Contribution Stats (Enhanced) -->
       <UCard
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center justify-between">
@@ -309,7 +309,7 @@
       <!-- Reviewer Progress Card (Enhanced) -->
       <UCard
         v-if="canReview"
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center gap-2">
@@ -363,7 +363,7 @@
       <!-- Filling Assistance Analytics Card -->
       <UCard
         v-if="canReview"
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center justify-between gap-3">
@@ -508,7 +508,7 @@
       </UCard>
 
       <!-- Dialect Coverage Card -->
-      <UCard class="shadow-sm border border-gray-200 dark:border-gray-700">
+      <UCard class="jc-card border border-[var(--jc-border)]">
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-globe-alt" class="w-5 h-5 text-blue-500" />
@@ -560,7 +560,7 @@
       <!-- My Recent Activities -->
       <UCard
         v-if="isAuthenticated"
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center gap-2">
@@ -625,7 +625,7 @@
       <!-- All Recent Activities (reviewer/admin only) -->
       <UCard
         v-if="isAuthenticated && canReview"
-        class="shadow-sm border border-gray-200 dark:border-gray-700"
+        class="jc-card border border-[var(--jc-border)]"
       >
         <template #header>
           <div class="flex items-center gap-2">

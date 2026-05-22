@@ -1,11 +1,11 @@
 <template>
   <div class="mx-auto max-w-7xl space-y-6">
-    <div class="rounded-3xl border border-gray-200 bg-gradient-to-br from-green-50 via-white to-emerald-50 p-6 dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-emerald-950/30 lg:p-8">
+    <div class="border border-[var(--jc-border)] bg-white p-6 shadow-[var(--jc-shadow-hard-lg)] dark:border-[var(--jc-dark-border)] dark:bg-slate-900 lg:p-8">
       <div class="max-w-3xl">
-        <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/20">
+        <div class="mb-4 inline-flex h-12 w-12 items-center justify-center bg-[var(--jc-accent)] text-white shadow-[var(--jc-shadow-hard)]">
           <UIcon name="i-heroicons-book-open" class="h-6 w-6" />
         </div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">JyutCollab 使用指南</h1>
+        <h1 class="jc-serif text-3xl font-bold text-gray-900 dark:text-white">JyutCollab 使用指南</h1>
       </div>
       <div class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <p class="text-gray-600 dark:text-gray-300">
@@ -20,7 +20,7 @@
     <div class="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <DocsSidebar class="lg:sticky lg:top-24 lg:self-start" :docs="docsList" :current-path="currentPath" />
 
-      <article class="min-w-0 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:p-10">
+      <article class="jc-card-lg min-w-0 border border-[var(--jc-border)] bg-white p-6 dark:border-[var(--jc-dark-border)] dark:bg-slate-900 lg:p-10">
         <div v-if="page" class="docs-prose">
           <ContentRenderer :value="page" />
         </div>

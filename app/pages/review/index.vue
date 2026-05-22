@@ -4,9 +4,9 @@
     <div class="mb-6">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <UIcon name="i-heroicons-clipboard-document-check" class="w-6 h-6 text-amber-600 dark:text-amber-400" />
+          <h1 class="jc-serif text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            <div class="w-10 h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent-soft-strong)] border border-[var(--jc-accent)]">
+              <UIcon name="i-heroicons-clipboard-document-check" class="w-6 h-6 text-[var(--jc-accent)]" />
             </div>
             審核隊列
           </h1>
@@ -37,7 +37,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="entryList.length === 0" class="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div v-else-if="entryList.length === 0" class="text-center py-16 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
         <UIcon name="i-heroicons-check-circle" class="w-10 h-10 text-green-500" />
       </div>
@@ -50,7 +50,7 @@
       <div
         v-for="entry in entryList"
         :key="entry.id"
-        class="review-dict-card bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden"
+        class="review-dict-card transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 overflow-hidden"
       >
         <EntriesEntryDetailCard :display-entry="entryToDisplay(entry)">
           <template #actions>
@@ -92,7 +92,7 @@
     <!-- Reject Modal -->
     <UModal v-model:open="rejectModalOpen">
       <template #content>
-        <UCard class="w-full max-w-lg">
+        <UCard class="jc-modal-card w-full max-w-lg rounded-none [&>*]:rounded-none">
           <template #header>
             <div class="flex items-center gap-2">
               <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5 text-red-500" />
@@ -100,7 +100,7 @@
             </div>
           </template>
 
-          <div v-if="rejectingEntry" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div v-if="rejectingEntry" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <p class="font-medium text-gray-900 dark:text-white">
               {{ rejectingEntry.headword?.display || rejectingEntry.text }}
             </p>
@@ -120,13 +120,14 @@
 
           <template #footer>
             <div class="flex justify-end gap-3">
-              <UButton color="neutral" variant="ghost" @click="rejectModalOpen = false">
+              <UButton color="neutral" variant="ghost" class="rounded-none [&>*]:rounded-none" @click="rejectModalOpen = false">
                 取消
               </UButton>
               <UButton
                 color="error"
                 :loading="rejecting"
                 :disabled="!rejectReason.trim()"
+                class="rounded-none [&>*]:rounded-none"
                 @click="handleReject"
               >
                 確認拒絕

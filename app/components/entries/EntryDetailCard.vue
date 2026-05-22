@@ -7,7 +7,7 @@
     >
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
         <div class="flex-1 min-w-0">
-          <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 break-words">
+          <h3 class="jc-serif text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 break-words">
             {{ displayEntry.headwordDisplay }}
             <sup
               v-if="displayEntry.meta?.variant_number"
@@ -44,31 +44,31 @@
         >
           <span
             v-if="displayEntry.dialectLabel"
-            class="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-sm whitespace-nowrap"
+            class="px-3 py-1 bg-[var(--jc-accent-soft)] text-[var(--jc-accent)] border border-[var(--jc-accent)] text-sm whitespace-nowrap"
           >
             {{ displayEntry.dialectLabel }}
           </span>
           <span
             v-if="displayEntry.entryTypeLabel"
-            class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm whitespace-nowrap"
+            class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 text-sm whitespace-nowrap"
           >
             {{ displayEntry.entryTypeLabel }}
           </span>
           <span
             v-if="displayEntry.register"
-            class="px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm whitespace-nowrap"
+            class="px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 text-sm whitespace-nowrap"
           >
             {{ displayEntry.register }}
           </span>
           <span
             v-if="displayEntry.categoryLabel"
-            class="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-sm break-words max-w-full"
+            class="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-sm break-words max-w-full"
           >
             {{ displayEntry.categoryLabel }}
           </span>
           <span
             v-if="displayEntry.sourceBook"
-            class="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm"
+            class="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 text-sm"
           >
             {{ displayEntry.sourceBook }}
           </span>

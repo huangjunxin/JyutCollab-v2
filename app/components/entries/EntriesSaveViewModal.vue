@@ -1,7 +1,7 @@
 <template>
   <UModal :open="open" class="max-w-md" @update:open="handleOpenChange">
     <template #content>
-      <UCard class="w-full">
+      <UCard class="jc-modal-card w-full rounded-none [&>*]:rounded-none">
         <template #header>
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-2">

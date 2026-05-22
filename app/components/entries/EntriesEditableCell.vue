@@ -27,14 +27,14 @@
               :ui="{ content: 'max-w-xs' }"
             >
               <div
-                class="flex-1 px-0 py-0 text-sm min-h-[24px] cursor-pointer rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors truncate"
+                class="flex-1 px-0 py-0 text-sm min-h-[24px] cursor-pointer rounded hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors truncate"
               >
                 {{ displayText }}
               </div>
             </UTooltip>
             <div
               v-else
-              class="flex-1 px-0 py-0 text-sm text-gray-400 min-h-[24px] cursor-pointer rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+              class="flex-1 px-0 py-0 text-sm text-gray-400 min-h-[24px] cursor-pointer rounded hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors"
             >
               選擇分類
             </div>
@@ -133,7 +133,7 @@
               :ui="{ content: 'max-w-xs' }"
             >
               <div
-                class="flex-1 px-2 py-1 text-sm min-h-[24px] cursor-text rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors overflow-hidden"
+                class="flex-1 px-2 py-1 text-sm min-h-[24px] cursor-text rounded hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors overflow-hidden"
                 :class="[
                   cellClass,
                   overlayClassNames,
@@ -146,7 +146,7 @@
             </UTooltip>
             <div
               v-else
-              class="flex-1 px-2 py-1 text-sm text-gray-400 min-h-[24px] cursor-text rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+              class="flex-1 px-2 py-1 text-sm text-gray-400 min-h-[24px] cursor-text rounded hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors"
             >
               選擇分類
             </div>
@@ -154,7 +154,7 @@
           <!-- 普通文本顯示 -->
           <div
             v-else
-            class="flex-1 px-2 py-1 text-sm min-h-[24px] cursor-text rounded hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+            class="flex-1 px-2 py-1 text-sm min-h-[24px] cursor-text rounded hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors"
             :class="[
               cellClass,
               overlayClassNames,

@@ -5,7 +5,7 @@
     @update:open="(v: boolean) => $emit('update:open', v)"
   >
     <template #content>
-      <UCard class="w-full overflow-x-hidden">
+      <UCard class="jc-modal-card w-full overflow-x-hidden rounded-none [&>*]:rounded-none">
         <template #header>
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">

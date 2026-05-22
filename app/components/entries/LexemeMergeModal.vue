@@ -1,7 +1,7 @@
 <template>
   <UModal :open="open" @update:open="(v: boolean) => emit('update:open', v)">
     <template #content>
-      <UCard class="w-full max-w-2xl">
+      <UCard class="jc-modal-card w-full max-w-2xl rounded-none [&>*]:rounded-none">
         <template #header>
           <div class="flex items-center justify-between gap-3">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">

@@ -1,40 +1,40 @@
 <template>
   <div class="min-h-screen flex">
     <!-- Left side - Decorative -->
-    <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 relative overflow-hidden">
+    <div class="hidden lg:flex lg:w-1/2 bg-[var(--jc-paper)] border-r border-[var(--jc-border)] relative overflow-hidden">
       <!-- Background pattern -->
       <div class="absolute inset-0 opacity-10">
         <div class="absolute top-32 right-32 w-80 h-80 bg-white rounded-full blur-3xl"></div>
         <div class="absolute bottom-32 left-32 w-64 h-64 bg-white rounded-full blur-3xl"></div>
       </div>
 
-      <div class="relative z-10 flex flex-col justify-center items-center w-full p-12 text-white">
+      <div class="relative z-10 flex flex-col justify-center items-center w-full p-12 text-[var(--jc-ink)]">
         <!-- Logo -->
         <div class="mb-8">
-          <div class="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-2xl">
+          <div class="w-24 h-24 bg-[var(--jc-accent)] flex items-center justify-center shadow-[var(--jc-shadow-hard-lg)]">
             <UIcon name="i-heroicons-user-plus" class="w-12 h-12 text-white" />
           </div>
         </div>
 
-        <h1 class="text-4xl font-bold mb-4 text-center">加入社區</h1>
-        <p class="text-xl text-white/80 mb-8 text-center">成為粵語詞條貢獻者</p>
+        <h1 class="jc-serif text-4xl font-bold mb-4 text-center text-[var(--jc-accent)]">加入社區</h1>
+        <p class="jc-serif text-xl text-[var(--jc-body)] mb-8 text-center">成為粵語詞條貢獻者</p>
 
         <!-- Benefits -->
         <div class="space-y-4 max-w-md">
-          <div class="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-            <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div class="flex items-center gap-4 bg-white/75 backdrop-blur-sm border border-[var(--jc-border)] shadow-[var(--jc-shadow-hard)] p-4">
+            <div class="w-10 h-10 bg-[var(--jc-accent-soft-strong)] text-[var(--jc-accent)] flex items-center justify-center flex-shrink-0">
               <UIcon name="i-heroicons-document-text" class="w-5 h-5" />
             </div>
             <span class="text-sm">創建和編輯粵語詞條</span>
           </div>
-          <div class="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-            <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div class="flex items-center gap-4 bg-white/75 backdrop-blur-sm border border-[var(--jc-border)] shadow-[var(--jc-shadow-hard)] p-4">
+            <div class="w-10 h-10 bg-[var(--jc-accent-soft-strong)] text-[var(--jc-accent)] flex items-center justify-center flex-shrink-0">
               <UIcon name="i-heroicons-clock" class="w-5 h-5" />
             </div>
             <span class="text-sm">追蹤您的編輯歷史</span>
           </div>
-          <div class="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-            <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div class="flex items-center gap-4 bg-white/75 backdrop-blur-sm border border-[var(--jc-border)] shadow-[var(--jc-shadow-hard)] p-4">
+            <div class="w-10 h-10 bg-[var(--jc-accent-soft-strong)] text-[var(--jc-accent)] flex items-center justify-center flex-shrink-0">
               <UIcon name="i-heroicons-users" class="w-5 h-5" />
             </div>
             <span class="text-sm">參與社區協作審核</span>
@@ -44,24 +44,24 @@
     </div>
 
     <!-- Right side - Register form -->
-    <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900">
+    <div class="w-full lg:w-1/2 flex items-center justify-center p-8 jc-paper-shell">
       <div class="w-full max-w-md">
         <!-- Mobile header -->
         <div class="lg:hidden text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 mb-4">
+          <div class="inline-flex items-center justify-center w-16 h-16 bg-[var(--jc-accent)] shadow-[var(--jc-shadow-hard)] mb-4">
             <UIcon name="i-heroicons-book-open" class="w-8 h-8 text-white" />
           </div>
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">註冊 JyutCollab</h2>
+          <h2 class="jc-serif text-2xl font-bold text-gray-900 dark:text-white">註冊 JyutCollab</h2>
         </div>
 
         <!-- Desktop header -->
         <div class="hidden lg:block mb-8">
-          <h2 class="text-3xl font-bold text-gray-900 dark:text-white">創建賬户</h2>
+          <h2 class="jc-serif text-3xl font-bold text-gray-900 dark:text-white">創建賬户</h2>
           <p class="mt-2 text-gray-600 dark:text-gray-400">加入粵語詞條協作社區</p>
         </div>
 
         <!-- Register card -->
-        <UCard class="shadow-xl border border-gray-200 dark:border-gray-700">
+        <UCard class="jc-card-lg border border-[var(--jc-border)]">
           <form @submit.prevent="handleSubmit" class="space-y-5">
             <!-- Username -->
             <div>
@@ -175,7 +175,7 @@
               size="xl"
               block
               :loading="loading"
-              class="mt-6 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow"
+              class="mt-6 shadow-[var(--jc-shadow-hard)] transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5"
             >
               註冊
             </UButton>

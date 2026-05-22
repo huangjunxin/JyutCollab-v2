@@ -4,9 +4,9 @@
     <div class="mb-4">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-              <UIcon name="i-heroicons-clock" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h1 class="jc-serif text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            <div class="w-10 h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent-soft-strong)] border border-[var(--jc-accent)]">
+              <UIcon name="i-heroicons-clock" class="w-6 h-6 text-[var(--jc-accent)]" />
             </div>
             編輯歷史
           </h1>
@@ -18,7 +18,7 @@
     </div>
 
     <!-- Search filter -->
-    <div class="mb-4 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="mb-4 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
       <div class="flex flex-col sm:flex-row gap-3">
         <div class="flex-1">
           <UInput
@@ -82,7 +82,7 @@
       <UCard
         v-for="history in historyList"
         :key="history.id"
-        class="hover:shadow-md transition-shadow cursor-pointer"
+        class="jc-card cursor-pointer transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5"
         @click="showDiff(history)"
       >
         <div class="flex items-center justify-between gap-4">
@@ -174,7 +174,7 @@
       description="查看此筆編輯歷史的變更字段、修改前內容和修改後內容。"
     >
       <template #content>
-        <UCard class="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <UCard class="jc-modal-card max-w-3xl max-h-[90vh] overflow-y-auto rounded-none [&>*]:rounded-none">
           <template #header>
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold">修改詳情</h3>
@@ -183,6 +183,7 @@
                   v-if="selectedHistory"
                   :color="getActionColor(selectedHistory.action)"
                   variant="subtle"
+                  class="rounded-none"
                 >
                   {{ getActionLabel(selectedHistory.action) }}
                 </UBadge>
@@ -191,6 +192,7 @@
                   variant="ghost"
                   icon="i-heroicons-x-mark"
                   size="sm"
+                  class="rounded-none"
                   @click="diffModalOpen = false"
                 />
               </div>
@@ -224,6 +226,7 @@
                   color="primary"
                   variant="subtle"
                   size="xs"
+                  class="rounded-none"
                 >
                   {{ field }}
                 </UBadge>
@@ -232,12 +235,12 @@
 
             <!-- Diff view toggle -->
             <div class="flex items-center gap-2 mb-3">
-              <div class="inline-flex rounded-md shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="inline-flex shadow-[var(--jc-shadow-hard)] border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <UButton
                   :color="diffViewMode === 'unified' ? 'primary' : 'gray'"
                   :variant="diffViewMode === 'unified' ? 'solid' : 'ghost'"
                   size="xs"
-                  class="rounded-none"
+                  class="rounded-none [&>*]:rounded-none"
                   @click="diffViewMode = 'unified'"
                 >
                   差異視圖
@@ -246,7 +249,7 @@
                   :color="diffViewMode === 'split' ? 'primary' : 'gray'"
                   :variant="diffViewMode === 'split' ? 'solid' : 'ghost'"
                   size="xs"
-                  class="rounded-none border-l border-gray-200 dark:border-gray-700"
+                  class="rounded-none border-l border-gray-200 dark:border-gray-700 [&>*]:rounded-none"
                   @click="diffViewMode = 'split'"
                 >
                   對比視圖
@@ -259,7 +262,7 @@
               <div v-if="diffChanges.length === 0" class="p-4 text-center text-gray-500 text-sm">
                 無變化
               </div>
-              <div v-else class="max-h-96 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <div v-else class="max-h-96 overflow-auto border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                 <table class="w-full text-xs">
                   <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0">
                     <tr>
@@ -319,7 +322,7 @@
                   <UIcon name="i-heroicons-minus-circle" class="w-4 h-4" />
                   修改前
                 </h4>
-                <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 border border-red-200 dark:border-red-800 overflow-hidden">
+                <div class="bg-red-50 dark:bg-red-900/20 p-3 border border-red-200 dark:border-red-800 overflow-hidden">
                   <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words overflow-x-auto max-h-64">{{ formatSnapshot(selectedHistory.beforeSnapshot) }}</pre>
                 </div>
               </div>
@@ -329,14 +332,14 @@
                   <UIcon name="i-heroicons-plus-circle" class="w-4 h-4" />
                   修改後
                 </h4>
-                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-800 overflow-hidden">
+                <div class="bg-green-50 dark:bg-green-900/20 p-3 border border-green-200 dark:border-green-800 overflow-hidden">
                   <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words overflow-x-auto max-h-64">{{ formatSnapshot(selectedHistory.afterSnapshot) }}</pre>
                 </div>
               </div>
             </div>
 
             <!-- Reverted notice -->
-            <div v-if="selectedHistory.isReverted" class="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <div v-if="selectedHistory.isReverted" class="p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
               <div class="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <UIcon name="i-heroicons-arrow-uturn-left" class="w-4 h-4" />
                 <span class="text-sm">此更改已於 {{ selectedHistory.revertedAt ? formatDate(selectedHistory.revertedAt) : '未知時間' }} 被撤銷</span>
@@ -354,12 +357,13 @@
                   icon="i-heroicons-arrow-uturn-left"
                   :loading="reverting"
                   :disabled="reverting"
+                  class="rounded-none [&>*]:rounded-none"
                   @click="showRevertConfirm"
                 >
                   撤銷此更改
                 </UButton>
               </div>
-              <UButton color="gray" @click="diffModalOpen = false">
+              <UButton color="gray" class="rounded-none [&>*]:rounded-none" @click="diffModalOpen = false">
                 關閉
               </UButton>
             </div>
@@ -376,7 +380,7 @@
       description="確認是否撤銷此更改並將詞條恢復到修改前的狀態。"
     >
       <template #content>
-        <UCard class="w-full">
+        <UCard class="jc-modal-card w-full rounded-none [&>*]:rounded-none">
           <template #header>
             <div class="flex items-center gap-2 text-warning">
               <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5" />
@@ -390,12 +394,13 @@
 
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton color="gray" variant="ghost" @click="revertConfirmOpen = false">
+              <UButton color="gray" variant="ghost" class="rounded-none [&>*]:rounded-none" @click="revertConfirmOpen = false">
                 取消
               </UButton>
               <UButton
                 color="warning"
                 :loading="reverting"
+                class="rounded-none [&>*]:rounded-none"
                 @click="confirmRevert"
               >
                 確認撤銷

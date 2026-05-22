@@ -1,15 +1,15 @@
 <template>
-  <header class="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+  <header class="sticky top-0 z-50 border-b border-[var(--jc-border)] bg-white/80 backdrop-blur-md dark:border-[var(--jc-dark-border)] dark:bg-slate-900/80">
     <div class="w-full px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between items-center h-16">
         <div class="flex items-center gap-3">
           <NuxtLink to="/" class="flex items-center gap-3 group">
-            <div class="w-10 h-10 aspect-square flex items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:shadow-green-500/40 transition-shadow">
+            <div class="w-10 h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent)] text-white shadow-[var(--jc-shadow-hard)] transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5">
               <UIcon name="i-heroicons-book-open" class="w-6 h-6 text-white" />
             </div>
             <div class="flex flex-col">
-              <span class="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400 bg-clip-text text-transparent">JyutCollab</span>
-              <span class="text-xs text-gray-500 dark:text-gray-400 -mt-1">粵語詞條協作平台</span>
+              <span class="jc-serif text-xl font-bold text-[var(--jc-accent)]">JyutCollab</span>
+              <span class="text-xs text-[var(--jc-muted)] dark:text-slate-400 -mt-1">粵語詞條協作平台</span>
             </div>
           </NuxtLink>
         </div>
@@ -21,7 +21,7 @@
             variant="ghost"
             color="gray"
             icon="i-heroicons-home"
-            :class="[$route.path === '/' ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+            :class="[$route.path === '/' ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
           >
             首頁
           </UButton>
@@ -30,7 +30,7 @@
             variant="ghost"
             color="gray"
             icon="i-heroicons-book-open"
-            :class="[$route.path.startsWith('/docs') ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+            :class="[$route.path.startsWith('/docs') ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
           >
             使用指南
           </UButton>
@@ -39,7 +39,7 @@
             variant="ghost"
             color="gray"
             icon="i-heroicons-document-text"
-            :class="[$route.path.startsWith('/entries') ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+            :class="[$route.path.startsWith('/entries') ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
           >
             詞條列表
           </UButton>
@@ -49,7 +49,7 @@
             variant="ghost"
             color="gray"
             icon="i-heroicons-clipboard-document-check"
-            :class="[$route.path === '/review' ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+            :class="[$route.path === '/review' ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
           >
             審核隊列
           </UButton>
@@ -58,7 +58,7 @@
             variant="ghost"
             color="gray"
             icon="i-heroicons-clock"
-            :class="[$route.path === '/histories' ? 'bg-gray-100 dark:bg-gray-800 text-primary' : '']"
+            :class="[$route.path === '/histories' ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
           >
             編輯歷史
           </UButton>
@@ -88,7 +88,7 @@
               <!-- Notification Dropdown -->
               <div
                 v-show="notificationOpen"
-                class="absolute right-0 top-full mt-1 w-80 max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-50"
+                class="absolute right-0 top-full mt-1 w-80 max-h-96 overflow-y-auto border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] z-50"
               >
                 <div class="sticky top-0 flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
                   <span class="font-semibold text-gray-900 dark:text-white">通知</span>
@@ -118,7 +118,7 @@
                     :key="notification.id"
                     :to="notification.actionUrl || '#'"
                     class="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800"
-                    :class="{ 'bg-blue-50 dark:bg-blue-900/10': !notification.isRead }"
+                    :class="{ 'bg-[var(--jc-accent-soft)]': !notification.isRead }"
                     @click="handleNotificationClick(notification)"
                   >
                     <div class="flex items-start gap-3">
@@ -172,7 +172,7 @@
               </UButton>
               <div
                 v-show="userMenuOpen"
-                class="absolute right-0 top-full mt-1 min-w-[10rem] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1 z-50"
+                class="absolute right-0 top-full mt-1 min-w-[10rem] border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] py-1 z-50"
                 role="menu"
               >
                 <div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800" role="presentation">

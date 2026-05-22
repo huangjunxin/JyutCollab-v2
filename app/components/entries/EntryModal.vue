@@ -1,12 +1,12 @@
 <template>
   <UModal v-model:open="isOpen">
     <template #content>
-      <UCard class="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <UCard class="jc-modal-card max-w-2xl max-h-[90vh] overflow-y-auto rounded-none [&>*]:rounded-none">
         <template #header>
           <div class="flex justify-between items-center">
             <div class="flex items-center gap-3">
-              <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <UIcon :name="isEditing ? 'i-heroicons-pencil-square' : 'i-heroicons-plus'" class="w-5 h-5 text-green-600 dark:text-green-400" />
+              <div class="p-2 bg-[var(--jc-accent-soft-strong)] border border-[var(--jc-accent)]">
+                <UIcon :name="isEditing ? 'i-heroicons-pencil-square' : 'i-heroicons-plus'" class="w-5 h-5 text-[var(--jc-accent)]" />
               </div>
               <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ isEditing ? '編輯詞條' : '新建詞條' }}
@@ -48,10 +48,10 @@
                   type="button"
                   @click="form.dialect.name = option.value"
                   :class="[
-                    'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    'px-3 py-2 text-sm font-medium transition-all',
                     form.dialect.name === option.value
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)] ring-2 ring-[var(--jc-accent)]'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10'
                   ]"
                 >
                   {{ option.label }}

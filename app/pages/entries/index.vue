@@ -4,9 +4,9 @@
     <div class="mb-4 flex-shrink-0">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <div class="w-10 h-10 aspect-square flex items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-              <UIcon name="i-heroicons-table-cells" class="w-6 h-6 text-green-600 dark:text-green-400" />
+          <h1 class="jc-serif text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            <div class="w-10 h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent-soft-strong)] border border-[var(--jc-accent)]">
+              <UIcon name="i-heroicons-table-cells" class="w-6 h-6 text-[var(--jc-accent)]" />
             </div>
             詞條表格
           </h1>
@@ -46,7 +46,7 @@
             icon="i-heroicons-plus"
             color="primary"
             size="md"
-            class="shadow-lg shadow-primary/25"
+            class="shadow-[var(--jc-shadow-hard)] transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5"
             @click="addNewRow"
           >
             新建詞條
@@ -69,7 +69,7 @@
     />
 
     <!-- Search and filters -->
-    <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
       <div class="flex flex-col lg:flex-row gap-3">
         <div class="flex-1">
           <UInput
@@ -210,7 +210,7 @@
     </div>
 
     <!-- Loading state -->
-    <div v-if="loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div v-if="loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
       <div class="relative">
         <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
         <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
@@ -219,7 +219,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="isEmpty" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div v-else-if="isEmpty" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
         <UIcon name="i-heroicons-table-cells" class="w-10 h-10 text-gray-400" />
       </div>
@@ -290,13 +290,13 @@
         </div>
       </div>
       <div
-        class="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-        :class="{ 'rounded-t-none': selectedCount > 0 }"
+        class="flex-1 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] overflow-hidden flex flex-col"
+        :class="{ 'border-t-0': selectedCount > 0 }"
       >
       <div
         ref="tableWrapperRef"
         tabindex="0"
-        class="flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset rounded-b-xl"
+        class="flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
         @keydown="handleTableKeydown"
       >
         <table class="border-collapse w-full" style="table-layout: fixed" ref="tableRef">
@@ -310,7 +310,7 @@
             <col style="width: 128px" />
           </colgroup>
           <thead class="sticky top-0 z-10">
-            <tr class="bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <tr class="bg-[var(--jc-canvas-soft)] dark:bg-slate-950 border-b border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
               <th class="w-10 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700">
                 <input
                   ref="headerCheckboxRef"
@@ -429,7 +429,7 @@
             <!-- 平鋪詞條行 或 聚合視圖下展開的詞條行 -->
             <tr
               v-else
-              class="group hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
+              class="group hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors"
               :class="{ 'bg-amber-50 dark:bg-amber-900/10': row.entry._isDirty }"
             >
               <td
@@ -859,7 +859,7 @@
   <!-- 詞素引用搜索 Modal -->
   <UModal :open="morphemeSearchModalOpen" @update:open="(v: boolean) => { morphemeSearchModalOpen = v }">
     <template #content>
-      <UCard class="w-full max-w-2xl">
+      <UCard class="jc-modal-card w-full max-w-2xl rounded-none [&>*]:rounded-none">
         <template #header>
           <div class="flex items-center justify-between gap-3">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">搜索詞素／單音節詞</h3>
