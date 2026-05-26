@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
           explanation: ex.explanation,
           scenario: ex.scenario
         })),
-        phoneticNotation: entry.phonetic?.jyutping?.join(' '),
+        phoneticNotation: entry.phonetic?.jyutping?.join('; '),
         notationSystem: 'jyutping' as const,
         // 通用字段
         status: entry.status,

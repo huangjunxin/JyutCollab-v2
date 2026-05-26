@@ -566,7 +566,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     if (aiInlineError.value?.entryId === entryId) {
       aiInlineError.value = null
     }
-    const phoneticValue = entry.phonetic?.jyutping?.join(' ') ?? (entry as any).phoneticNotation ?? ''
+    const phoneticValue = entry.phonetic?.jyutping?.join('; ') ?? (entry as any).phoneticNotation ?? ''
     triggerAISuggestion(entry, 'phonetic', phoneticValue)
   }
 

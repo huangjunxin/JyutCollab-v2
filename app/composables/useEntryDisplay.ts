@@ -36,9 +36,7 @@ export interface DisplayEntry {
 function normalizeJyutping(entry: any): string {
   const arr = entry?.phonetic?.jyutping
   if (Array.isArray(arr) && arr.length > 0) {
-    const hasSpaceInside = arr.some((s: string) => (s || '').includes(' '))
-    if (!hasSpaceInside) return arr.join(' ')
-    return arr.join('; ')
+    return arr.map((s: string) => (s || '').trim()).filter(Boolean).join('; ')
   }
   return entry?.phoneticNotation || ''
 }
@@ -82,8 +80,7 @@ export function jyutjyuRawToDisplay(raw: Record<string, any>): DisplayEntry {
   const arr = raw?.phonetic?.jyutping
   let jyutpingDisplay = ''
   if (Array.isArray(arr) && arr.length > 0) {
-    const hasSpace = arr.some((s: string) => (s || '').includes(' '))
-    jyutpingDisplay = hasSpace ? arr.join('; ') : arr.join(' ')
+    jyutpingDisplay = arr.map((s: string) => (s || '').trim()).filter(Boolean).join('; ')
   }
   const dialectLabel =
     getDialectLabelByRegionCode(raw?.dialect?.region_code || '') || raw?.dialect?.name || ''

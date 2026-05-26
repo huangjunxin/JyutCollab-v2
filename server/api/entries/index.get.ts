@@ -199,7 +199,7 @@ export default defineEventHandler(async (event) => {
       usageNotes: entry.meta?.usage,
       formalityLevel: entry.meta?.register,
       examples: entry.senses?.[0]?.examples,
-      phoneticNotation: entry.phonetic?.jyutping?.join?.(' '),
+      phoneticNotation: entry.phonetic?.jyutping?.join?.('; '),
       notationSystem: 'jyutping' as const,
       status: entry.status,
       createdBy: entry.createdBy,

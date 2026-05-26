@@ -83,9 +83,7 @@ export function useEntriesTableColumns(
       get: (entry: Entry) => {
         const arr = entry.phonetic?.jyutping
         if (Array.isArray(arr) && arr.length > 0) {
-          const hasSpaceInside = arr.some(s => (s || '').includes(' '))
-          if (!hasSpaceInside) return arr.join(' ')
-          return arr.join('; ')
+          return arr.map(s => (s || '').trim()).filter(Boolean).join('; ')
         }
         return entry.phoneticNotation || ''
       },

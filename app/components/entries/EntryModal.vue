@@ -333,9 +333,9 @@ const form = reactive({
 
 // Computed for jyutping input
 const jyutpingInput = computed({
-  get: () => form.phonetic.jyutping?.join(' ') || '',
+  get: () => form.phonetic.jyutping?.join('; ') || '',
   set: (val) => {
-    form.phonetic.jyutping = val.split(/\s+/).filter(Boolean)
+    form.phonetic.jyutping = val.split(/[;,，；]/).map(s => s.trim()).filter(Boolean)
   }
 })
 
@@ -654,7 +654,7 @@ watch(() => props.entryId, async (id) => {
         form.headword.display = entry.headword?.display || entry.text || ''
         form.headword.normalized = entry.headword?.normalized || ''
         form.dialect.name = entry.dialect?.name || entry.region || 'hongkong'
-        form.phonetic.jyutping = entry.phonetic?.jyutping || (entry.phoneticNotation ? entry.phoneticNotation.split(' ') : [])
+        form.phonetic.jyutping = entry.phonetic?.jyutping || (entry.phoneticNotation ? entry.phoneticNotation.split(/[;,，；]/).map((s: string) => s.trim()).filter(Boolean) : [])
         form.entryType = entry.entryType || 'word'
         form.senses[0].definition = entry.senses?.[0]?.definition || entry.definition || ''
         form.senses[0].examples = (entry.senses?.[0]?.examples || entry.examples || []).map((e: any) => ({

@@ -2,11 +2,15 @@ import { getThemeNameById } from '~/composables/useThemeData'
 import { STATUS_LABELS, ENTRY_TYPE_LABELS } from '~/utils/entriesTableConstants'
 import type { Entry } from '~/types'
 
+function formatJyutping(entry: Entry): string {
+  return entry.phonetic?.jyutping?.map(s => (s || '').trim()).filter(Boolean).join('; ') ?? ''
+}
+
 /** 聚合組列顯示：粵拼（首條或「多種」） */
 export function getGroupPhonetic(group: { entries: Entry[] }): string {
-  const first = group.entries[0]?.phonetic?.jyutping?.join?.(' ')
+  const first = formatJyutping(group.entries[0]!)
   if (!first) return '—'
-  const allSame = group.entries.every(e => (e.phonetic?.jyutping?.join?.(' ') ?? '') === first)
+  const allSame = group.entries.every(e => formatJyutping(e) === first)
   return allSame ? first : '多種'
 }
 

@@ -32,8 +32,6 @@ export function useEntriesTableEdit(
     if (col.key === 'phonetic') {
       const arr = entry.phonetic?.jyutping
       if (Array.isArray(arr) && arr.length > 0) {
-        const hasSpaceInside = arr.some(s => (s || '').includes(' '))
-        if (!hasSpaceInside) return arr.join(' ')
         return arr[0] || '-'
       }
       return entry.phoneticNotation || (value as string) || '-'

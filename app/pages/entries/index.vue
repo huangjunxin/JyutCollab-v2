@@ -1990,15 +1990,10 @@ function getHeadwordExpandHint(entry: Entry): string {
 
 /** 粵拼列提示：有多個讀音時顯示「N 其他讀音」 */
 function getPhoneticHint(entry: Entry): string {
-  const arr = entry.phonetic?.jyutping
+  const arr = entry.phonetic?.jyutping?.map(s => (s || '').trim()).filter(Boolean)
   if (!Array.isArray(arr) || arr.length <= 1) return ''
 
-  // 舊數據：視為單一讀音的音節陣列，不顯示「其他讀音」
-  const hasSpaceInside = arr.some(s => (s || '').includes(' '))
-  if (!hasSpaceInside) return ''
-
   const othersCount = arr.length - 1
-  if (othersCount <= 0) return ''
   return `${othersCount} 其他讀音`
 }
 
