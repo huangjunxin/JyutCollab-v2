@@ -262,20 +262,60 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             originalContent: entry.meta?.register ?? ''
           }
 
-          const [definitionResponse, categorizeResponse, registerResponse] = await Promise.all([
-            $fetch<{ success: boolean; data?: { definition?: string; suggestionId?: string } }>('/api/ai/definitions', {
-              method: 'POST',
-              body: {
-                expression: headword,
-                region: 'hongkong',
-                clientEntryKey: entryId,
-                entryId: getRealEntryId(entry),
-                field: 'senses.0.definition',
-                originalContent: entry.senses?.[0]?.definition ?? ''
-              },
-              signal
-            }),
-            $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/categorize', {
+          const definitionRequest = $fetch<{ success: boolean; data?: { definition?: string; suggestionId?: string } }>('/api/ai/definitions', {
+            method: 'POST',
+            body: {
+              expression: headword,
+              region: 'hongkong',
+              clientEntryKey: entryId,
+              entryId: getRealEntryId(entry),
+              field: 'senses.0.definition',
+              originalContent: entry.senses?.[0]?.definition ?? ''
+            },
+            signal
+          }).catch(e => {
+            if (e?.name === 'AbortError') throw e
+            console.error('AI definition error:', e)
+            return null
+          })
+          const registerRequest = $fetch<{ success: boolean; data?: { register?: Register; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/register', {
+            method: 'POST',
+            body: registerBody,
+            signal
+          }).catch(e => {
+            if (e?.name === 'AbortError') throw e
+            console.error('AI register error:', e)
+            return null
+          })
+
+          let definitionResponse: { success: boolean; data?: { definition?: string; suggestionId?: string } } | null = null
+          let categorizeResponse: { success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } } | null = null
+          let registerResponse: { success: boolean; data?: { register?: Register; confidence?: number; explanation?: string; suggestionId?: string } } | null = null
+
+          if (firstDefinition) {
+            [definitionResponse, categorizeResponse, registerResponse] = await Promise.all([
+              definitionRequest,
+              $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/categorize', {
+                method: 'POST',
+                body: categorizeBody,
+                signal
+              }).catch(e => {
+                if (e?.name === 'AbortError') throw e
+                console.error('AI categorization error:', e)
+                return null
+              }),
+              registerRequest
+            ])
+          } else {
+            [definitionResponse, registerResponse] = await Promise.all([
+              definitionRequest,
+              registerRequest
+            ])
+            const generatedDefinition = definitionResponse?.data?.definition?.trim()
+            if (generatedDefinition) {
+              categorizeBody.context = generatedDefinition
+            }
+            categorizeResponse = await $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/categorize', {
               method: 'POST',
               body: categorizeBody,
               signal
@@ -283,17 +323,8 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
               if (e?.name === 'AbortError') throw e
               console.error('AI categorization error:', e)
               return null
-            }),
-            $fetch<{ success: boolean; data?: { register?: Register; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/register', {
-              method: 'POST',
-              body: registerBody,
-              signal
-            }).catch(e => {
-              if (e?.name === 'AbortError') throw e
-              console.error('AI register error:', e)
-              return null
             })
-          ])
+          }
 
           const currentEntry = currentPageEntries.value.find(e => getEntryIdString(e) === entryId)
           const currentHeadword = currentEntry?.headword?.display?.trim() || ''
