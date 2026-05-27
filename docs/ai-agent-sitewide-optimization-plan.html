@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JyutCollab 全站 AI Agent 優化計劃</title>
+  <style>
+    :root {
+      --ink: #142033;
+      --muted: #65758b;
+      --line: #d9e2ef;
+      --soft: #f7f9fc;
+      --accent: #ff2d3d;
+      --accent-soft: #fff1f2;
+      --blue: #2563eb;
+      --green: #16a34a;
+      --amber: #d97706;
+      --card: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f3f5f0;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Noto Sans HK", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+    }
+
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    h1 { font-size: 36px; letter-spacing: -0.03em; }
+    h2 { margin-top: 40px; font-size: 26px; }
+    h3 { margin-top: 24px; font-size: 19px; }
+    p { margin: 10px 0 0; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.25rem; }
+    li + li { margin-top: 6px; }
+    code { background: #eef2f7; padding: 2px 6px; border-radius: 4px; font-size: 0.92em; }
+
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #fff, #fff6f6 55%, #eef4ff);
+      padding: 32px;
+      box-shadow: 6px 6px 0 rgba(20, 32, 51, 0.08);
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .summary-grid,
+    .phase-grid,
+    .gap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--card);
+      padding: 18px;
+      box-shadow: 4px 4px 0 rgba(20, 32, 51, 0.06);
+    }
+
+    .card h3 { margin-top: 0; }
+    .muted { color: var(--muted); }
+    .badge {
+      display: inline-block;
+      margin-bottom: 8px;
+      border: 1px solid currentColor;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge.red { color: var(--accent); background: var(--accent-soft); }
+    .badge.blue { color: var(--blue); background: #eff6ff; }
+    .badge.green { color: var(--green); background: #f0fdf4; }
+    .badge.amber { color: var(--amber); background: #fffbeb; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th { background: #f8fafc; font-weight: 700; }
+
+    .callout {
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-left: 4px solid var(--accent);
+      background: #fff;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .step {
+      border: 1px dashed #9fb0c8;
+      background: #fff;
+      padding: 14px;
+      min-height: 94px;
+    }
+    .step strong { display: block; margin-bottom: 4px; }
+
+    .priority-high { color: var(--accent); font-weight: 700; }
+    .priority-mid { color: var(--amber); font-weight: 700; }
+    .priority-low { color: var(--blue); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="kicker">✦ JyutCollab AI Agent</div>
+      <h1>全站方便快捷可用的 AI Agent 優化計劃</h1>
+      <p class="muted">目標：把目前偏「詞條查詢助手」的 Agent 升級為能理解使用指南、調用歷史、協助複雜搜尋、引導編輯/審核流程、並可被審計的全站操作助手。</p>
+      <div class="summary-grid">
+        <div class="card">
+          <span class="badge green">已落地基礎</span>
+          <h3>全站側邊 Agent、對話歷史與審計落庫</h3>
+          <p>AI 助手已從浮動 Slideover 改為全站右側 Panel，由 Header 按鈕開關；後端已新增 conversation/message/audit event 儲存，支援歷史對話與工具調用審計資料。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已全部落地</span>
+          <h3>工具擴展與前端聯動</h3>
+          <p>docs、歷史、進階篩選、頁面動作、審計查詢、寫入工作流均已工具化。Agent 可靠調用明確工具，前端透過 action 佇列執行本地操作，所有高風險動作走確認策略。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>一、目前能力盤點</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>能力區域</th>
+            <th>目前實現</th>
+            <th>可用程度</th>
+            <th>限制</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>詞條搜尋</td>
+            <td><code>search_entries</code> 支援 query、headword、jyutping、dialectName、status、category、register。</td>
+            <td>中</td>
+            <td>只能回傳最多 20 條；無法直接使用前端進階公式/多條正則；分類、主題、語義意圖容易被模型誤填到 query。</td>
+          </tr>
+          <tr>
+            <td>詞條詳情</td>
+            <td><code>get_entry_detail</code> 按 id 或 ObjectId 讀取完整詞條。</td>
+            <td>中高</td>
+            <td>無法批量讀詳情；沒有根據當前表格選中行自動讀取。</td>
+          </tr>
+          <tr>
+            <td>重複檢查</td>
+            <td><code>check_duplicate</code> 可檢查同方言阻塞性重複。</td>
+            <td>中高</td>
+            <td>尚未連到草稿建立/提交的完整工作流。</td>
+          </tr>
+          <tr>
+            <td>方言列表</td>
+            <td><code>list_dialects</code> 返回方言代碼、標籤、顏色；已加入中文標籤正規化。</td>
+            <td>高</td>
+            <td>仍缺少「根據自然語言地名/別名猜方言」的提示與候選解釋。</td>
+          </tr>
+          <tr>
+            <td>使用指南</td>
+            <td>前端有 <code>content/docs/*.md</code> 與 docs 頁面。</td>
+            <td>低</td>
+            <td>Agent 工具完全不能讀 docs，因此無法回答使用方法、流程、快捷鍵、權限等問題。</td>
+          </tr>
+          <tr>
+            <td>編輯歷史</td>
+            <td>站內有 <code>/api/histories</code> 與 <code>/api/histories/[entryId]</code>。</td>
+            <td>低</td>
+            <td>Agent 未註冊歷史工具，不能幫用戶查某詞條誰改過、何時改、改了什麼、能否回退。</td>
+          </tr>
+          <tr>
+            <td>前端頁面動作</td>
+            <td>AI 助手已由全站 Header 按鈕控制，開啟後以右側固定 <code>AgentPanel</code> 常駐顯示；<code>navigate</code> 仍支援 home/docs/entries/review。</td>
+            <td>中</td>
+            <td>面板已全站可用，但 local action 仍不能幫用戶套用篩選、打開進階篩選、填入正則、定位詞條、切換視圖、打開歷史頁。</td>
+          </tr>
+          <tr>
+            <td>AI 審計與歷史</td>
+            <td>已新增 <code>AgentConversation</code>、<code>AgentMessage</code>、<code>AgentAuditEvent</code> 模型，以及 conversations、messages、archive、audit-events API；串流與確認回覆都會寫入 requestId、conversationId 與審計事件。</td>
+            <td>中高</td>
+            <td>後端資料與 API 已具備，但缺少使用者可見的審計檢視、按工具/風險/請求查詢、以及「為什麼 Agent 這樣做」的解釋視圖。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>二、核心問題診斷</h2>
+      <div class="gap-grid">
+        <div class="card">
+          <span class="badge green">已解決</span>
+          <h3>Agent 沒有站內知識庫</h3>
+          <p>使用指南存在於 <code>content/docs</code>，現已新增 <code>search_docs</code> 與 <code>read_doc</code> 工具。Agent 可靠回答使用方法、流程、快捷鍵、權限等問題。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已解決</span>
+          <h3>搜尋能力與前端能力脫節</h3>
+          <p>已新增 <code>plan_advanced_filter</code> 與 <code>apply_entry_filters</code>，Agent 可生成前端進階篩選公式/正則並直接套用到表格，語義搜尋 fallback 也已補齊。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已解決</span>
+          <h3>不能查歷史與審計</h3>
+          <p>已新增 <code>search_histories</code>、<code>get_entry_history</code>、<code>search_agent_audit</code> 工具，以及 AgentPanel 審計分頁。用戶可問「這個詞誰改過」「剛才 AI 做了什麼工具調用」。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已解決</span>
+          <h3>缺少當前頁上下文</h3>
+          <p>entries 頁透過 <code>provide('agentPageContext')</code> 傳遞篩選、視圖、選中行、可見數量；<code>useAgentChat</code> 透過 <code>inject</code> 取得並傳入後端。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已解決</span>
+          <h3>操作型工具不足</h3>
+          <p>本地 UI 工具已擴展為 5 個：導航、打開詞條、打開歷史、進階篩選面板、切換視圖。動作用佇列分派，套用篩選有可清除橫幅。寫入工作流已工具化為 safe 預覽模式。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已解決</span>
+          <h3>缺少失敗恢復策略</h3>
+          <p><code>search_entries</code> 無結果時自動偵測語義關鍵詞並建議 <code>plan_advanced_filter</code>。系統提示已增加主動調用進階篩選的規則。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>三、近期實作同步（2026-05-27）</h2>
+      <div class="phase-grid">
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>全站右側 Agent Panel</h3>
+          <p>原本的 <code>AgentSidebar</code> 浮動按鈕與 Slideover 已改為 <code>AgentPanel</code>。面板掛在 <code>app/layouts/default.vue</code>，由 <code>AppHeader</code> 的 sparkles 按鈕控制，開啟時與主內容並排，方便在 entries、review、docs 等頁面持續使用。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>對話列表與歷史消息</h3>
+          <p><code>useAgentChat</code> 已支援 <code>currentConversationId</code>、<code>refreshConversations</code>、<code>createConversation</code>、<code>loadConversation</code>、<code>archiveConversation</code>。前端可建立新對話、讀取歷史對話、封存目前對話。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>Agent 持久化模型與 API</h3>
+          <p>新增 <code>server/utils/AgentConversation.ts</code>、<code>AgentMessage.ts</code>、<code>AgentAuditEvent.ts</code> 與 <code>server/utils/agent/persistence.ts</code>，並提供 conversations、messages、archive、audit-events API。無效 conversation id 已先驗證，避免 Mongo CastError 變成 500。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>串流與確認流程審計</h3>
+          <p><code>chat.stream.post.ts</code> 與 <code>chat.post.ts</code> 已把 user message、assistant message、tool start/result、blocked action、confirmation requested/accepted/rejected/expired、model error 寫入審計事件，並在 SSE payload 中帶回 <code>conversationId</code> 與 <code>requestId</code>。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>站內知識與歷史工具</h3>
+          <p>已新增 <code>docsTools.ts</code>（<code>search_docs</code>、<code>read_doc</code>）、<code>historyTools.ts</code>（<code>search_histories</code>、<code>get_entry_history</code>），掃描 <code>content/docs/*.md</code> 建立輕量索引，支援標題/關鍵詞/heading 權重搜尋。編輯歷史沿用 contributor/reviewer/admin 可見規則。Agent 已可回答「如何回退歷史」「審核流程怎麼走」「某詞最近誰改過」等問題。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>頁面上下文與篩選操作</h3>
+          <p>已新增 <code>pageContextTools.ts</code>（<code>get_page_context</code>）、<code>filterTools.ts</code>（<code>plan_advanced_filter</code>、<code>apply_entry_filters</code>）。entries 頁透過 <code>provide('agentPageContext')</code> 提供當前篩選、視圖、選中詞條與可見數量；<code>useAgentChat</code> 透過 <code>inject</code> 取得並傳入後端。<code>plan_advanced_filter</code> 支援語義模式（動物、食物、身體等）、粵拼模式、狀態、釋義長度、語域等條件轉換。<code>apply_entry_filters</code> 回傳 localAction，由 entries 頁 watcher 套用到表格，並顯示可清除的篩選提示橫幅。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>本地 UI 動作分派與導航</h3>
+          <p><code>localUi.ts</code> 已擴展為 5 個工具：<code>navigate</code>、<code>open_entry</code>、<code>open_history</code>、<code>toggle_advanced_filter</code>、<code>switch_view</code>。<code>useAgentChat</code> 在收到 <code>TOOL_CALL_RESULT</code> 時自動將 <code>localAction</code> 入佇列；<code>navigate</code> 動作由 <code>router.push()</code> 直接處理，其餘動作由 entries 頁的 <code>useAgentActions</code> watcher 處理。套用篩選時顯示可清除的提示橫幅，用戶可一鍵回到之前狀態。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>審計與信任視圖</h3>
+          <p>已新增 <code>auditTools.ts</code>（<code>search_agent_audit</code>）、<code>useAgentAudit.ts</code> composable 與 <code>AuditTimeline.vue</code> 元件。AgentPanel 新增「審計」分頁，以時間軸形式顯示工具調用、確認操作、被阻止操作等事件，包含事件圖標、風險徽章、工具名稱與時間戳。審計範圍可按當前對話篩選。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>寫入工作流工具</h3>
+          <p>已新增 <code>writeWorkflowTools.ts</code>（<code>prepare_entry_draft</code>、<code>submit_or_review_entry</code>）。<code>prepare_entry_draft</code> 驗證方言權限、檢查同方言重複，生成草稿預覽。<code>submit_or_review_entry</code> 預覽送審/通過/拒絕操作的結果，檢查狀態前置條件與審核權限。兩者均為 safe 風險，不直接執行寫入，需用戶確認後走正式流程。</p>
+        </div>
+        <div class="card">
+          <span class="badge green">已完成</span>
+          <h3>搜尋 Fallback 與 Prompt 優化</h3>
+          <p><code>search_entries</code> 在無結果時自動偵測語義關鍵詞（動物、植物、食物、身體、顏色、天氣、情緒），建議使用 <code>plan_advanced_filter</code>。系統提示已增加導航工具路由、複雜條件路由、指南回答格式化等規則，減少模型誤填 query 或只重複工具摘要的情況。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>四、建議新增工具集</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>工具</th>
+            <th>用途</th>
+            <th>風險等級</th>
+            <th>第一版輸入/輸出</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>jyutcollab.search_docs</code></td>
+            <td>搜尋使用指南、FAQ、快捷鍵、流程說明。</td>
+            <td>safe</td>
+            <td>輸入 query；輸出 docs slug、title、excerpt、score。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.read_doc</code></td>
+            <td>讀取指定指南全文，用於回答具體使用方法。</td>
+            <td>safe</td>
+            <td>輸入 slug；輸出 title、sections、markdown 摘要。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.search_histories</code></td>
+            <td>按 entryId、詞頭、action、userId 查編輯歷史。</td>
+            <td>safe</td>
+            <td>輸入 entryQuery/action/userScope/page/perPage；輸出變更摘要與可跳轉歷史頁。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.get_entry_history</code></td>
+            <td>查單個詞條的歷史，回答「誰改過、改了什麼」。</td>
+            <td>safe</td>
+            <td>輸入 entryId 或 headword + dialect；輸出最近 N 次變更摘要。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.plan_advanced_filter</code></td>
+            <td>把自然語言轉成前端進階篩選公式/正則條件。</td>
+            <td>safe</td>
+            <td>輸入 userGoal；輸出 formula、regexRows、humanExplanation、warnings。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.apply_entry_filters</code></td>
+            <td>在本地 UI 套用搜尋、方言、狀態、視圖、進階篩選。</td>
+            <td>local_ui</td>
+            <td>輸出 localAction，由前端更新 entries 頁狀態，不修改伺服器資料。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.get_page_context</code></td>
+            <td>讓 Agent 知道當前頁、篩選、選中行、可見列表摘要。</td>
+            <td>safe/local_ui</td>
+            <td>前端 provide context snapshot；後端只讀取摘要，不接收敏感 token。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.search_agent_audit</code></td>
+            <td>讓用戶查自己的 AI 對話審計：工具調用、確認、阻止原因。</td>
+            <td>safe</td>
+            <td>輸入 conversationId/requestId/eventType；輸出 redacted audit events。<br><span class="badge green">✅ 已實作</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.prepare_entry_draft</code></td>
+            <td>根據用戶描述生成草稿，不直接提交。</td>
+            <td>draft_write</td>
+            <td>輸出草稿 diff 和確認請求；必須顯示目標與 echo。<br><span class="badge green">✅ 已實作（safe 預覽模式）</span></td>
+          </tr>
+          <tr>
+            <td><code>jyutcollab.submit_or_review_entry</code></td>
+            <td>送審、批准、拒絕等不可逆/半不可逆動作。</td>
+            <td>editorial/admin</td>
+            <td>沿用確認策略，必須 actor 綁定、target echo、審計落庫。<br><span class="badge green">✅ 已實作（safe 預覽模式）</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>五、複雜搜尋與正則協助設計</h2>
+      <p>目前前端已經有進階公式與 regex rows；最佳做法不是讓後端重寫一套不一致的搜尋語法，而是讓 Agent 生成同一份前端可套用的篩選狀態。</p>
+      <div class="flow">
+        <div class="step"><strong>1. 理解意圖</strong>例如「找廣州話裡釋義提到動物、粵拼以 ng 開頭、狀態待審核」。</div>
+        <div class="step"><strong>2. 轉換條件</strong>普通條件進入 query/dialect/status；複雜條件進入 formula + regexRows。</div>
+        <div class="step"><strong>3. 先預覽</strong>Agent 說明將套用哪些條件，並可顯示匹配數。</div>
+        <div class="step"><strong>4. 本地套用</strong><code>apply_entry_filters</code> 更新表格狀態，保持用戶可撤銷。</div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>自然語言</th><th>建議生成</th><th>說明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>找與動物有關的詞</td>
+            <td><code>regexRows: [{ field: "theme", pattern: "動物|獸|禽|魚|蟲", flags: "i" }, { field: "definition", pattern: "動物|獸|禽|魚|蟲", flags: "i" }]</code></td>
+            <td>不應只用 query=動物，因為相關詞可能在分類或釋義中以更細詞出現。</td>
+          </tr>
+          <tr>
+            <td>找粵拼以 ang 結尾的詞</td>
+            <td><code>regexRows: [{ field: "phonetic", pattern: "ang[1-6]?\\b", flags: "i" }]</code></td>
+            <td>前端正則比簡單 jyutping contains 更適合。</td>
+          </tr>
+          <tr>
+            <td>找已發佈但釋義少於 5 個字的詞</td>
+            <td><code>formula: "status == '已發佈' && len(definition) &lt; 5"</code></td>
+            <td>需要公式能力，不應只查 Mongo query。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>六、使用指南 Q&amp;A 設計</h2>
+      <p>用戶最常問的不是詞條資料，而是「我現在應該怎麼操作」。因此 docs 工具應成為 Agent 的第一優先能力之一。</p>
+      <div class="phase-grid">
+        <div class="card">
+          <h3>Docs 索引</h3>
+          <p>啟動時或 build 時掃描 <code>content/docs/*.md</code>，提取 title、headings、正文純文本、slug。</p>
+        </div>
+        <div class="card">
+          <h3>輕量搜尋</h3>
+          <p>第一版可用關鍵詞/標題/heading 權重，不必立即上向量庫。後續再加 embedding。</p>
+        </div>
+        <div class="card">
+          <h3>引用來源</h3>
+          <p>回答「如何操作」時附上「可前往 使用指南 → xxx」和 local navigation action。</p>
+        </div>
+        <div class="card">
+          <h3>上下文路由</h3>
+          <p>如果用戶在 entries 頁問「怎麼篩選」，優先搜 entries-table、views-filters-and-labels、keyboard-shortcuts。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>七、分階段落地路線</h2>
+      <table>
+        <thead>
+          <tr><th>階段</th><th>目標</th><th>交付物</th><th>驗收標準</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="priority-high">P0</span> 對話持久化與全站入口</td>
+            <td>讓 Agent 成為可持續使用的全站助手，而不是單次浮動查詢框。</td>
+            <td><code>AgentPanel</code>、Header toggle、conversation/message/audit models、conversations API、SSE conversationId/requestId。</td>
+            <td><strong>已完成：</strong>可建立、讀取、封存對話；串流與確認流程可落庫並追蹤 requestId。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-high">P0</span> 知識與歷史補齊</td>
+            <td>讓 Agent 能回答使用指南與編輯歷史問題。</td>
+            <td><code>docsTools.ts</code>、<code>historyTools.ts</code>、registry 註冊、測試。</td>
+            <td><strong>已完成：</strong>能回答「如何回退歷史」「審核流程怎麼走」「某詞最近誰改過」。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-high">P0</span> 搜尋意圖修正</td>
+            <td>提升分類、方言、語義搜尋準確率。</td>
+            <td>搜尋 prompt、分類/主題候選、無結果 fallback、工具測試。</td>
+            <td><strong>已完成：</strong>「廣州話動物相關詞」不再只用 <code>query: 雞</code>，而是偵測語義關鍵詞後建議 <code>plan_advanced_filter</code>。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-mid">P1</span> 進階篩選編譯器</td>
+            <td>把自然語言轉成公式/正則 rows。</td>
+            <td><code>plan_advanced_filter</code>、前端 localAction handler。</td>
+            <td><strong>已完成：</strong>用戶一句話即可打開並套用進階篩選，表格結果同步更新。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-mid">P1</span> 頁面上下文</td>
+            <td>讓 Agent 知道當前頁面和可見資料。</td>
+            <td><code>useAgentPageContext</code>、route-specific context adapters。</td>
+            <td><strong>已完成：</strong>entries 頁 provide/inject 傳遞篩選、視圖、選中詞條、可見數量。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-mid">P1</span> 本地 UI 動作擴展</td>
+            <td>可導航、套用篩選、切換視圖、定位詞條。</td>
+            <td><code>apply_entry_filters</code>、<code>open_entry</code>、<code>open_history</code> action。</td>
+            <td><strong>已完成：</strong>5 個 local_ui 工具已就緒，動作用佇列分派，套用篩選有可清除橫幅。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-low">P2</span> 審計與信任視圖</td>
+            <td>讓用戶查看 AI 做了什麼、為什麼。</td>
+            <td>AI audit 頁面/對話內審計面板、<code>search_agent_audit</code>。</td>
+            <td><strong>已完成：</strong>AgentPanel 審計分頁、AuditTimeline 元件、useAgentAudit composable。</td>
+          </tr>
+          <tr>
+            <td><span class="priority-low">P2</span> 寫入工作流</td>
+            <td>從查詢助手升級到受控協作助手。</td>
+            <td>草稿準備、送審、審核工具；延續 target echo confirmation。</td>
+            <td><strong>已完成：</strong><code>prepare_entry_draft</code> 與 <code>submit_or_review_entry</code> 工具，含權限驗證、重複檢查、狀態前置條件。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>八、實施注意事項</h2>
+      <div class="callout">
+        <strong>不要把所有能力塞進 Prompt。</strong>
+        <p>Prompt 只能改善模型選工具的傾向，不能保證資料可讀、權限正確、結果可審計。全站 Agent 的核心應是「明確工具 + 明確風險 + 前端 action handler + 審計」。</p>
+      </div>
+      <ul>
+        <li><strong>已完成基礎：</strong>全站右側 Agent Panel、對話持久化、歷史對話列表、封存、SSE conversationId/requestId、工具/確認/錯誤審計落庫。</li>
+        <li><strong>已完成功能擴展：</strong>docs 歷史工具、進階篩選編譯器、頁面上下文 provide/inject、本地 UI 動作（5 個工具）、審計時間軸面板、寫入工作流工具（草稿/送審/審核）、語義搜尋 fallback、系統提示優化。</li>
+        <li><strong>安全邊界：</strong>Docs、歷史、搜尋、審計查詢屬於 safe；本地 UI 操作屬於 local_ui；草稿/送審/審核維持 draft_write/editorial/admin 並要求確認。</li>
+        <li><strong>權限一致：</strong>歷史工具沿用 <code>/api/histories</code> 的 contributor/reviewer/admin 可見規則；寫入工具驗證方言權限與審核角色。</li>
+        <li><strong>資料最小化：</strong>page context 只傳目前頁、篩選、選中 id、可見行摘要，不傳 token/cookie/raw response。</li>
+        <li><strong>可觀測性：</strong>每次工具規劃、fallback、local action 和確認都寫入 <code>agent_audit_events</code>，審計面板可查閱。</li>
+        <li><strong>UI 可撤銷：</strong>套用篩選時顯示可清除的提示橫幅，一鍵清除所有篩選回到之前狀態。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>九、建議優先實作清單</h2>
+      <ol>
+        <li><del>新增 docs search/read 工具，讓 Agent 能回答使用指南、快捷鍵、流程和 FAQ。</del> ✅ 已完成。</li>
+        <li><del>新增 histories 查詢工具，支援按詞頭/entryId/action/userScope 查編輯歷史。</del> ✅ 已完成。</li>
+        <li><del>新增 advanced filter planner，復用前端欄位定義和正則/公式語義。</del> ✅ 已完成。</li>
+        <li><del>新增 local UI actions：套用 entries filters、打開進階篩選、切換視圖、打開歷史頁。</del> ✅ 已完成。</li>
+        <li><del>新增 page context snapshot，讓 Agent 理解當前頁面與用戶正在看的資料。</del> ✅ 已完成。</li>
+        <li><del>補充無結果 fallback 策略與工具測試，尤其是分類/主題/方言/動植物等語義查詢。</del> ✅ 已完成。</li>
+        <li><del>把 AI audit 做成可見入口，讓用戶能查看自己的 AI 使用歷史與工具調用。</del> ✅ 已完成。</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>
