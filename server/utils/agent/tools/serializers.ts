@@ -18,7 +18,8 @@ export function compactEntrySummary(entry: any) {
     status: String(entry?.status ?? ''),
     entryType: entry?.entryType,
     definitionPreview: entry?.senses?.[0]?.definition ?? entry?.definition,
-    jyutping: entry?.phonetic?.jyutping
+    jyutping: entry?.phonetic?.jyutping,
+    category: entry?.meta?.category
   }
 }
 
