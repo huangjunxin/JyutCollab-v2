@@ -69,23 +69,26 @@
     />
 
     <!-- Agent filter applied banner -->
-    <UAlert
+    <div
       v-if="agentFilterLabel"
-      color="primary"
-      variant="soft"
-      icon="i-lucide-sparkles"
-      :title="`AI 助手已套用篩選`"
-      :description="agentFilterLabel"
-      :close-button="{ icon: 'i-heroicons-x-mark-20-solid', color: 'primary', variant: 'link' }"
-      class="mb-4"
-      @close="clearAgentFilter"
+      class="mb-4 flex flex-wrap items-center justify-between gap-3 border border-[var(--jc-border)] bg-white p-3 shadow-[var(--jc-shadow-hard)] dark:bg-slate-800"
     >
-      <template #footer>
+      <div class="flex min-w-0 items-center gap-3">
+        <UIcon name="i-lucide-sparkles" class="h-5 w-5 shrink-0 text-[var(--jc-accent)]" />
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-gray-900 dark:text-white">AI 助手已更新表格篩選</p>
+          <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ agentFilterLabel }}</p>
+        </div>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <UButton size="xs" variant="ghost" color="neutral" @click="dismissAgentFilterNotice">
+          關閉提示
+        </UButton>
         <UButton size="xs" variant="outline" color="primary" @click="clearAgentFilter">
           清除篩選
         </UButton>
-      </template>
-    </UAlert>
+      </div>
+    </div>
 
     <!-- Search and filters -->
     <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
@@ -2948,6 +2951,10 @@ watch(agentActions, async (queue) => {
       break
   }
 }, { deep: true })
+
+function dismissAgentFilterNotice() {
+  agentFilterLabel.value = null
+}
 
 function clearAgentFilter() {
   agentFilterLabel.value = null

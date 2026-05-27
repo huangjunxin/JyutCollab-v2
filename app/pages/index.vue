@@ -371,7 +371,7 @@
               <UIcon name="i-heroicons-sparkles" class="w-5 h-5 text-violet-500" />
               <span class="font-semibold text-gray-900 dark:text-white">填寫輔助成效</span>
             </div>
-            <UButtonGroup size="xs">
+            <div class="inline-flex rounded-md border border-[var(--jc-border)] bg-white p-0.5 dark:bg-slate-900">
               <UButton
                 :color="assistanceStatsTab === 'ai' ? 'primary' : 'neutral'"
                 :variant="assistanceStatsTab === 'ai' ? 'solid' : 'ghost'"
@@ -388,7 +388,7 @@
               >
                 參考資料
               </UButton>
-            </UButtonGroup>
+            </div>
           </div>
         </template>
         <div v-if="assistanceStatsTab === 'ai' && (aiSuggestionStatsLoading || !aiSuggestionStats)" class="space-y-3">
