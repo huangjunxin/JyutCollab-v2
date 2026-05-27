@@ -4,5 +4,6 @@
     <main class="p-6">
       <slot />
     </main>
+    <AgentSidebar />
   </div>
 </template>

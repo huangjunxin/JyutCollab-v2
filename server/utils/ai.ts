@@ -4,7 +4,7 @@ import { convertToHongKongTraditional } from './textConversion'
 import type { Register } from './types'
 
 // Configure OpenRouter client
-const getOpenAIClient = () => {
+export const getOpenAIClient = () => {
   const config = useRuntimeConfig()
   const apiKey = config.openrouterApiKey
 
@@ -26,7 +26,7 @@ const getOpenAIClient = () => {
 // Unified model
 const DEFAULT_MODEL = 'deepseek-v4-flash'
 
-const getLLMModel = () => {
+export const getLLMModel = () => {
   const config = useRuntimeConfig()
   return config.openrouterModel || DEFAULT_MODEL
 }
