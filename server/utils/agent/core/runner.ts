@@ -109,11 +109,13 @@ function buildSystemPrompt() {
 
 核心規則：
 - 你應根據用戶自然語言意圖自主選擇合適工具，不要要求用戶使用固定命令格式。
-- 用戶說「找」「查」「搵」「有哪些」「粵拼為」「讀音是」等查詢需求時，應優先調用搜尋或詳情工具。
-- 如果用戶指定粵拼，例如「找一下粵拼為 ang1 的詞」，請調用 jyutcollab.search_entries 並填入 jyutping: "ang1"。
-- 如果用戶指定詞頭，請填入 headword；如果只是泛查，才使用 query。
-- 如果用戶說「分類」「類別」「主題」等，例如「分類 生活」、「有哪些生活類的詞」，請調用 jyutcollab.search_entries 並填入 category: "生活"，不要把「分類」放進 query。
-- 語義搜尋（如「動物相關」「食物類」「身體部位」）或複雜條件（如「粵拼以 ng 開頭」「釋義少於 5 個字」）應使用 jyutcollab.plan_advanced_filter 生成進階篩選條件，再用 jyutcollab.apply_entry_filters 套用到詞條表格，讓用戶在表格中直接看到結果。
+- 方言點資料是系統內建固定資料；工具會直接按 shared/dialects.ts 的方言 ID 與顯示名匹配。用戶指定「梧州」「廣州」等方言點時，直接把該名稱填入 dialect/dialectName，不要先說要查詢支援列表，也不要為了確認代碼而調用 jyutcollab.list_dialects。
+- 如果當前 route 是 /entries，且用戶要求搜尋、篩選、搜尋加篩選或查某方言詞語，優先使用 jyutcollab.apply_entry_filters 直接套用到左側詞條表格。完成後可在右側 AI 欄說明採用了哪些搜尋/篩選條件，但不要列出實際詞條結果清單或結果摘要。
+- 用戶說「找」「查」「搵」「有哪些」「粵拼為」「讀音是」等查詢需求時，應優先調用搜尋或詳情工具；但在 /entries 頁面的列表型搜尋應優先套用詞條表格篩選。
+- 如果用戶指定粵拼，例如「找一下粵拼為 ang1 的詞」，請在 /entries 頁面調用 jyutcollab.apply_entry_filters 並填入 query: "ang1"；其他頁面可調用 jyutcollab.search_entries 並填入 jyutping: "ang1"。
+- 如果用戶指定詞頭，/entries 頁面用 jyutcollab.apply_entry_filters 的 query；其他頁面填入 search_entries 的 headword；如果只是泛查，才使用 query。
+- 如果用戶說「分類」「類別」「主題」等，例如「分類 生活」、「有哪些生活類的詞」，在 /entries 頁面優先用 jyutcollab.apply_entry_filters 或進階篩選套用到表格；其他頁面可調用 jyutcollab.search_entries 並填入 category: "生活"，不要把「分類」放進 query。
+- 語義搜尋（如「動物相關」「食物類」「身體部位」）或複雜條件（如「粵拼以 ng 開頭」「釋義少於 5 個字」）應使用 jyutcollab.plan_advanced_filter 生成進階篩選條件，再用 jyutcollab.apply_entry_filters 套用到詞條表格，讓用戶在表格中直接看到結果。類別型語義搜尋應依據系統分類表生成相關分類條件，不要自行臆測一串自由關鍵詞。
 - 用戶要求導航到某個頁面時（如「去歷史頁」「打開審核」），使用 jyutcollab.navigate。
 - 用戶問「怎麼用」「如何操作」「快捷鍵」「權限」「流程」等使用指南問題時，先用 jyutcollab.search_docs 搜尋相關指南，再用 jyutcollab.read_doc 讀取完整內容回答。回答時整理成可操作步驟，不要只重複工具摘要。
 - 用戶問「誰改過」「什麼時候改的」「改了什麼」「歷史記錄」等編輯歷史問題時，使用 jyutcollab.get_entry_history 或 jyutcollab.search_histories 查詢。
@@ -125,7 +127,7 @@ function buildSystemPrompt() {
 - 工具返回無結果時，根據結果向用戶簡潔解釋並建議下一步，不要說「不支援」除非真的沒有相關能力。利用 warnings 中的建議幫助用戶調整搜尋。如果建議使用 plan_advanced_filter，應主動調用該工具。
 - 工具返回 entries、dialects、sameDialect 或 otherDialects 等結構化資料時，不要在正文重複列出詞條表格或逐條清單；正文只總結數量、相關性和下一步，具體資料由介面卡片展示。
 - 如需引用結果，只提 1–2 個代表例子，不要重建完整 Markdown 表格。
-- 回答使用繁體中文，語氣像正式上線產品。不要提 MVP、demo、測試版或內部實作。`
+- 回答使用香港繁體中文，語氣像正式上線產品。不要提 MVP、demo、測試版或內部實作。`
 }
 
 function summarizeToolResult(name: string, result: AgentToolResult) {
@@ -136,7 +138,9 @@ function summarizeToolResult(name: string, result: AgentToolResult) {
     data: result.data,
     warnings: result.warnings,
     nextAction: result.nextAction,
-    presentationInstruction: '如果 data 內有 entries、dialects、sameDialect 或 otherDialects，正文不要重複列出完整表格或清單；只做摘要和下一步建議，讓前端結構化卡片展示具體資料。'
+    presentationInstruction: name === 'jyutcollab.apply_entry_filters'
+      ? '這是詞條表格本地篩選動作。正文可以說明已套用的搜尋或篩選條件，並提醒用戶在左側詞條表格查看；不要列出、推測或摘要具體詞條結果。'
+      : '如果 data 內有 entries、dialects、sameDialect 或 otherDialects，正文不要重複列出完整表格或清單；只做摘要和下一步建議，讓前端結構化卡片展示具體資料。'
   })
 }
 
@@ -155,7 +159,7 @@ async function completeFinalAnswer(input: RunAgentInput, messages: AgentChatMess
       {
         role: 'user',
         content: JSON.stringify({
-          instruction: '請根據上面的對話和工具結果，直接回答用戶最新問題。不要只重複工具摘要；如果剛才讀取了指南，請整理成可操作步驟。',
+          instruction: '請根據上面的對話和工具結果，直接回答用戶最新問題。不要只重複工具摘要；如果剛才讀取了指南，請整理成可操作步驟。如果剛才套用了詞條表格篩選，可以說明篩選條件並提醒用戶在左側詞條表格查看，但不要列出或摘要具體詞條結果。',
           originalMessage: input.message
         })
       }
@@ -191,6 +195,7 @@ export async function runAgent(input: RunAgentInput): Promise<AgentRunnerRespons
       content: JSON.stringify({
         message: input.message,
         route: input.route,
+        pageContext: input.pageContext,
         actor: input.actor ? { id: input.actor.id, role: input.actor.role, username: input.actor.username } : undefined
       })
     }

@@ -159,10 +159,15 @@ watch(messages, scheduleScrollToBottom, { deep: true, flush: 'post' })
 watch(open, async (isOpen) => {
   if (isOpen) {
     await refreshConversations()
+    const shouldRestoreMessages = messages.value.length === 1 && messages.value[0]?.id === 'agent-welcome'
+    const conversationIdToLoad = currentConversationId.value || conversations.value[0]?.id
+    if (shouldRestoreMessages && conversationIdToLoad) {
+      await loadConversation(conversationIdToLoad)
+    }
     await nextTick()
     scheduleScrollToBottom()
   }
-})
+}, { immediate: true })
 
 watch(currentConversationId, (id) => {
   selectedConversationId.value = id

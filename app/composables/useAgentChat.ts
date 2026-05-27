@@ -7,6 +7,8 @@ const WELCOME_MESSAGE: AgentChatMessage = {
   createdAt: new Date().toISOString()
 }
 
+const CURRENT_CONVERSATION_STORAGE_KEY = 'jyutcollab-agent-current-conversation-id'
+
 export function useAgentChat() {
   const route = useRoute()
   const router = useRouter()
@@ -14,7 +16,10 @@ export function useAgentChat() {
   const injectedPageContext = inject<AgentPageContext | null>('agentPageContext', null)
   const open = useState('agent-sidebar-open', () => false)
   const conversations = useState<AgentConversationSummary[]>('agent-chat-conversations', () => [])
-  const currentConversationId = useState<string | null>('agent-chat-current-conversation-id', () => null)
+  const currentConversationId = useState<string | null>('agent-chat-current-conversation-id', () => {
+    if (!import.meta.client) return null
+    return localStorage.getItem(CURRENT_CONVERSATION_STORAGE_KEY)
+  })
   const messages = useState<AgentChatMessage[]>('agent-chat-messages', () => [{ ...WELCOME_MESSAGE, createdAt: new Date().toISOString() }])
   const pending = useState('agent-chat-pending', () => false)
   const loadingHistory = useState('agent-chat-loading-history', () => false)
@@ -55,6 +60,12 @@ export function useAgentChat() {
   if (import.meta.client && pending.value) {
     resetStalePendingMessages()
   }
+
+  watch(currentConversationId, (id) => {
+    if (!import.meta.client) return
+    if (id) localStorage.setItem(CURRENT_CONVERSATION_STORAGE_KEY, id)
+    else localStorage.removeItem(CURRENT_CONVERSATION_STORAGE_KEY)
+  })
 
   function refreshMessages() {
     messages.value = [...messages.value]

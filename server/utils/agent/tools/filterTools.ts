@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { THEME_ID_MAP } from '../../themeMapping'
+import { normalizeDialectName } from './readOnlyJyutCollab'
 import type { AgentToolDefinition } from '../core/contracts'
 
 const PlanAdvancedFilterInput = z.object({
@@ -22,6 +24,59 @@ const FILTERABLE_FIELDS: Record<string, string> = {
   entryType: '詞條類型（word/character/phrase/idiom/proverb）',
   examples: '例句（senses.examples.text）',
   theme: '主題標籤'
+}
+
+const THEME_QUERY_GROUPS: Array<{ keywords: string[], categoryPrefixes: string[] }> = [
+  { keywords: ['身體部位', '人體部位', '身體', '人體', '器官'], categoryPrefixes: ['二B'] },
+  { keywords: ['身體狀況', '健康', '疾病', '病痛', '症狀'], categoryPrefixes: ['二C9', '二C10', '二C11', '二C12', '二C13', '二C14', '二C15'] },
+  { keywords: ['動物'], categoryPrefixes: ['二D'] },
+  { keywords: ['植物'], categoryPrefixes: ['二E'] },
+  { keywords: ['食物', '飲食', '菜式'], categoryPrefixes: ['三B', '七B2', '七B3'] },
+  { keywords: ['顏色'], categoryPrefixes: ['九A11', '九A12'] },
+  { keywords: ['天氣', '氣象', '氣候'], categoryPrefixes: ['二A3'] },
+  { keywords: ['情緒', '感情', '心情'], categoryPrefixes: ['五A'] }
+]
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeSearchText(value: string) {
+  return value.toLowerCase().replace(/[\s，、,。；;：「」『』（）()【】\[\]《》〈〉的和與跟及有關相关相關類詞語詞条詞條找查搜尋顯示列出所有]/g, '')
+}
+
+function getThemeDisplayName(category: string) {
+  return category.replace(/^[一二三四五六七八九十]+[A-Z]\d+/, '')
+}
+
+function findThemeCategories(goal: string) {
+  const normalizedGoal = normalizeSearchText(goal)
+  if (!normalizedGoal) return []
+
+  const groupedCategories = THEME_QUERY_GROUPS
+    .filter(group => group.keywords.some(keyword => normalizedGoal.includes(normalizeSearchText(keyword))))
+    .flatMap(group => Object.keys(THEME_ID_MAP).filter(category => group.categoryPrefixes.some(prefix => category.startsWith(prefix))))
+
+  if (groupedCategories.length > 0) {
+    return groupedCategories
+      .map(category => ({ category, displayName: getThemeDisplayName(category), score: 100 }))
+  }
+
+  const scored = Object.keys(THEME_ID_MAP)
+    .map(category => {
+      const displayName = getThemeDisplayName(category)
+      const normalizedCategory = normalizeSearchText(displayName)
+      const score = normalizedCategory.includes(normalizedGoal)
+        ? normalizedGoal.length * 4
+        : normalizedGoal.includes(normalizedCategory)
+          ? normalizedCategory.length * 3
+          : [...normalizedGoal].filter(char => normalizedCategory.includes(char)).length
+      return { category, displayName, score }
+    })
+    .filter(item => item.score >= Math.min(2, normalizedGoal.length))
+    .sort((a, b) => b.score - a.score || a.category.localeCompare(b.category, 'zh-Hant'))
+
+  return scored.slice(0, 8)
 }
 
 function buildFilterFromGoal(goal: string): {
@@ -55,22 +110,11 @@ function buildFilterFromGoal(goal: string): {
     }
   }
 
-  // Detect semantic/theme patterns
-  const semanticPatterns: Array<{ keywords: string[], pattern: string, label: string }> = [
-    { keywords: ['動物', '獸', '禽', '畜'], pattern: '動物|獸|禽|畜|鳥|貓|狗|豬|牛|羊|雞|鴨|魚|蟲', label: '動物' },
-    { keywords: ['植物', '花', '草', '樹', '菜'], pattern: '植物|花|草|樹|菜|果|竹|葉|根', label: '植物' },
-    { keywords: ['食物', '食', '飲', '吃', '菜式'], pattern: '食物|食|飲|吃|菜|飯|粥|粉|麵|茶|糖|餅', label: '食物' },
-    { keywords: ['身體', '人體', '器官'], pattern: '身體|人體|頭|眼|耳|口|手|腳|心|胃|骨', label: '身體' },
-    { keywords: ['顏色', '色'], pattern: '顏色|色|紅|藍|綠|黃|白|黑|紫|橙', label: '顏色' },
-    { keywords: ['天氣', '氣象', '季節'], pattern: '天氣|氣象|雨|風|雷|雪|晴|陰|冷|熱', label: '天氣' },
-    { keywords: ['情緒', '感情', '心情'], pattern: '情緒|感情|心情|開心|傷心|嬲|驚|怕|怒', label: '情緒' }
-  ]
-  for (const sp of semanticPatterns) {
-    if (sp.keywords.some(kw => g.includes(kw))) {
-      regexRows.push({ field: 'definition', pattern: sp.pattern, flags: 'i' })
-      regexRows.push({ field: 'theme', pattern: sp.pattern, flags: 'i' })
-      explanations.push(`釋義或主題涉及「${sp.label}」相關詞`)
-    }
+  const matchedThemes = findThemeCategories(goal)
+  if (matchedThemes.length > 0) {
+    const pattern = matchedThemes.map(theme => escapeRegex(theme.displayName)).join('|')
+    regexRows.push({ field: 'theme', pattern, flags: 'i' })
+    explanations.push(`分類匹配「${matchedThemes.map(theme => theme.displayName).join('」「')}」`)
   }
 
   // Detect status (take first match to avoid contradictions like approved && rejected)
@@ -181,8 +225,9 @@ export const applyEntryFiltersTool: AgentToolDefinition<z.infer<typeof ApplyEntr
   inputSchema: ApplyEntryFiltersInput,
   async execute(input) {
     const applied: string[] = []
+    const dialect = normalizeDialectName(input.dialect)
     if (input.query) applied.push(`搜尋「${input.query}」`)
-    if (input.dialect) applied.push(`方言：${input.dialect}`)
+    if (dialect) applied.push(`方言：${dialect}`)
     if (input.status) applied.push(`狀態：${input.status}`)
     if (input.view) applied.push(`視圖：${input.view}`)
     if (input.formula) applied.push(`公式：${input.formula}`)
@@ -196,7 +241,7 @@ export const applyEntryFiltersTool: AgentToolDefinition<z.infer<typeof ApplyEntr
           label: applied.length > 0 ? `套用篩選：${applied.join('、')}` : '清除所有篩選',
           filters: {
             query: input.query,
-            dialect: input.dialect,
+            dialect,
             status: input.status,
             view: input.view,
             formula: input.formula,
