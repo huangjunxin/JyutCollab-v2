@@ -209,6 +209,20 @@
               </div>
             </div>
           </template>
+          <!-- AI agent toggle -->
+          <template v-if="isAuthenticated">
+            <UButton
+              variant="ghost"
+              size="sm"
+              square
+              :class="agentOpen ? 'ring-2 ring-primary/40' : ''"
+              aria-label="JyutCollab AI 助手"
+              @click="toggleAgent"
+            >
+              <UIcon name="i-lucide-sparkles" class="w-5 h-5 text-primary" />
+            </UButton>
+          </template>
+
           <template v-else>
             <UButton
               to="/login"
@@ -232,11 +246,17 @@
 
 <script setup lang="ts">
 import { useAuth } from '../../composables/useAuth'
+import { useAgentChat } from '../../composables/useAgentChat'
 import type { Notification, NotificationType } from '../../composables/useNotifications'
 
 const { user, isAuthenticated, canReview, isAdmin, logout } = useAuth()
 const router = useRouter()
 const $route = useRoute()
+const { open: agentOpen } = useAgentChat()
+
+function toggleAgent() {
+  agentOpen.value = !agentOpen.value
+}
 
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)

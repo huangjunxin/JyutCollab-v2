@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="flex flex-col">
     <!-- Page header -->
     <div class="mb-4 flex-shrink-0">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -70,8 +70,8 @@
 
     <!-- Search and filters -->
     <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-      <div class="flex flex-col lg:flex-row gap-3">
-        <div class="flex-1">
+      <div class="flex flex-wrap gap-3">
+        <div class="min-w-[12rem] flex-1">
           <UInput
             v-model="searchQuery"
             placeholder="搜索詞頭、粵拼、分類、釋義..."
