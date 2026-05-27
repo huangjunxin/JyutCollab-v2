@@ -18,6 +18,7 @@ export interface AgentToolContext {
   actor?: AgentActor
   requestId?: string
   locale?: string
+  pageContext?: Record<string, unknown>
 }
 
 export interface AgentToolResult<Output = unknown> {

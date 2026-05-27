@@ -1,9 +1,9 @@
-import type { AgentChatMessage, AgentChatResponse, AgentConversationSummary } from '../types/agent'
+import type { AgentChatMessage, AgentChatResponse, AgentConversationSummary, AgentPageContext } from '../types/agent'
 
 const WELCOME_MESSAGE: AgentChatMessage = {
   id: 'agent-welcome',
   role: 'assistant',
-  content: '可以直接問我：「查 食飯」、「找粵拼 ang1」、「檢查重複 詞頭: 食飯 方言: hongkong」。需要建立草稿、送審或審核時，我會先請你確認。',
+  content: '我可以幫你查詞條、查歷史、解答使用指南問題，還能幫你套用篩選條件。試試問我：「查 食飯」、「找粵拼 ang1」、「怎麼回退歷史」、「幫我找動物相關的詞」。',
   createdAt: new Date().toISOString()
 }
 
@@ -19,6 +19,19 @@ export function useAgentChat() {
 
   function welcomeMessages() {
     return [{ ...WELCOME_MESSAGE, createdAt: new Date().toISOString() }]
+  }
+
+  function buildPageContext(): AgentPageContext {
+    const ctx: AgentPageContext = { route: route.fullPath }
+    if (route.path === '/entries') {
+      ctx.filters = {}
+      const q = route.query
+      if (q.query) ctx.filters.query = String(q.query)
+      if (q.dialect) ctx.filters.dialect = String(q.dialect)
+      if (q.status) ctx.filters.status = String(q.status)
+      if (q.view) ctx.view = String(q.view)
+    }
+    return ctx
   }
 
   function resetStalePendingMessages() {
@@ -158,6 +171,7 @@ export function useAgentChat() {
         body: JSON.stringify({
           message: content,
           route: route.fullPath,
+          pageContext: buildPageContext(),
           ...(currentConversationId.value ? { conversationId: currentConversationId.value } : {})
         }),
         signal: controller.signal

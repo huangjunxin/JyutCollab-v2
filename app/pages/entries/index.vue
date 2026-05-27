@@ -2856,6 +2856,59 @@ watch(
   { deep: true }
 )
 
+// Watch for agent local actions (from AI assistant panel)
+const { pending: agentActions, dequeue: dequeueAgentAction } = useAgentActions()
+watch(agentActions, async (queue) => {
+  if (!queue.length || isInitializing.value) return
+  const action = dequeueAgentAction()
+  if (!action) return
+
+  switch (action.kind) {
+    case 'apply_filters':
+      if (action.filters?.query !== undefined) searchQuery.value = action.filters.query
+      if (action.filters?.dialect) filters.region = action.filters.dialect
+      if (action.filters?.status) {
+        const statusMap: Record<string, string> = {
+          draft: 'draft', pending_review: 'pending_review', approved: 'approved', rejected: 'rejected'
+        }
+        filters.status = statusMap[action.filters.status] || action.filters.status
+      }
+      if (action.filters?.view) setViewMode(action.filters.view as 'flat' | 'aggregated' | 'lexeme')
+      if (action.filters?.formula || action.filters?.regexRows?.length) {
+        advancedFilters.formulaInput.value = action.filters.formula || ''
+        if (action.filters.regexRows?.length) {
+          advancedFilters.regexRows.value = action.filters.regexRows.map(row => ({
+            id: crypto.randomUUID(),
+            field: row.field as any,
+            pattern: row.pattern,
+            flags: row.flags || 'i'
+          }))
+        }
+        if (action.filters.openAdvancedFilter) advancedFilters.advancedFilterExpanded.value = true
+        advancedFilters.applyAdvancedFilters()
+      }
+      currentPage.value = 1
+      await handleSearch()
+      break
+
+    case 'switch_view':
+      if (action.view) setViewMode(action.view as 'flat' | 'aggregated' | 'lexeme')
+      break
+
+    case 'toggle_advanced_filter':
+      advancedFilters.advancedFilterExpanded.value = action.open ?? true
+      break
+
+    case 'open_entry':
+      if (action.entryId) {
+        searchQuery.value = action.entryId
+        currentPage.value = 1
+        await handleSearch()
+      }
+      break
+  }
+}, { deep: true })
+
 // 監聽 entries / 聚合 groups 變化，即時保存到本地儲存
 watch(
   [() => entries.value, () => aggregatedGroups.value, () => lexemeGroups.value],

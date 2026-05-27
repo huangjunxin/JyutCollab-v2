@@ -26,7 +26,11 @@
 
     <div class="agent-markdown text-sm text-gray-900 dark:text-gray-100" v-html="renderMarkdown(primaryMarkdown)" />
 
-    <details v-if="message.streamingToolCall || message.toolCall" class="mt-3 rounded-md border border-blue-100 bg-blue-50/60 p-2 text-xs dark:border-blue-900 dark:bg-blue-950/20">
+    <details
+      v-if="message.streamingToolCall || message.toolCall"
+      class="mt-3 rounded-md border border-blue-100 bg-blue-50/60 p-2 text-xs dark:border-blue-900 dark:bg-blue-950/20"
+      @toggle="emit('content-resize')"
+    >
       <summary class="cursor-pointer select-none font-medium text-gray-700 dark:text-gray-200">
         {{ detailsSummary }}
       </summary>
@@ -51,7 +55,7 @@
 
     <div v-if="secondaryMarkdown" class="agent-markdown mt-3 text-sm text-gray-900 dark:text-gray-100" v-html="renderMarkdown(secondaryMarkdown)" />
 
-    <div v-if="message.toolCall && (entryResults.length || dialectResults.length)" class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2 text-xs dark:border-gray-800 dark:bg-gray-950">
+    <div v-if="message.toolCall && (entryResults.length || dialectResults.length || docResults.length || historyResults.length || auditResults.length)" class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2 text-xs dark:border-gray-800 dark:bg-gray-950">
       <div class="mb-1 flex items-center justify-between gap-2">
         <span class="font-medium">查詢結果</span>
         <UBadge color="success" variant="soft">{{ formatRisk(message.toolCall.risk) }}</UBadge>
@@ -90,13 +94,92 @@
           <code class="text-[11px] text-gray-500">{{ dialect.id }}</code>
         </div>
       </div>
+      <div v-else-if="docResults.length" class="mt-2 space-y-2">
+        <div
+          v-for="doc in docResults"
+          :key="doc.slug"
+          class="rounded border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
+        >
+          <div class="font-medium text-gray-900 dark:text-gray-100">{{ doc.title }}</div>
+          <div class="mt-0.5 text-gray-500">{{ doc.category }} · {{ doc.description }}</div>
+          <div v-if="doc.headings?.length" class="mt-1 text-gray-400">章節：{{ doc.headings.join('、') }}</div>
+        </div>
+      </div>
+      <div v-else-if="historyResults.length" class="mt-2 space-y-2">
+        <div
+          v-for="history in historyResults"
+          :key="history.id"
+          class="rounded border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-medium text-gray-900 dark:text-gray-100">
+              {{ history.headword || history.entryId }}
+            </div>
+            <div class="flex items-center gap-1">
+              <UBadge :color="historyActionColor(history.action)" variant="soft">{{ historyActionLabel(history.action) }}</UBadge>
+              <UBadge v-if="history.isReverted" color="warning" variant="soft">已還原</UBadge>
+            </div>
+          </div>
+          <div class="mt-0.5 text-gray-500">
+            <span v-if="history.user">{{ history.user.displayName || history.user.username }}</span>
+            <span v-if="history.dialect"> · {{ formatDialect(history.dialect) }}</span>
+            <span> · {{ formatHistoryDate(history.createdAt) }}</span>
+          </div>
+          <div v-if="history.changedFields?.length" class="mt-1 text-gray-400">
+            修改欄位：{{ history.changedFields.join('、') }}
+          </div>
+        </div>
+      </div>
+      <div v-else-if="auditResults.length" class="mt-2 space-y-2">
+        <div
+          v-for="event in auditResults"
+          :key="event.id"
+          class="rounded border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <UBadge :color="auditEventColor(event.eventType)" variant="soft">{{ event.eventTypeLabel }}</UBadge>
+              <span v-if="event.toolName" class="font-medium text-gray-700 dark:text-gray-300">{{ event.toolName }}</span>
+            </div>
+            <span class="text-gray-400">{{ formatHistoryDate(event.createdAt) }}</span>
+          </div>
+          <p v-if="event.outputSummary" class="mt-1 text-gray-600 dark:text-gray-400">{{ event.outputSummary }}</p>
+          <p v-if="event.blockedReason" class="mt-1 text-red-600 dark:text-red-400">原因：{{ event.blockedReason }}</p>
+        </div>
+      </div>
     </div>
 
     <div v-if="message.localAction" class="mt-3 rounded-md border border-blue-200 bg-blue-50 p-2 text-xs dark:border-blue-800 dark:bg-blue-950/30">
       <div class="mb-2 font-medium">{{ message.localAction.label }}</div>
-      <UButton size="xs" color="primary" variant="soft" :to="message.localAction.to">
-        前往 {{ message.localAction.to }}
-      </UButton>
+      <div v-if="message.localAction.kind === 'navigate' && message.localAction.to" class="flex items-center gap-2">
+        <UButton size="xs" color="primary" variant="soft" :to="message.localAction.to">
+          前往 {{ message.localAction.to }}
+        </UButton>
+      </div>
+      <template v-else>
+        <div v-if="message.localAction.kind === 'apply_filters' && message.localAction.filters" class="mb-2 space-y-1">
+          <div v-if="message.localAction.filters.query" class="text-gray-600 dark:text-gray-400">搜尋：{{ message.localAction.filters.query }}</div>
+          <div v-if="message.localAction.filters.dialect" class="text-gray-600 dark:text-gray-400">方言：{{ message.localAction.filters.dialect }}</div>
+          <div v-if="message.localAction.filters.status" class="text-gray-600 dark:text-gray-400">狀態：{{ message.localAction.filters.status }}</div>
+          <div v-if="message.localAction.filters.view" class="text-gray-600 dark:text-gray-400">視圖：{{ message.localAction.filters.view }}</div>
+          <div v-if="message.localAction.filters.formula" class="text-gray-600 dark:text-gray-400">公式：{{ message.localAction.filters.formula }}</div>
+          <div v-if="message.localAction.filters.regexRows?.length" class="text-gray-600 dark:text-gray-400">
+            正則條件 {{ message.localAction.filters.regexRows.length }} 條
+          </div>
+        </div>
+        <div v-else-if="message.localAction.kind === 'open_entry'" class="mb-2 text-gray-600 dark:text-gray-400">
+          詞條 ID：{{ message.localAction.entryId }}
+        </div>
+        <div v-else-if="message.localAction.kind === 'switch_view'" class="mb-2 text-gray-600 dark:text-gray-400">
+          視圖模式：{{ viewLabel(message.localAction.view) }}
+        </div>
+        <div v-else-if="message.localAction.kind === 'toggle_advanced_filter'" class="mb-2 text-gray-600 dark:text-gray-400">
+          {{ message.localAction.open ? '打開進階篩選面板' : '關閉進階篩選面板' }}
+        </div>
+        <UButton size="xs" color="primary" variant="soft" @click="applyLocalAction(message.localAction!)">
+          {{ actionButtonLabel(message.localAction!.kind) }}
+        </UButton>
+      </template>
     </div>
 
     <AgentConfirmationCard
@@ -110,14 +193,17 @@
 </template>
 
 <script setup lang="ts">
-import type { AgentChatMessage, AgentEntrySummary } from '../../types/agent'
+import type { AgentChatMessage, AgentEntrySummary, AgentLocalActionSummary } from '../../types/agent'
 import { DIALECT_LABELS } from '~shared/dialects'
 
 const props = defineProps<{ message: AgentChatMessage }>()
-defineEmits<{
+const emit = defineEmits<{
   confirm: [{ id: string, echo?: string, reason?: string }]
   cancel: [string]
+  'content-resize': []
 }>()
+
+const { enqueue } = useAgentActions()
 
 const toolData = computed(() => props.message.toolCall?.data as any)
 const entryResults = computed<AgentEntrySummary[]>(() => {
@@ -139,6 +225,9 @@ const entryResults = computed<AgentEntrySummary[]>(() => {
   return []
 })
 const dialectResults = computed<Array<{ id: string, label: string }>>(() => toolData.value?.dialects || [])
+const docResults = computed(() => toolData.value?.docs || [])
+const historyResults = computed(() => toolData.value?.histories || [])
+const auditResults = computed(() => toolData.value?.events || [])
 const showRawData = computed(() => Boolean(props.message.toolCall?.data) && import.meta.dev)
 const markdownParts = computed(() => splitMarkdownForDetails(props.message.content))
 const primaryMarkdown = computed(() => markdownParts.value.primary)
@@ -328,6 +417,74 @@ function renderMarkdown(markdown: string) {
 
 function formatData(data: unknown) {
   return JSON.stringify(data, null, 2)
+}
+
+function applyLocalAction(action: AgentLocalActionSummary) {
+  enqueue(action)
+}
+
+function actionButtonLabel(kind: string) {
+  const labels: Record<string, string> = {
+    apply_filters: '套用篩選',
+    switch_view: '切換視圖',
+    toggle_advanced_filter: '套用',
+    open_entry: '查看詞條'
+  }
+  return labels[kind] || '套用'
+}
+
+function viewLabel(view?: string) {
+  const labels: Record<string, string> = {
+    flat: '平鋪視圖',
+    aggregated: '詞頭聚合視圖',
+    lexeme: '詞語組視圖'
+  }
+  return labels[view || ''] || view || ''
+}
+
+function historyActionLabel(action: string) {
+  const labels: Record<string, string> = {
+    create: '新增',
+    update: '修改',
+    delete: '刪除',
+    status_change: '狀態變更'
+  }
+  return labels[action] || action
+}
+
+function historyActionColor(action: string) {
+  const colors: Record<string, string> = {
+    create: 'success',
+    update: 'info',
+    delete: 'error',
+    status_change: 'warning'
+  }
+  return (colors[action] || 'neutral') as any
+}
+
+function formatHistoryDate(dateStr: string) {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleString('zh-Hant', { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return dateStr
+  }
+}
+
+function auditEventColor(eventType: string) {
+  const colors: Record<string, string> = {
+    tool_call_started: 'info',
+    tool_call_result: 'success',
+    confirmation_requested: 'warning',
+    confirmation_accepted: 'success',
+    confirmation_rejected: 'error',
+    confirmation_failed: 'error',
+    confirmation_expired: 'neutral',
+    blocked_action: 'error',
+    model_error: 'error'
+  }
+  return (colors[eventType] || 'neutral') as any
 }
 </script>
 

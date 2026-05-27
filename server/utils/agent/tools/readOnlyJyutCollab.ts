@@ -51,7 +51,7 @@ export function normalizeDialectName(value?: string) {
 
 export const listDialectsTool: AgentToolDefinition<z.infer<typeof DialectListInput>> = {
   name: 'jyutcollab.list_dialects',
-  description: '列出 JyutCollab 支援的方言代碼、顯示名稱與顏色。',
+  description: '列出 JyutCollab 支援的所有方言代碼、顯示名稱與顏色。支援按中文地名或方言別名自動匹配。',
   risk: 'safe',
   inputSchema: DialectListInput,
   async execute() {
@@ -72,7 +72,7 @@ export const listDialectsTool: AgentToolDefinition<z.infer<typeof DialectListInp
 
 export const searchEntriesTool: AgentToolDefinition<z.infer<typeof EntrySearchInput>> = {
   name: 'jyutcollab.search_entries',
-  description: '安全搜尋詞條，不修改資料。',
+  description: '安全搜尋詞條，不修改資料。支援按詞頭(headword)、粵拼(jyutping)、方言(dialectName)、狀態(status)、分類主題(category)、語域(register)和通用搜尋(query)。語義搜尋（如「動物相關」「食物類」）應使用 category 欄位。',
   risk: 'safe',
   inputSchema: EntrySearchInput,
   async execute(input) {
@@ -113,18 +113,38 @@ export const searchEntriesTool: AgentToolDefinition<z.infer<typeof EntrySearchIn
     ])
     const summaries = entries.map(compactEntrySummary)
 
+    if (total === 0) {
+      const fallbackSuggestions: string[] = []
+      if (dialectName) fallbackSuggestions.push('嘗試移除方言限制重新搜尋。')
+      if (input.jyutping) fallbackSuggestions.push('嘗試只用部分粵拼（如聲母或韻母）搜尋。')
+      if (input.headword) fallbackSuggestions.push('嘗試用釋義關鍵詞在 query 中搜尋。')
+      if (input.category) fallbackSuggestions.push('嘗試用更短的分類關鍵詞。')
+      if (!input.headword && !input.jyutping && trimmedQuery) {
+        fallbackSuggestions.push('嘗試把搜尋詞拆分，分別填入 headword 或 jyutping 欄位。')
+      }
+      return {
+        ok: true,
+        data: { entries: [], page: input.page, perPage: input.perPage, total: 0 },
+        summary: `找不到符合條件的詞條。`,
+        warnings: fallbackSuggestions,
+        nextAction: fallbackSuggestions.length > 0
+          ? fallbackSuggestions[0]
+          : '嘗試放寬搜尋條件或使用不同關鍵詞。'
+      }
+    }
+
     return {
       ok: true,
       data: { entries: summaries, page: input.page, perPage: input.perPage, total },
       summary: `找到 ${total} 個詞條，返回 ${summaries.length} 個。`,
-      nextAction: '需要查看完整內容時，使用 jyutcollab.get_entry_detail。'
+      nextAction: '需要查看完整內容時，使用 jyutcollab.get_entry_detail。如果需要更精確的篩選，可使用 jyutcollab.plan_advanced_filter 生成進階篩選條件。'
     }
   }
 }
 
 export const getEntryDetailTool: AgentToolDefinition<z.infer<typeof EntryDetailInput>> = {
   name: 'jyutcollab.get_entry_detail',
-  description: '讀取單個詞條詳情，不修改資料。',
+  description: '讀取單個詞條的完整詳情，包括詞頭、方言、音系、義項、例句、分類和狀態。不修改資料。',
   risk: 'safe',
   inputSchema: EntryDetailInput,
   async execute(input) {

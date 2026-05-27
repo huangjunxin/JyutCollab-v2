@@ -1,11 +1,13 @@
 import { z } from 'zod'
-import { createDefaultAgentToolRegistry, runAgent } from '../../utils/agent'
+import { createDefaultAgentToolRegistry, runAgent, type AgentRunnerHistoryMessage } from '../../utils/agent'
 import { createAgentRequestId, ensureAgentConversation, recordAgentAuditEvent, saveAgentMessage } from '../../utils/agent/persistence'
+import { AgentMessage } from '../../utils/AgentMessage'
 
 const StreamChatSchema = z.object({
   message: z.string().trim().max(2000),
   route: z.string().trim().max(500).optional(),
-  conversationId: z.string().optional()
+  conversationId: z.string().optional(),
+  pageContext: z.record(z.string(), z.unknown()).optional()
 })
 
 function toolResultPayload(toolCall: Awaited<ReturnType<typeof runAgent>>['toolCalls'][number]) {
@@ -17,6 +19,36 @@ function toolResultPayload(toolCall: Awaited<ReturnType<typeof runAgent>>['toolC
     warnings: toolCall.result.warnings,
     nextAction: toolCall.result.nextAction
   }
+}
+
+function stringifyToolContext(toolCall: any) {
+  if (!toolCall?.name && !toolCall?.summary) return ''
+  return JSON.stringify({
+    tool: toolCall.name,
+    summary: toolCall.summary,
+    warnings: toolCall.warnings,
+    nextAction: toolCall.nextAction
+  })
+}
+
+async function loadAgentHistory(conversationId: string, ownerId: string): Promise<AgentRunnerHistoryMessage[]> {
+  const records = await AgentMessage.find({ conversationId, ownerId })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .lean()
+  const history: AgentRunnerHistoryMessage[] = []
+  let totalChars = 0
+  for (const message of records.reverse()) {
+    if (message.role !== 'user' && message.role !== 'assistant') continue
+    const toolContext = message.role === 'assistant' ? stringifyToolContext(message.toolCall) : ''
+    const content = [message.content, toolContext ? `工具摘要：${toolContext}` : ''].filter(Boolean).join('\n').trim()
+    if (!content) continue
+    const clipped = content.length > 1200 ? `${content.slice(0, 1200)}…` : content
+    totalChars += clipped.length
+    if (totalChars > 8000) break
+    history.push({ role: message.role, content: clipped })
+  }
+  return history
 }
 
 export default defineEventHandler(async (event) => {
@@ -39,6 +71,7 @@ export default defineEventHandler(async (event) => {
     title: parsed.data.message
   })
   const conversationId = conversation._id.toString()
+  const history = await loadAgentHistory(conversationId, actor.id)
   const requestId = createAgentRequestId()
   const userMessage = await saveAgentMessage({
     conversationId,
@@ -92,6 +125,8 @@ export default defineEventHandler(async (event) => {
             actor,
             channel: 'web',
             registry: createDefaultAgentToolRegistry(),
+            history,
+            pageContext: parsed.data.pageContext as Record<string, unknown> | undefined,
             async onTextStart() {
               if (!textStarted) {
                 textStarted = true

@@ -42,13 +42,14 @@
     </div>
 
     <!-- Messages -->
-    <div class="flex-1 min-h-0 overflow-y-auto space-y-3 bg-gray-50/70 dark:bg-slate-900/50 p-4">
+    <div ref="messagesContainer" class="flex-1 min-h-0 overflow-y-auto space-y-3 bg-gray-50/70 dark:bg-slate-900/50 p-4">
       <AgentMessage
         v-for="message in messages"
         :key="message.id"
         :message="message"
         @confirm="handleConfirm"
         @cancel="handleCancel"
+        @content-resize="scheduleScrollToBottom"
       />
     </div>
 
@@ -92,9 +93,32 @@ const {
 } = useAgentChat()
 const draft = ref('')
 const selectedConversationId = ref<string | null>(null)
+const messagesContainer = ref<HTMLElement | null>(null)
+let scrollFrame: number | null = null
+
+function scrollToBottom() {
+  const container = messagesContainer.value
+  if (!container) return
+  container.scrollTop = container.scrollHeight
+}
+
+function scheduleScrollToBottom() {
+  if (!import.meta.client) return
+  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame)
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = null
+    scrollToBottom()
+  })
+}
+
+watch(messages, scheduleScrollToBottom, { deep: true, flush: 'post' })
 
 watch(open, async (isOpen) => {
-  if (isOpen) await refreshConversations()
+  if (isOpen) {
+    await refreshConversations()
+    await nextTick()
+    scheduleScrollToBottom()
+  }
 })
 
 watch(currentConversationId, (id) => {
@@ -102,12 +126,17 @@ watch(currentConversationId, (id) => {
 })
 
 async function handleConversationChange(id: string | null) {
-  if (id) await loadConversation(id)
+  if (id) {
+    await loadConversation(id)
+    await nextTick()
+    scheduleScrollToBottom()
+  }
 }
 
 async function handleSubmit() {
   const content = draft.value
   draft.value = ''
+  scheduleScrollToBottom()
   await sendMessage(content)
 }
 

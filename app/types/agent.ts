@@ -1,9 +1,33 @@
 export type AgentMessageRole = 'user' | 'assistant' | 'tool'
 
 export interface AgentLocalActionSummary {
-  kind: 'navigate'
+  kind: 'navigate' | 'apply_filters' | 'open_entry' | 'toggle_advanced_filter' | 'switch_view'
   label: string
-  to: string
+  to?: string
+  entryId?: string
+  filters?: {
+    query?: string
+    dialect?: string
+    status?: string
+    view?: string
+    formula?: string
+    regexRows?: Array<{ field: string, pattern: string, flags?: string }>
+    openAdvancedFilter?: boolean
+  }
+  open?: boolean
+  view?: string
+}
+
+export interface AgentPageContext {
+  route?: string
+  filters?: {
+    query?: string
+    dialect?: string
+    status?: string
+  }
+  view?: string
+  selectedEntries?: string[]
+  visibleCount?: number
 }
 
 export interface AgentProgressStep {
