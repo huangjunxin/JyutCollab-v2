@@ -68,6 +68,25 @@
       @close="mobileWarningDismissed = true"
     />
 
+    <!-- Agent filter applied banner -->
+    <UAlert
+      v-if="agentFilterLabel"
+      color="primary"
+      variant="soft"
+      icon="i-lucide-sparkles"
+      :title="`AI 助手已套用篩選`"
+      :description="agentFilterLabel"
+      :close-button="{ icon: 'i-heroicons-x-mark-20-solid', color: 'primary', variant: 'link' }"
+      class="mb-4"
+      @close="clearAgentFilter"
+    >
+      <template #footer>
+        <UButton size="xs" variant="outline" color="primary" @click="clearAgentFilter">
+          清除篩選
+        </UButton>
+      </template>
+    </UAlert>
+
     <!-- Search and filters -->
     <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
       <div class="flex flex-wrap gap-3">
@@ -2875,11 +2894,14 @@ provide('agentPageContext', computed(() => ({
 })))
 
 // Watch for agent local actions (from AI assistant panel)
+const agentFilterLabel = ref<string | null>(null)
 const { pending: agentActions, dequeue: dequeueAgentAction } = useAgentActions()
 watch(agentActions, async (queue) => {
   if (!queue.length || isInitializing.value) return
   const action = dequeueAgentAction()
   if (!action) return
+
+  if (action.label) agentFilterLabel.value = action.label
 
   switch (action.kind) {
     case 'apply_filters':
@@ -2926,6 +2948,18 @@ watch(agentActions, async (queue) => {
       break
   }
 }, { deep: true })
+
+function clearAgentFilter() {
+  agentFilterLabel.value = null
+  searchQuery.value = ''
+  filters.region = ALL_FILTER_VALUE
+  filters.status = ALL_FILTER_VALUE
+  filters.theme = ALL_FILTER_VALUE
+  filters.createdBy = ''
+  advancedFilters.clearAdvancedFilters()
+  currentPage.value = 1
+  fetchEntries()
+}
 
 // 監聽 entries / 聚合 groups 變化，即時保存到本地儲存
 watch(

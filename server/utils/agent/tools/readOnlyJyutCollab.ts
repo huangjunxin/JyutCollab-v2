@@ -122,14 +122,24 @@ export const searchEntriesTool: AgentToolDefinition<z.infer<typeof EntrySearchIn
       if (!input.headword && !input.jyutping && trimmedQuery) {
         fallbackSuggestions.push('嘗試把搜尋詞拆分，分別填入 headword 或 jyutping 欄位。')
       }
+
+      // Detect semantic/natural-language queries that should use advanced filter
+      const semanticKeywords = ['動物', '植物', '食物', '身體', '顏色', '天氣', '情緒', '相關', '類', '有關', '含有', '包含']
+      const isSemanticQuery = trimmedQuery && semanticKeywords.some(kw => trimmedQuery.includes(kw))
+      if (isSemanticQuery) {
+        fallbackSuggestions.unshift('語義搜尋建議使用 jyutcollab.plan_advanced_filter 生成進階篩選條件，再用 jyutcollab.apply_entry_filters 套用到詞條表格。')
+      }
+
       return {
         ok: true,
         data: { entries: [], page: input.page, perPage: input.perPage, total: 0 },
         summary: `找不到符合條件的詞條。`,
         warnings: fallbackSuggestions,
-        nextAction: fallbackSuggestions.length > 0
-          ? fallbackSuggestions[0]
-          : '嘗試放寬搜尋條件或使用不同關鍵詞。'
+        nextAction: isSemanticQuery
+          ? '使用 jyutcollab.plan_advanced_filter 把自然語言轉換為進階篩選條件。'
+          : fallbackSuggestions.length > 0
+            ? fallbackSuggestions[0]
+            : '嘗試放寬搜尋條件或使用不同關鍵詞。'
       }
     }
 
