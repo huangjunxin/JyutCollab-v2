@@ -64,9 +64,22 @@ export interface AgentChatMessage {
   streamingToolCall?: AgentStreamingToolCall
 }
 
+export interface AgentConversationSummary {
+  id: string
+  title: string
+  channel: string
+  lastMessageAt: string
+  messageCount: number
+  lastSummary?: string
+  archivedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AgentChatRequest {
   message: string
   route?: string
+  conversationId?: string
   confirmation?: {
     id: string
     confirmed: boolean
@@ -76,5 +89,6 @@ export interface AgentChatRequest {
 }
 
 export interface AgentChatResponse {
+  conversationId: string
   messages: AgentChatMessage[]
 }

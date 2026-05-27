@@ -332,6 +332,16 @@ function formatData(data: unknown) {
 </script>
 
 <style scoped>
+
+.agent-markdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.agent-markdown :deep(*) {
+  max-width: 100%;
+}
 .agent-markdown :deep(h1),
 .agent-markdown :deep(h2),
 .agent-markdown :deep(h3) {

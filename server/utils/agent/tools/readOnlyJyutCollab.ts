@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DIALECT_IDS, DIALECT_OPTIONS, getDialectColor } from '../../../../shared/dialects'
+import { DIALECT_IDS, DIALECT_LABELS, DIALECT_OPTIONS, getDialectColor } from '../../../../shared/dialects'
 import { connectDB } from '../../db'
 import { Entry } from '../../Entry'
 import type { AgentToolDefinition } from '../core/contracts'
@@ -31,6 +31,22 @@ const DialectListInput = z.object({})
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function normalizeDialectName(value?: string) {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+  if ((DIALECT_IDS as readonly string[]).includes(trimmed)) return trimmed
+
+  const labels = DIALECT_LABELS as Record<string, string>
+  const exact = Object.entries(labels).find(([, label]) => label === trimmed)
+  if (exact) return exact[0]
+
+  const compact = trimmed.replace(/\s+/g, '')
+  const compactMatch = Object.entries(labels).find(([, label]) => label.replace(/\s+/g, '') === compact)
+  if (compactMatch) return compactMatch[0]
+
+  return trimmed
 }
 
 export const listDialectsTool: AgentToolDefinition<z.infer<typeof DialectListInput>> = {
@@ -85,7 +101,8 @@ export const searchEntriesTool: AgentToolDefinition<z.infer<typeof EntrySearchIn
       filter.$and = [...(filter.$and || []), { $or: [{ 'headword.display': regex }, { 'headword.normalized': regex }, { 'headword.variants': regex }] }]
     }
     if (input.jyutping) filter['phonetic.jyutping'] = new RegExp(escapeRegex(input.jyutping), 'i')
-    if (input.dialectName) filter['dialect.name'] = input.dialectName
+    const dialectName = normalizeDialectName(input.dialectName)
+    if (dialectName) filter['dialect.name'] = dialectName
     if (input.status) filter.status = input.status
     if (input.category) filter['meta.category'] = new RegExp(escapeRegex(input.category), 'i')
     if (input.register) filter['meta.register'] = input.register
@@ -146,15 +163,16 @@ export const checkDuplicateTool: AgentToolDefinition<z.infer<typeof DuplicateChe
       if (/^[a-f\d]{24}$/i.test(input.excludeId)) excludeConditions.push({ _id: { $ne: input.excludeId } })
     }
     const excludeFilter = excludeConditions.length > 0 ? { $and: excludeConditions } : {}
+    const dialect = normalizeDialectName(input.dialect) || input.dialect
     const [sameDialectRaw, otherDialectsRaw] = await Promise.all([
       Entry.find({
         'headword.display': input.headword,
-        'dialect.name': input.dialect,
+        'dialect.name': dialect,
         ...excludeFilter
       }).select('id headword dialect status senses meta theme createdAt').sort({ createdAt: -1 }).limit(20).lean(),
       Entry.find({
         'headword.display': input.headword,
-        'dialect.name': { $ne: input.dialect },
+        'dialect.name': { $ne: dialect },
         ...excludeFilter
       }).select('id headword dialect status senses meta theme createdAt').sort({ createdAt: -1 }).limit(20).lean()
     ])
@@ -170,8 +188,8 @@ export const checkDuplicateTool: AgentToolDefinition<z.infer<typeof DuplicateChe
         otherDialects
       },
       summary: duplicateRisk
-        ? `「${input.headword}」在 ${input.dialect} 已有 ${sameDialect.length} 個同方言詞條。`
-        : `「${input.headword}」在 ${input.dialect} 未發現同方言重複。`,
+        ? `「${input.headword}」在 ${dialect} 已有 ${sameDialect.length} 個同方言詞條。`
+        : `「${input.headword}」在 ${dialect} 未發現同方言重複。`,
       warnings: duplicateRisk ? ['同方言重複應阻止直接建立新草稿。'] : [],
       nextAction: otherDialects.length > 0 ? '可參考其他方言詞條內容，但不視為阻塞性重複。' : '可繼續草稿準備流程。'
     }

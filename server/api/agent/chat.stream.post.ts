@@ -1,9 +1,11 @@
 import { z } from 'zod'
 import { createDefaultAgentToolRegistry, runAgent } from '../../utils/agent'
+import { createAgentRequestId, ensureAgentConversation, recordAgentAuditEvent, saveAgentMessage } from '../../utils/agent/persistence'
 
 const StreamChatSchema = z.object({
   message: z.string().trim().max(2000),
-  route: z.string().trim().max(500).optional()
+  route: z.string().trim().max(500).optional(),
+  conversationId: z.string().optional()
 })
 
 function toolResultPayload(toolCall: Awaited<ReturnType<typeof runAgent>>['toolCalls'][number]) {
@@ -28,6 +30,32 @@ export default defineEventHandler(async (event) => {
   }
 
   const encoder = new TextEncoder()
+  const actor = event.context.auth
+  const conversation = await ensureAgentConversation({
+    actorId: actor.id,
+    channel: 'web',
+    conversationId: parsed.data.conversationId,
+    route: parsed.data.route,
+    title: parsed.data.message
+  })
+  const conversationId = conversation._id.toString()
+  const requestId = createAgentRequestId()
+  const userMessage = await saveAgentMessage({
+    conversationId,
+    ownerId: actor.id,
+    requestId,
+    role: 'user',
+    content: parsed.data.message,
+    metadata: { route: parsed.data.route }
+  })
+  await recordAgentAuditEvent({
+    conversationId,
+    messageId: userMessage._id.toString(),
+    requestId,
+    actorId: actor.id,
+    eventType: 'user_message',
+    metadata: { route: parsed.data.route }
+  })
   let statusTimer: NodeJS.Timeout | undefined
   let timeoutTimer: NodeJS.Timeout | undefined
   let closed = false
@@ -36,7 +64,7 @@ export default defineEventHandler(async (event) => {
     start(controller) {
       function send(type: string, payload: Record<string, unknown> = {}) {
         if (closed) return
-        controller.enqueue(encoder.encode(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`))
+        controller.enqueue(encoder.encode(`event: ${type}\ndata: ${JSON.stringify({ conversationId, requestId, ...payload })}\n\n`))
       }
 
       async function run() {
@@ -49,14 +77,19 @@ export default defineEventHandler(async (event) => {
           timeoutTimer = setTimeout(() => {
             send('ERROR', { message: 'AI 助手等待模型回應逾時，請稍後再試。' })
             closed = true
-            controller.close()
-          }, 45_000)
+            try {
+              controller.close()
+            } catch {
+            }
+          }, 90_000)
 
           let toolCallCount = 0
+          let assistantContent = ''
+          let lastToolCall: Awaited<ReturnType<typeof runAgent>>['toolCalls'][number] | undefined
           const result = await runAgent({
             message: parsed.data.message,
             route: parsed.data.route,
-            actor: event.context.auth,
+            actor,
             channel: 'web',
             registry: createDefaultAgentToolRegistry(),
             async onTextStart() {
@@ -70,6 +103,7 @@ export default defineEventHandler(async (event) => {
                 textStarted = true
                 send('TEXT_MESSAGE_START', {})
               }
+              assistantContent += delta
               send('TEXT_MESSAGE_CONTENT', { content: delta })
             },
             async onToolCallDelta(delta) {
@@ -77,9 +111,30 @@ export default defineEventHandler(async (event) => {
             },
             async onToolCallStart(toolCall) {
               toolCallCount += 1
+              await recordAgentAuditEvent({
+                conversationId,
+                requestId,
+                actorId: actor.id,
+                eventType: 'tool_call_started',
+                toolName: toolCall.name,
+                input: toolCall.input
+              })
               send('TOOL_CALL_START', toolCall as unknown as Record<string, unknown>)
             },
             async onToolResult(toolCall) {
+              lastToolCall = toolCall
+              await recordAgentAuditEvent({
+                conversationId,
+                requestId,
+                actorId: actor.id,
+                eventType: toolCall.result.ok ? 'tool_call_result' : 'blocked_action',
+                toolName: toolCall.name,
+                risk: toolCall.risk,
+                input: toolCall.input,
+                outputSummary: toolCall.result.summary,
+                output: toolCall.result.data,
+                blockedReason: toolCall.result.ok ? undefined : toolCall.result.warnings?.join('；')
+              })
               send('TOOL_CALL_RESULT', { toolCall: toolResultPayload(toolCall), localAction: (toolCall.result.data as any)?.action })
             }
           })
@@ -98,15 +153,42 @@ export default defineEventHandler(async (event) => {
               textStarted = true
               send('TEXT_MESSAGE_START', {})
             }
-            send('TEXT_MESSAGE_CONTENT', { content: result.toolCalls.at(-1)?.result.summary || '' })
+            const fallbackContent = result.toolCalls.at(-1)?.result.summary || ''
+            assistantContent += fallbackContent
+            send('TEXT_MESSAGE_CONTENT', { content: fallbackContent })
           } else if (result.content && !textStarted) {
             textStarted = true
+            assistantContent += result.content
             send('TEXT_MESSAGE_START', {})
             send('TEXT_MESSAGE_CONTENT', { content: result.content })
           }
+          const assistantMessage = await saveAgentMessage({
+            conversationId,
+            ownerId: actor.id,
+            requestId,
+            role: 'assistant',
+            content: assistantContent || result.content || '',
+            toolCall: lastToolCall ? toolResultPayload(lastToolCall) : undefined,
+            localAction: (lastToolCall?.result.data as any)?.action
+          })
+          await recordAgentAuditEvent({
+            conversationId,
+            messageId: assistantMessage._id.toString(),
+            requestId,
+            actorId: actor.id,
+            eventType: 'assistant_message',
+            outputSummary: assistantContent || result.content || ''
+          })
           send('DONE', { toolCallCount })
         } catch (error: any) {
-          send('ERROR', { message: error?.message || 'AI 助手暫時無法回應。' })
+          await recordAgentAuditEvent({
+            conversationId,
+            requestId,
+            actorId: actor.id,
+            eventType: 'model_error',
+            blockedReason: error?.message || 'AI 助手暫時無法回應。'
+          })
+          if (!closed) send('ERROR', { message: error?.message || 'AI 助手暫時無法回應。' })
         } finally {
           if (statusTimer) clearInterval(statusTimer)
           if (timeoutTimer) clearTimeout(timeoutTimer)

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { DIALECT_IDS } from '../../../shared/dialects'
 import { buildConfirmationRequest, createDefaultAgentToolRegistry, runAgent } from '../../utils/agent'
+import { createAgentRequestId, ensureAgentConversation, recordAgentAuditEvent, saveAgentMessages } from '../../utils/agent/persistence'
 import { canContributeToDialect } from '../../utils/auth'
 import { connectDB } from '../../utils/db'
 import { EditHistory } from '../../utils/EditHistory'
@@ -11,6 +12,7 @@ import { User } from '../../utils/User'
 const ChatSchema = z.object({
   message: z.string().trim().max(2000).default(''),
   route: z.string().trim().max(500).optional(),
+  conversationId: z.string().optional(),
   confirmation: z.object({
     id: z.string(),
     confirmed: z.boolean(),
@@ -266,28 +268,69 @@ export default defineEventHandler(async (event) => {
   const actor = event.context.auth
   pruneExpiredPendingActions()
   const { message: userMessage, confirmation } = parsed.data
+  const conversation = await ensureAgentConversation({
+    actorId: actor.id,
+    channel: 'web',
+    conversationId: parsed.data.conversationId,
+    route: parsed.data.route,
+    title: userMessage
+  })
+  const conversationId = conversation._id.toString()
+  const requestId = createAgentRequestId()
+  const persistResponse = async (messages: ReturnType<typeof message>[]) => {
+    await saveAgentMessages({ conversationId, ownerId: actor.id, requestId, messages: messages as any })
+    return { conversationId, messages }
+  }
+
+  if (userMessage.trim()) {
+    const savedUserMessages = await saveAgentMessages({
+      conversationId,
+      ownerId: actor.id,
+      requestId,
+      messages: [message(userMessage, 'user') as any]
+    })
+    await recordAgentAuditEvent({
+      conversationId,
+      messageId: savedUserMessages[0]?._id.toString(),
+      requestId,
+      actorId: actor.id,
+      eventType: 'user_message',
+      metadata: { route: parsed.data.route, confirmation: Boolean(confirmation) }
+    })
+  }
 
   if (confirmation) {
     const pending = pendingActions.get(confirmation.id)
-    if (!pending) return { messages: [message('確認已過期或不存在，請重新發起操作。')] }
+    if (!pending) {
+      const messages = [message('確認已過期或不存在，請重新發起操作。')]
+      await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_expired', blockedReason: 'pending action missing' })
+      return persistResponse(messages)
+    }
     if (!confirmation.confirmed) {
       pendingActions.delete(confirmation.id)
-      return { messages: [message('已取消操作。')] }
+      const messages = [message('已取消操作。')]
+      await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_rejected', metadata: { action: pending.action } })
+      return persistResponse(messages)
     }
     if (new Date(pending.expiresAt).getTime() <= Date.now()) {
       pendingActions.delete(confirmation.id)
-      return { messages: [message('確認已過期，請重新發起操作。')] }
+      const messages = [message('確認已過期，請重新發起操作。')]
+      await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_expired', metadata: { action: pending.action } })
+      return persistResponse(messages)
     }
     const requiredEcho = 'headword' in pending ? pending.headword : pending.draft.headword
     if (pending.actorId !== actor.id || confirmation.echo !== requiredEcho) {
-      return { messages: [message('確認失敗：操作者或 echo 不匹配。')] }
+      const messages = [message('確認失敗：操作者或 echo 不匹配。')]
+      await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_failed', blockedReason: 'actor or echo mismatch', metadata: { action: pending.action } })
+      return persistResponse(messages)
     }
     pendingActions.delete(confirmation.id)
-    if (pending.action === 'create_draft_entry') return { messages: [await createDraft(pending.draft, actor)] }
-    if (pending.action === 'submit_entry_for_review') return { messages: [await submitEntry(pending.entryId, actor)] }
-    if (pending.action === 'approve_review_entry') return { messages: [await reviewEntry(pending.entryId, actor, true)] }
-    if (!confirmation.reason?.trim()) return { messages: [message('拒絕操作需要提供拒絕原因。')] }
-    return { messages: [await reviewEntry(pending.entryId, actor, false, confirmation.reason)] }
+    await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_accepted', metadata: { action: pending.action } })
+    if (pending.action === 'create_draft_entry') return persistResponse([await createDraft(pending.draft, actor)])
+    if (pending.action === 'submit_entry_for_review') return persistResponse([await submitEntry(pending.entryId, actor)])
+    if (pending.action === 'approve_review_entry') return persistResponse([await reviewEntry(pending.entryId, actor, true)])
+    if (!confirmation.reason?.trim()) return persistResponse([message('拒絕操作需要提供拒絕原因。')])
+    return persistResponse([await reviewEntry(pending.entryId, actor, false, confirmation.reason)])
   }
 
   const text = userMessage.trim()
@@ -295,7 +338,7 @@ export default defineEventHandler(async (event) => {
 
   if (lower.includes('草稿') || lower.includes('draft') || lower.includes('新建') || lower.includes('建立')) {
     const draft = parseDraft(text)
-    if (!draft.success) return { messages: [message('請提供草稿資料，例如：建立草稿 詞頭: 食飯 方言: hongkong 釋義: to eat a meal。')] }
+    if (!draft.success) return persistResponse([message('請提供草稿資料，例如：建立草稿 詞頭: 食飯 方言: hongkong 釋義: to eat a meal。')])
     const request = buildConfirmationRequest({
       action: 'create_draft_entry',
       risk: 'draft_write',
@@ -307,11 +350,12 @@ export default defineEventHandler(async (event) => {
       consequences: ['會在 JyutCollab 建立一個 draft 詞條。', '不會自動送審。']
     })
     pendingActions.set(request.id, { action: 'create_draft_entry', actorId: actor.id, draft: draft.data, expiresAt: request.expiresAt })
-    return { messages: [message('建立草稿需要確認。', 'assistant', { confirmation: request })] }
+    await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_requested', risk: request.risk, input: request, metadata: { action: request.action } })
+    return persistResponse([message('建立草稿需要確認。', 'assistant', { confirmation: request })])
   }
   if (lower.includes('送審') || lower.includes('submit')) {
     const entryId = extractEntryId(text)
-    if (!entryId) return { messages: [message('請提供要送審的詞條 ID。')] }
+    if (!entryId) return persistResponse([message('請提供要送審的詞條 ID。')])
     const request = buildConfirmationRequest({
       action: 'submit_entry_for_review',
       risk: 'editorial',
@@ -323,36 +367,35 @@ export default defineEventHandler(async (event) => {
       consequences: ['詞條狀態會改為 pending_review。']
     })
     pendingActions.set(request.id, { action: 'submit_entry_for_review', actorId: actor.id, entryId, headword: entryId, expiresAt: request.expiresAt })
-    return { messages: [message('送審需要確認。', 'assistant', { confirmation: request })] }
+    await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_requested', risk: request.risk, input: request, metadata: { action: request.action } })
+    return persistResponse([message('送審需要確認。', 'assistant', { confirmation: request })])
   }
   if (lower.includes('審核隊列') || lower.includes('review queue')) {
     if (actor.role !== 'reviewer' && actor.role !== 'admin') {
-      return { messages: [message('你目前沒有審核隊列權限。')] }
+      return persistResponse([message('你目前沒有審核隊列權限。')])
     }
     await connectDB()
     const entries = await Entry.find({ status: 'pending_review' }).sort({ createdAt: 1 }).limit(10).lean()
-    return {
-      messages: [message(`目前有 ${entries.length} 個待審詞條（最多顯示 10 個）。`, 'tool', {
-        toolCall: {
-          name: 'jyutcollab.review_queue',
-          risk: 'safe',
-          summary: `目前有 ${entries.length} 個待審詞條。`,
-          data: {
-            entries: entries.map(entry => ({
-              id: entry.id || entry._id.toString(),
-              headword: entry.headword?.display,
-              dialect: entry.dialect?.name,
-              definition: entry.senses?.[0]?.definition
-            }))
-          },
-          nextAction: '可輸入「通過 id: 詞條ID」或「拒絕 id: 詞條ID」。'
-        }
-      })]
-    }
+    return persistResponse([message(`目前有 ${entries.length} 個待審詞條（最多顯示 10 個）。`, 'tool', {
+      toolCall: {
+        name: 'jyutcollab.review_queue',
+        risk: 'safe',
+        summary: `目前有 ${entries.length} 個待審詞條。`,
+        data: {
+          entries: entries.map(entry => ({
+            id: entry.id || entry._id.toString(),
+            headword: entry.headword?.display,
+            dialect: entry.dialect?.name,
+            definition: entry.senses?.[0]?.definition
+          }))
+        },
+        nextAction: '可輸入「通過 id: 詞條ID」或「拒絕 id: 詞條ID」。'
+      }
+    })])
   }
   if (lower.includes('通過') || lower.includes('approve') || lower.includes('拒絕') || lower.includes('reject')) {
     const entryId = extractEntryId(text)
-    if (!entryId) return { messages: [message('請提供要審核的詞條 ID。')] }
+    if (!entryId) return persistResponse([message('請提供要審核的詞條 ID。')])
     const rejecting = lower.includes('拒絕') || lower.includes('reject')
     const request = buildConfirmationRequest({
       action: rejecting ? 'reject_review_entry' : 'approve_review_entry',
@@ -365,7 +408,8 @@ export default defineEventHandler(async (event) => {
       consequences: ['這會改變詞條審核狀態。']
     })
     pendingActions.set(request.id, { action: rejecting ? 'reject_review_entry' : 'approve_review_entry', actorId: actor.id, entryId, headword: entryId, expiresAt: request.expiresAt })
-    return { messages: [message('審核操作需要確認。', 'assistant', { confirmation: request })] }
+    await recordAgentAuditEvent({ conversationId, requestId, actorId: actor.id, eventType: 'confirmation_requested', risk: request.risk, input: request, metadata: { action: request.action } })
+    return persistResponse([message('審核操作需要確認。', 'assistant', { confirmation: request })])
   }
 
   const agentResult = await runAgent({
@@ -376,11 +420,24 @@ export default defineEventHandler(async (event) => {
     registry: createDefaultAgentToolRegistry()
   })
 
-  return {
-    messages: [message(agentResult.content, 'assistant', {
-      progress: agentProgress(agentResult.toolCalls),
-      localAction: (agentResult.toolCalls.at(-1)?.result.data as any)?.action,
-      toolCall: agentResult.toolCalls.length ? toolResultPayload(agentResult.toolCalls.at(-1)!) : undefined
-    })]
+  for (const toolCall of agentResult.toolCalls) {
+    await recordAgentAuditEvent({
+      conversationId,
+      requestId,
+      actorId: actor.id,
+      eventType: toolCall.result.ok ? 'tool_call_result' : 'blocked_action',
+      toolName: toolCall.name,
+      risk: toolCall.risk,
+      input: toolCall.input,
+      outputSummary: toolCall.result.summary,
+      output: toolCall.result.data,
+      blockedReason: toolCall.result.ok ? undefined : toolCall.result.warnings?.join('；')
+    })
   }
+
+  return persistResponse([message(agentResult.content, 'assistant', {
+    progress: agentProgress(agentResult.toolCalls),
+    localAction: (agentResult.toolCalls.at(-1)?.result.data as any)?.action,
+    toolCall: agentResult.toolCalls.length ? toolResultPayload(agentResult.toolCalls.at(-1)!) : undefined
+  })])
 })

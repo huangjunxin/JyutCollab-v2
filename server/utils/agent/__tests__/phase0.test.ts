@@ -7,6 +7,7 @@ import {
   confirmationMatches,
   createDefaultAgentToolRegistry,
   listDialectsTool,
+  normalizeDialectName,
   redactAgentPayload,
   requiresConfirmation,
   searchEntriesTool,
@@ -126,6 +127,12 @@ describe('read-only JyutCollab agent tools', () => {
         expect.objectContaining({ id: 'other' })
       ])
     )
+  })
+
+  it('normalizes dialect labels before searching entries', () => {
+    expect(normalizeDialectName('容縣')).toBe('rongxian')
+    expect(normalizeDialectName('容縣 石頭')).toBe('rongxian_shitou')
+    expect(normalizeDialectName('rongxian')).toBe('rongxian')
   })
 
   it('redacts token-bearing and raw backend fields from tool payloads', () => {

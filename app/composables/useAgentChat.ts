@@ -1,18 +1,25 @@
-import type { AgentChatMessage, AgentChatResponse } from '../types/agent'
+import type { AgentChatMessage, AgentChatResponse, AgentConversationSummary } from '../types/agent'
+
+const WELCOME_MESSAGE: AgentChatMessage = {
+  id: 'agent-welcome',
+  role: 'assistant',
+  content: '可以直接問我：「查 食飯」、「找粵拼 ang1」、「檢查重複 詞頭: 食飯 方言: hongkong」。需要建立草稿、送審或審核時，我會先請你確認。',
+  createdAt: new Date().toISOString()
+}
 
 export function useAgentChat() {
   const route = useRoute()
   const open = useState('agent-sidebar-open', () => false)
-  const messages = useState<AgentChatMessage[]>('agent-chat-messages', () => [
-    {
-      id: 'agent-welcome',
-      role: 'assistant',
-      content: '你好，我可以幫你查詞、查粵拼、檢查重複、整理草稿，並在你明確確認後處理送審或審核操作。',
-      createdAt: new Date().toISOString()
-    }
-  ])
+  const conversations = useState<AgentConversationSummary[]>('agent-chat-conversations', () => [])
+  const currentConversationId = useState<string | null>('agent-chat-current-conversation-id', () => null)
+  const messages = useState<AgentChatMessage[]>('agent-chat-messages', () => [{ ...WELCOME_MESSAGE, createdAt: new Date().toISOString() }])
   const pending = useState('agent-chat-pending', () => false)
+  const loadingHistory = useState('agent-chat-loading-history', () => false)
   const error = useState<string | null>('agent-chat-error', () => null)
+
+  function welcomeMessages() {
+    return [{ ...WELCOME_MESSAGE, createdAt: new Date().toISOString() }]
+  }
 
   function resetStalePendingMessages() {
     pending.value = false
@@ -40,8 +47,62 @@ export function useAgentChat() {
     messages.value = messages.value.map(message => message.id === id ? updater(message) : message)
   }
 
-  function getMessage(id: string) {
-    return messages.value.find(message => message.id === id)
+  async function refreshConversations() {
+    if (!import.meta.client) return
+    const response = await $fetch<{ conversations: AgentConversationSummary[] }>('/api/agent/conversations')
+    conversations.value = response.conversations
+  }
+
+  async function createConversation() {
+    pending.value = false
+    loadingHistory.value = true
+    error.value = null
+    try {
+      const response = await $fetch<{ conversation: AgentConversationSummary }>('/api/agent/conversations', {
+        method: 'POST',
+        body: { route: route.fullPath }
+      })
+      currentConversationId.value = response.conversation.id
+      messages.value = welcomeMessages()
+      conversations.value = [response.conversation, ...conversations.value.filter(conversation => conversation.id !== response.conversation.id)]
+    } catch (err: any) {
+      error.value = err?.data?.message || err?.message || '無法建立新對話。'
+    } finally {
+      loadingHistory.value = false
+    }
+  }
+
+  async function loadConversation(id: string) {
+    if (pending.value) resetStalePendingMessages()
+    loadingHistory.value = true
+    error.value = null
+    try {
+      const response = await $fetch<{ messages: AgentChatMessage[] }>(`/api/agent/conversations/${id}/messages`)
+      currentConversationId.value = id
+      messages.value = response.messages.length ? response.messages : welcomeMessages()
+    } catch (err: any) {
+      error.value = err?.data?.message || err?.message || '無法讀取對話記錄。'
+    } finally {
+      loadingHistory.value = false
+    }
+  }
+
+  async function archiveConversation(id: string) {
+    if (pending.value) resetStalePendingMessages()
+    loadingHistory.value = true
+    error.value = null
+    try {
+      await $fetch(`/api/agent/conversations/${id}/archive`, { method: 'POST' })
+      conversations.value = conversations.value.filter(conversation => conversation.id !== id)
+      if (currentConversationId.value === id) {
+        currentConversationId.value = null
+        messages.value = welcomeMessages()
+      }
+    } catch (err: any) {
+      error.value = err?.data?.message || err?.message || '無法封存對話。'
+    } finally {
+      loadingHistory.value = false
+    }
   }
 
   async function sendMessage(content: string) {
@@ -49,6 +110,7 @@ export function useAgentChat() {
     if (!trimmed) return
     if (pending.value) resetStalePendingMessages()
 
+    messages.value = messages.value.filter(message => message.id !== 'agent-welcome')
     messages.value.push({
       id: crypto.randomUUID(),
       role: 'user',
@@ -70,6 +132,7 @@ export function useAgentChat() {
     error.value = null
     try {
       await streamMessage(trimmed, progressMessageId)
+      await refreshConversations()
     } catch (err: any) {
       error.value = err?.data?.message || err?.message || 'AI 助手暫時無法回應。'
       updateMessage(progressMessageId, message => ({
@@ -92,7 +155,11 @@ export function useAgentChat() {
       const response = await fetch('/api/agent/chat.stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, route: route.fullPath }),
+        body: JSON.stringify({
+          message: content,
+          route: route.fullPath,
+          ...(currentConversationId.value ? { conversationId: currentConversationId.value } : {})
+        }),
         signal: controller.signal
       })
       if (!response.ok || !response.body) throw new Error('AI 助手暫時無法回應。')
@@ -140,6 +207,7 @@ export function useAgentChat() {
     } catch {
       data = {}
     }
+    if (data.conversationId) currentConversationId.value = String(data.conversationId)
 
     if (event === 'STATUS_UPDATE') {
       const label = String(data.label || '')
@@ -227,10 +295,13 @@ export function useAgentChat() {
         body: {
           message: confirmed ? '確認執行' : '取消操作',
           route: route.fullPath,
+          ...(currentConversationId.value ? { conversationId: currentConversationId.value } : {}),
           confirmation: { id, confirmed, echo, reason }
         }
       })
+      currentConversationId.value = response.conversationId
       messages.value.push(...response.messages)
+      await refreshConversations()
     } catch (err: any) {
       error.value = err?.data?.message || err?.message || '確認操作失敗。'
       messages.value.push({
@@ -246,9 +317,16 @@ export function useAgentChat() {
 
   return {
     open,
+    conversations,
+    currentConversationId,
     messages,
     pending,
+    loadingHistory,
     error,
+    refreshConversations,
+    createConversation,
+    loadConversation,
+    archiveConversation,
     sendMessage,
     resolveConfirmation
   }
