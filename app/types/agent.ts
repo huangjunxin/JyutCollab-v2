@@ -24,10 +24,15 @@ export interface AgentPageContext {
     query?: string
     dialect?: string
     status?: string
+    theme?: string
+    createdBy?: string
   }
   view?: string
   selectedEntries?: string[]
   visibleCount?: number
+  totalCount?: number
+  currentPage?: number
+  hasAdvancedFilters?: boolean
 }
 
 export interface AgentProgressStep {
@@ -98,6 +103,20 @@ export interface AgentConversationSummary {
   archivedAt?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface AgentAuditEventItem {
+  id: string
+  conversationId?: string
+  messageId?: string
+  requestId?: string
+  actorId: string
+  eventType: string
+  toolName?: string
+  risk?: string
+  outputSummary?: string
+  blockedReason?: string
+  createdAt: string
 }
 
 export interface AgentChatRequest {

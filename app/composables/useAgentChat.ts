@@ -1,4 +1,4 @@
-import type { AgentChatMessage, AgentChatResponse, AgentConversationSummary, AgentPageContext } from '../types/agent'
+import type { AgentChatMessage, AgentChatResponse, AgentConversationSummary, AgentPageContext, AgentLocalActionSummary } from '../types/agent'
 
 const WELCOME_MESSAGE: AgentChatMessage = {
   id: 'agent-welcome',
@@ -9,6 +9,9 @@ const WELCOME_MESSAGE: AgentChatMessage = {
 
 export function useAgentChat() {
   const route = useRoute()
+  const router = useRouter()
+  const { enqueue: enqueueAgentAction } = useAgentActions()
+  const injectedPageContext = inject<AgentPageContext | null>('agentPageContext', null)
   const open = useState('agent-sidebar-open', () => false)
   const conversations = useState<AgentConversationSummary[]>('agent-chat-conversations', () => [])
   const currentConversationId = useState<string | null>('agent-chat-current-conversation-id', () => null)
@@ -22,6 +25,7 @@ export function useAgentChat() {
   }
 
   function buildPageContext(): AgentPageContext {
+    if (injectedPageContext) return injectedPageContext
     const ctx: AgentPageContext = { route: route.fullPath }
     if (route.path === '/entries') {
       ctx.filters = {}
@@ -271,12 +275,20 @@ export function useAgentChat() {
       return
     }
     if (event === 'TOOL_CALL_RESULT') {
+      const localAction = data.localAction as AgentLocalActionSummary | undefined
       updateMessage(assistantMessageId, message => ({
         ...message,
         toolCall: data.toolCall,
-        localAction: data.localAction || message.localAction,
+        localAction: localAction || message.localAction,
         streamingToolCall: message.streamingToolCall ? { ...message.streamingToolCall, status: 'completed' } : undefined
       }))
+      if (localAction) {
+        if (localAction.kind === 'navigate' && localAction.to) {
+          router.push(localAction.to)
+        } else {
+          enqueueAgentAction(localAction)
+        }
+      }
       return
     }
     if (event === 'ERROR') {

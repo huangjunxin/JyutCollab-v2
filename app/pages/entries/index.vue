@@ -2856,6 +2856,24 @@ watch(
   { deep: true }
 )
 
+// Provide page context for AI agent
+provide('agentPageContext', computed(() => ({
+  route: route.fullPath,
+  filters: {
+    query: searchQuery.value || undefined,
+    dialect: filters.region !== ALL_FILTER_VALUE ? filters.region : undefined,
+    status: filters.status !== ALL_FILTER_VALUE ? filters.status : undefined,
+    theme: filters.theme !== ALL_FILTER_VALUE ? filters.theme : undefined,
+    createdBy: filters.createdBy || undefined
+  },
+  view: viewMode.value,
+  selectedEntries: [...selectedEntryIds.value],
+  visibleCount: visibleEntryCount.value,
+  totalCount: pagination.total,
+  currentPage: currentPage.value,
+  hasAdvancedFilters: hasActiveAdvancedFilters.value
+})))
+
 // Watch for agent local actions (from AI assistant panel)
 const { pending: agentActions, dequeue: dequeueAgentAction } = useAgentActions()
 watch(agentActions, async (queue) => {
