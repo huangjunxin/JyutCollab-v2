@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { Entry } from '../../../utils/Entry'
 import { Lexeme } from '../../../utils/Lexeme'
+import { EditHistory } from '../../../utils/EditHistory'
 
 const BodySchema = z.object({
   action: z.enum(['new', 'set']),
@@ -50,8 +51,20 @@ export default defineEventHandler(async (event) => {
     nextLexemeId = lexemeId
   }
 
+  const beforeSnapshot = existingEntry.toObject()
   existingEntry.lexemeId = nextLexemeId
   await existingEntry.save()
+
+  // 建立編輯歷史
+  await EditHistory.create({
+    entryId: existingEntry._id.toString(),
+    userId: event.context.auth.id,
+    beforeSnapshot,
+    afterSnapshot: existingEntry.toObject(),
+    changedFields: ['lexemeId'],
+    action: 'update',
+    comment: action === 'new' ? '建立新詞語組' : `重新關聯至詞語組 ${nextLexemeId}`
+  })
 
   // 確保 Lexeme 記錄存在
   await Lexeme.updateOne({ id: nextLexemeId }, { $setOnInsert: { id: nextLexemeId } }, { upsert: true })

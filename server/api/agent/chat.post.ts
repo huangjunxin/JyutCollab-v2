@@ -5,6 +5,7 @@ import { buildConfirmationRequest, createDefaultAgentToolRegistry, runAgent } fr
 import { createAgentRequestId, ensureAgentConversation, recordAgentAuditEvent, saveAgentMessages } from '../../utils/agent/persistence'
 import { canContributeToDialect } from '../../utils/auth'
 import { connectDB } from '../../utils/db'
+import { convertToHongKongTraditional } from '../../utils/textConversion'
 import { EditHistory } from '../../utils/EditHistory'
 import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
@@ -159,19 +160,24 @@ async function createDraft(draft: z.infer<typeof DraftSchema>, actor: any) {
   }
 
   const lexemeId = nanoid(10)
+  const displayText = convertToHongKongTraditional(draft.headword)
+  const normalizedText = convertToHongKongTraditional(displayText)
   const entry = await Entry.create({
     id: nanoid(12),
     lexemeId,
     headword: {
-      display: draft.headword,
-      normalized: draft.headword,
-      isPlaceholder: draft.headword.includes('□'),
+      display: displayText,
+      normalized: normalizedText,
+      isPlaceholder: displayText.includes('□'),
       variants: []
     },
     dialect: { name: draft.dialect },
     phonetic: { jyutping: draft.jyutping },
     entryType: 'word',
-    senses: [{ definition: draft.definition, examples: [] }],
+    senses: [{
+      definition: convertToHongKongTraditional((draft.definition || '').trim()),
+      examples: []
+    }],
     theme: {},
     meta: draft.register ? { register: draft.register } : {},
     status: 'draft',

@@ -322,6 +322,8 @@ export default defineEventHandler(async (event) => {
             .filter(({ ref }: { ref: { targetEntryId?: string } }) => ref.targetEntryId === id)
           if (matchingRefs.length === 0) continue
 
+          const beforeCascade = E.toObject()
+
           let display = (E.headword?.display ?? '') || ''
           const normalizedWasDisplay = (E.headword?.normalized ?? '') === display
 
@@ -356,6 +358,15 @@ export default defineEventHandler(async (event) => {
           E.morphemeRefs = refs
           try {
             await E.save()
+            await EditHistory.create({
+              entryId: E._id.toString(),
+              userId,
+              beforeSnapshot: beforeCascade,
+              afterSnapshot: E.toObject(),
+              changedFields: ['headword', 'morphemeRefs'],
+              action: 'update',
+              comment: `詞素詞頭同步：${oldDisplay} → ${newDisplay}（源自詞條 ${id}）`
+            })
           } catch (err: any) {
             console.error('Morpheme headword sync: failed to update entry', E.id, err?.message)
           }

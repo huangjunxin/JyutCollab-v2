@@ -13,17 +13,14 @@ export default defineEventHandler(async () => {
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const [total, approved, pending, rejected, contributors, activeContributors, recentContributions] = await Promise.all([
-      Entry.countDocuments({}),
+    const [approved, contributors, activeContributors, recentContributions] = await Promise.all([
       Entry.countDocuments({ status: 'approved' }),
-      Entry.countDocuments({ status: 'pending_review' }),
-      Entry.countDocuments({ status: 'rejected' }),
-      Entry.distinct('createdBy').then(userIds => userIds.filter(Boolean).length),
+      Entry.distinct('createdBy', { status: 'approved' }).then(userIds => userIds.filter(Boolean).length),
       EditHistory.distinct('userId', { createdAt: { $gte: sevenDaysAgo } }).then(userIds => userIds.filter(Boolean).length),
       EditHistory.countDocuments({ createdAt: { $gte: sevenDaysAgo } })
     ])
 
-    return { total, approved, pending, rejected, contributors, activeContributors, recentContributions }
+    return { total: approved, approved, pending: 0, rejected: 0, contributors, activeContributors, recentContributions }
   } catch (error: any) {
     console.error('[Stats API]', error?.message || error)
     throw createError({

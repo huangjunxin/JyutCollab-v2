@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { Entry } from '../../utils/Entry'
 import { connectDB } from '../../utils/db'
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 const QuerySchema = z.object({
   // 搜索參數（可選，用於推薦）
   headword: z.string().optional(), // 當前詞條的詞頭
@@ -72,19 +76,25 @@ export default defineEventHandler(async (event) => {
       if (definition) {
         const keywords = definition.split(/[\s，,。.；;：:]/).filter(k => k.length > 1)
         if (keywords.length > 0) {
-          orConditions.push({ 'senses.definition': { $regex: keywords.join('|'), $options: 'i' } })
+          const escaped = keywords.map(k => escapeRegex(k)).join('|')
+          orConditions.push({ 'senses.definition': { $regex: escaped, $options: 'i' } })
         }
       }
       if (orConditions.length > 0) {
-        filter.$or = (filter.$or ? [filter.$or] : []).concat({ $or: orConditions }) as any
-        // 若原本有 entryType 的 $or，需要合併進一個大 $and
-        if (filter.$or && filter.entryType === undefined) {
-          const entryTypeOr = filter.$or
-          delete filter.$or
+        if (filter.$or) {
+          // 既有 entryType $or，又有粵拼/釋義條件 → 用 $and 合併
           filter.$and = [
-            entryTypeOr,
+            { $or: filter.$or },
             orConditions.length === 1 ? orConditions[0] : { $or: orConditions }
           ]
+          delete filter.$or
+        } else {
+          // 只有粵拼/釋義條件（entryType 已明確設置 → 無 entryType $or）
+          if (orConditions.length === 1) {
+            Object.assign(filter, orConditions[0])
+          } else {
+            filter.$or = orConditions
+          }
         }
       }
     }

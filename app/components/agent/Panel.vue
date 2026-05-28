@@ -159,10 +159,9 @@ watch(messages, scheduleScrollToBottom, { deep: true, flush: 'post' })
 watch(open, async (isOpen) => {
   if (isOpen) {
     await refreshConversations()
-    const shouldRestoreMessages = messages.value.length === 1 && messages.value[0]?.id === 'agent-welcome'
-    const conversationIdToLoad = currentConversationId.value || conversations.value[0]?.id
-    if (shouldRestoreMessages && conversationIdToLoad) {
-      await loadConversation(conversationIdToLoad)
+    const isFreshSession = messages.value.length === 1 && messages.value[0]?.id === 'agent-welcome'
+    if (isFreshSession) {
+      await createConversation()
     }
     await nextTick()
     scheduleScrollToBottom()
