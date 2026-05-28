@@ -43,11 +43,11 @@
         />
         <UButton
           v-if="currentConversationId"
-          color="neutral"
+          color="error"
           variant="ghost"
           size="sm"
-          icon="i-lucide-archive"
-          aria-label="封存目前對話"
+          icon="i-lucide-trash-2"
+          aria-label="刪除目前對話"
           @click="archiveConversation(currentConversationId)"
         />
       </template>
