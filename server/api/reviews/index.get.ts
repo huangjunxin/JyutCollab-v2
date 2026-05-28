@@ -1,3 +1,4 @@
+import { DIALECT_IDS, DIALECT_LABELS } from '../../../shared/dialects'
 import { z } from 'zod'
 import { formatZodErrorToMessage } from '../../utils/validation'
 
@@ -42,6 +43,15 @@ export default defineEventHandler(async (event) => {
     }
 
     const { page, perPage, dialectName, status, sortBy, sortOrder } = validated.data
+    const normalizedDialectName = typeof dialectName === 'string'
+      ? dialectName.trim()
+      : ''
+    const dialectLabelToId = new Map(Object.entries(DIALECT_LABELS).map(([id, label]) => [label, id]))
+    const dialectFilter = normalizedDialectName && normalizedDialectName !== '全部方言'
+      ? DIALECT_IDS.includes(normalizedDialectName as any)
+        ? normalizedDialectName
+        : dialectLabelToId.get(normalizedDialectName)
+      : ''
 
     // 構建篩選條件
     const filter: Record<string, any> = {
@@ -49,8 +59,8 @@ export default defineEventHandler(async (event) => {
     }
 
     // 如果指定了方言篩選，使用指定的值
-    if (dialectName) {
-      filter['dialect.name'] = dialectName
+    if (dialectFilter) {
+      filter['dialect.name'] = dialectFilter
     }
 
     // 構建排序

@@ -163,7 +163,7 @@ const processing = ref<string | null>(null)
 const action = ref<string | null>(null)
 const ALL_DIALECT_VALUE = '__all__'
 
-const selectedDialect = ref(ALL_DIALECT_VALUE)
+const selectedDialect = ref<string | { value?: string; label?: string }>(ALL_DIALECT_VALUE)
 
 const pagination = reactive({
   total: 0,
@@ -178,8 +178,14 @@ const rejectingEntry = ref<Entry | null>(null)
 
 const dialectOptions = dialectOptionsWithAll(ALL_DIALECT_VALUE)
 
+function getSelectedDialectValue() {
+  const value = selectedDialect.value
+  return typeof value === 'string' ? value : value?.value || ALL_DIALECT_VALUE
+}
+
 const cacheKey = computed(() => {
-  const dialect = selectedDialect.value === ALL_DIALECT_VALUE ? 'all' : selectedDialect.value
+  const selected = getSelectedDialectValue()
+  const dialect = selected === ALL_DIALECT_VALUE ? 'all' : selected
   return `review-live:${currentPage.value}:${dialect}`
 })
 
@@ -198,8 +204,9 @@ const { data: entries, pending: loading, refresh: refreshEntries } = useAsyncDat
       status: 'pending_review'
     }
 
-    if (selectedDialect.value && selectedDialect.value !== ALL_DIALECT_VALUE) {
-      query.dialectName = selectedDialect.value
+    const selectedDialectValue = getSelectedDialectValue()
+    if (selectedDialectValue && selectedDialectValue !== ALL_DIALECT_VALUE) {
+      query.dialectName = selectedDialectValue
     }
 
     return await $fetch('/api/reviews', { query })
