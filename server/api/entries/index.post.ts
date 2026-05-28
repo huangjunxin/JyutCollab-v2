@@ -4,7 +4,6 @@ import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
-import { User } from '../../utils/User'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -34,6 +33,33 @@ function formatMongooseValidationMessage(error: any) {
   return '詞條資料未能通過驗證，請檢查必填欄位後再試。'
 }
 
+function normalizeExample(ex: any) {
+  return {
+    text: convertToHongKongTraditional(ex.text || ex.sentence || ''),
+    jyutping: ex.jyutping,
+    translation: convertToHongKongTraditional(ex.translation || ''),
+    explanation: convertToHongKongTraditional(ex.explanation || ''),
+    scenario: convertToHongKongTraditional(ex.scenario || ''),
+    source: ex.source || 'user_generated' as const
+  }
+}
+
+function normalizeSense(sense: any) {
+  return {
+    definition: convertToHongKongTraditional((sense.definition || '').trim()),
+    label: sense.label ? convertToHongKongTraditional(sense.label) : undefined,
+    examples: Array.isArray(sense.examples) ? sense.examples.map(normalizeExample) : undefined,
+    images: Array.isArray(sense.images) ? sense.images.slice(0, 3) : undefined,
+    subSenses: Array.isArray(sense.subSenses)
+      ? sense.subSenses.map((sub: any) => ({
+          label: convertToHongKongTraditional(sub.label || ''),
+          definition: convertToHongKongTraditional((sub.definition || '').trim()),
+          examples: Array.isArray(sub.examples) ? sub.examples.map(normalizeExample) : undefined
+        }))
+      : undefined
+  }
+}
+
 const CreateEntrySchema = z.object({
   // 新格式
   headword: z.object({
@@ -61,7 +87,18 @@ const CreateEntrySchema = z.object({
       translation: z.string().optional(),
       scenario: z.string().optional()
     })).optional(),
-    images: z.array(z.string()).optional()
+    images: z.array(z.string()).optional(),
+    subSenses: z.array(z.object({
+      label: z.string(),
+      definition: z.string(),
+      examples: z.array(z.object({
+        text: z.string(),
+        jyutping: z.string().optional(),
+        translation: z.string().optional(),
+        scenario: z.string().optional(),
+        explanation: z.string().optional()
+      })).optional()
+    })).optional()
   })).optional(),
   theme: z.object({
     level1: z.string().optional(),
@@ -134,6 +171,8 @@ export default defineEventHandler(async (event) => {
 
     const data = validated.data
     const userId = event.context.auth.id
+    const userRole = event.context.auth.role
+    const isReviewerOrAdmin = userRole === 'admin' || userRole === 'reviewer'
 
     // 轉換文本為港式繁體（顯示/標準化用）
     const displayText = convertToHongKongTraditional(data.headword?.display || data.text || '')
@@ -142,7 +181,7 @@ export default defineEventHandler(async (event) => {
     // 異形詞：直接使用 headword.variants（若缺省則為空陣列）
     let variants: string[] = []
     if (Array.isArray(data.headword?.variants)) {
-      variants = data.headword!.variants
+      variants = data.headword!.variants.map(variant => convertToHongKongTraditional(variant))
     }
 
     // 構建詞頭
@@ -162,11 +201,6 @@ export default defineEventHandler(async (event) => {
 
     // 方案 A：貢獻者僅能在其方言權限內建立詞條
     const auth = event.context.auth
-    // 從 DB 刷新 dialectPermissions，避免 session snapshot 過期
-    const freshUser = await User.findById(auth.id).select('dialectPermissions').lean()
-    if (freshUser) {
-      auth.dialectPermissions = (freshUser.dialectPermissions || []) as any
-    }
     if (!canContributeToDialect(auth, dialect.name)) {
       throw createError({
         statusCode: 403,
@@ -175,17 +209,10 @@ export default defineEventHandler(async (event) => {
     }
 
     // 構建 senses
-    const senses = data.senses || [{
-      definition: convertToHongKongTraditional(data.definition || ''),
-      examples: (data.examples || []).map(ex => ({
-        text: convertToHongKongTraditional(ex.text || ex.sentence || ''),
-        jyutping: ex.jyutping,
-        translation: convertToHongKongTraditional(ex.translation || ''),
-        explanation: convertToHongKongTraditional(ex.explanation || ''),
-        scenario: ex.scenario,
-        source: 'user_generated' as const
-      }))
-    }]
+    const senses = data.senses?.map(normalizeSense) || [normalizeSense({
+      definition: data.definition || '',
+      examples: data.examples || []
+    })]
 
     // 構建 theme
     const theme = {
@@ -214,6 +241,14 @@ export default defineEventHandler(async (event) => {
     // 決定本詞條所屬的 lexemeId（若前端已有，沿用；否則新建一個）
     const lexemeId = data.lexemeId || nanoid(10)
 
+    const requestedStatus = data.status || 'draft'
+    if (!isReviewerOrAdmin && (requestedStatus === 'approved' || requestedStatus === 'rejected')) {
+      throw createError({
+        statusCode: 403,
+        message: '無權直接建立已審核詞條'
+      })
+    }
+
     // 創建詞條
     const entryData: any = {
       id: nanoid(12),
@@ -225,12 +260,16 @@ export default defineEventHandler(async (event) => {
       senses,
       theme,
       meta,
-      status: data.status || 'draft',
+      status: requestedStatus,
       createdBy: userId,
       viewCount: 0,
       likeCount: 0
     }
-    
+    if (requestedStatus === 'approved' || requestedStatus === 'rejected') {
+      entryData.reviewedBy = userId
+      entryData.reviewedAt = new Date()
+    }
+
     // 詞素／單音節來源（僅屬於本方言點詞條）
     if (data.morphemeRefs && Array.isArray(data.morphemeRefs)) {
       entryData.morphemeRefs = data.morphemeRefs

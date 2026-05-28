@@ -81,24 +81,27 @@
             />
           </div>
 
-          <!-- 可貢獻的方言（多選）；reviewer/admin 可操作所有方言，此處可標記常用 -->
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               可貢獻的方言
-              <span class="text-gray-400 font-normal">（可多選，至少一項）</span>
+              <span class="text-gray-400 font-normal">（由管理員授權）</span>
             </label>
             <p v-if="profile.role === 'reviewer' || profile.role === 'admin'" class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              您可審核所有方言，此處為您常用的方言標籤
+              您可審核所有方言；下列項目只顯示額外授權記錄
             </p>
-            <USelect
-              v-model="form.dialects"
-              multiple
-              :items="dialectOptions"
-              value-key="value"
-              placeholder="請選擇方言點（可多選）"
-              size="lg"
-              class="w-full"
-            />
+            <div class="flex flex-wrap gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2 min-h-11">
+              <UBadge
+                v-for="dialect in form.dialects"
+                :key="dialect"
+                color="neutral"
+                variant="soft"
+              >
+                {{ dialectLabel(dialect) }}
+              </UBadge>
+              <span v-if="form.dialects.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                暫無方言權限
+              </span>
+            </div>
           </div>
 
           <div>
@@ -181,7 +184,7 @@
 
 <script setup lang="ts">
 import { useProfileUpdatedUser } from '~/composables/useAuth'
-import { getDialectLabel, DIALECT_OPTIONS_FOR_SELECT, DIALECT_OPTIONS_OPTIONAL, normalizeNativeDialect } from '~/utils/dialects'
+import { getDialectLabel, DIALECT_OPTIONS_OPTIONAL, normalizeNativeDialect } from '~/utils/dialects'
 
 definePageMeta({
   middleware: ['auth'],
@@ -216,8 +219,6 @@ const loadError = ref('')
 const saving = ref(false)
 const error = ref('')
 const success = ref(false)
-
-const dialectOptions = DIALECT_OPTIONS_FOR_SELECT
 
 const form = reactive({
   displayName: '',
@@ -270,11 +271,6 @@ async function loadProfile() {
 }
 
 async function handleSubmit() {
-  const isContributor = profile.value?.role === 'contributor'
-  if (isContributor && form.dialects.length < 1) {
-    error.value = '請至少選擇一個可貢獻的方言點'
-    return
-  }
   saving.value = true
   error.value = ''
   success.value = false
@@ -285,9 +281,6 @@ async function handleSubmit() {
       nativeDialect: form.nativeDialect || undefined,
       avatarUrl: form.avatarUrl || undefined,
       bio: form.bio || undefined
-    }
-    if (form.dialects.length >= 1) {
-      body.dialects = [...new Set(form.dialects)]
     }
     const res = await $fetch<{ success: boolean; data?: Profile; error?: string }>('/api/auth/me', {
       method: 'PATCH',

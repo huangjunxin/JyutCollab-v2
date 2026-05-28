@@ -3,7 +3,6 @@ import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
-import { User } from '../../utils/User'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -138,7 +137,8 @@ export default defineEventHandler(async (event) => {
 
     // Check permission - only owner or admin/reviewer can edit
     const isOwner = existingEntry.createdBy === userId
-    const canEdit = isOwner || userRole === 'admin' || userRole === 'reviewer'
+    const isReviewerOrAdmin = userRole === 'admin' || userRole === 'reviewer'
+    const canEdit = isOwner || isReviewerOrAdmin
 
     if (!canEdit) {
       throw createError({
@@ -148,6 +148,22 @@ export default defineEventHandler(async (event) => {
     }
 
     const data = validated.data
+
+    if (existingEntry.status === 'approved' && !isReviewerOrAdmin) {
+      throw createError({
+        statusCode: 403,
+        message: '已通過審核的詞條不可直接修改，請提交修訂建議'
+      })
+    }
+
+    const effectiveDialectName = data.dialect?.name || existingEntry.dialect?.name
+    if (effectiveDialectName && !canContributeToDialect(event.context.auth, effectiveDialectName)) {
+      throw createError({
+        statusCode: 403,
+        message: data.dialect ? '你沒有權限將詞條改為此方言' : '你沒有權限修改此方言的詞條'
+      })
+    }
+
     const beforeSnapshot = existingEntry.toObject()
     const changedFields: string[] = []
 
@@ -172,20 +188,8 @@ export default defineEventHandler(async (event) => {
       changedFields.push('headword')
     }
 
-    // Update dialect（方案 A：貢獻者僅能在其方言權限內修改）
+    // Update dialect
     if (data.dialect) {
-      const auth = event.context.auth
-      // 從 DB 刷新 dialectPermissions，避免 session snapshot 過期
-      const freshUser = await User.findById(auth.id).select('dialectPermissions').lean()
-      if (freshUser) {
-        auth.dialectPermissions = (freshUser.dialectPermissions || []) as any
-      }
-      if (!canContributeToDialect(auth, data.dialect.name)) {
-        throw createError({
-          statusCode: 403,
-          message: '你沒有權限將詞條改為此方言'
-        })
-      }
       existingEntry.dialect = data.dialect
       changedFields.push('dialect')
     }
@@ -273,7 +277,7 @@ export default defineEventHandler(async (event) => {
     // Update status (only reviewers/admins can approve/reject)
     if (data.status) {
       if (data.status === 'approved' || data.status === 'rejected') {
-        if (userRole !== 'admin' && userRole !== 'reviewer') {
+        if (!isReviewerOrAdmin) {
           throw createError({
             statusCode: 403,
             message: '無權更改審核狀態'

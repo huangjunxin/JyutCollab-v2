@@ -1,5 +1,6 @@
 import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
+import { getActiveAuthUserById } from '../../utils/auth'
 
 /** 當前登錄用戶的完整資料（不含密碼），供個人資料頁使用 */
 export default defineEventHandler(async (event) => {
@@ -8,6 +9,15 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 401,
       message: '請先登錄'
+    })
+  }
+
+  const activeUser = await getActiveAuthUserById(session.user.id)
+  if (!activeUser) {
+    await clearUserSession(event)
+    throw createError({
+      statusCode: 401,
+      message: '帳戶已停用或不存在，請重新登錄'
     })
   }
 

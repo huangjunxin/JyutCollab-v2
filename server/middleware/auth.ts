@@ -1,3 +1,5 @@
+import { getActiveAuthUserById } from '../utils/auth'
+
 export default defineEventHandler(async (event) => {
   const path = event.path
   const method = event.method
@@ -44,14 +46,23 @@ export default defineEventHandler(async (event) => {
 
   // All other API routes need authentication (session from nuxt-auth-utils)
   const session = await getUserSession(event)
-  if (!session?.user) {
+  if (!session?.user?.id) {
     throw createError({
       statusCode: 401,
       message: '請先登錄'
     })
   }
 
-  event.context.auth = session.user
+  const freshUser = await getActiveAuthUserById(session.user.id)
+  if (!freshUser) {
+    await clearUserSession(event)
+    throw createError({
+      statusCode: 401,
+      message: '帳戶已停用或不存在，請重新登錄'
+    })
+  }
+
+  event.context.auth = freshUser
 })
 
 // Extend event context types（session.user 與 toAuthUser 一致，含 dialectPermissions）

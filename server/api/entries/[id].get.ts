@@ -1,3 +1,4 @@
+import { getActiveAuthUserById } from '../../utils/auth'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -11,15 +12,27 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // 支持通過 id 或 _id 查找
-    const entry = await Entry.findOne({
-      $or: [
-        { id },
-        { _id: id }
-      ]
-    }).lean()
+    const lookupConditions: Record<string, any>[] = [{ id }]
+    if (/^[a-f\d]{24}$/i.test(id)) {
+      lookupConditions.push({ _id: id })
+    }
+
+    const entry = await Entry.findOne({ $or: lookupConditions }).lean()
 
     if (!entry) {
+      throw createError({
+        statusCode: 404,
+        message: '詞條不存在'
+      })
+    }
+
+    const session = await getUserSession(event)
+    const viewer = session?.user?.id ? await getActiveAuthUserById(session.user.id) : null
+    const isReviewerOrAdmin = viewer?.role === 'admin' || viewer?.role === 'reviewer'
+    const isOwner = viewer?.id === entry.createdBy
+    const canView = entry.status === 'approved' || isReviewerOrAdmin || isOwner
+
+    if (!canView) {
       throw createError({
         statusCode: 404,
         message: '詞條不存在'
@@ -91,7 +104,7 @@ export default defineEventHandler(async (event) => {
         reviewedBy: entry.reviewedBy,
         reviewedAt: entry.reviewedAt?.toISOString(),
         reviewNotes: entry.reviewNotes,
-        viewCount: entry.viewCount + 1,
+        viewCount: (entry.viewCount ?? 0) + 1,
         likeCount: entry.likeCount,
         createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
         updatedAt: entry.updatedAt?.toISOString?.() || entry.updatedAt

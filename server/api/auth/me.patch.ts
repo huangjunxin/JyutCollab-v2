@@ -1,27 +1,23 @@
 import { z } from 'zod'
-import { DIALECT_IDS } from '../../../shared/dialects'
 import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
+import { getActiveAuthUserById } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
-
-const VALID_DIALECTS: string[] = [...DIALECT_IDS]
 
 const UpdateProfileSchema = z.object({
   displayName: z.string().trim().max(100, '顯示名稱最多100個字符').optional(),
   location: z.string().trim().max(100, '所在地最多100個字符').optional(),
   nativeDialect: z.string().trim().max(50).optional(),
   bio: z.string().trim().max(500, '簡介最多500個字符').optional(),
-  avatarUrl: z.union([z.string().url('請輸入有效的頭像網址'), z.literal('')]).optional(),
-  dialects: z.array(z.string().refine(id => VALID_DIALECTS.includes(id), { message: '請選擇有效的方言點' })).min(1, '請至少選擇一個方言點').optional()
-})
+  avatarUrl: z.union([z.string().url('請輸入有效的頭像網址'), z.literal('')]).optional()
+}).strict()
 
 const PROFILE_FIELD_LABELS: Record<string, string> = {
   displayName: '顯示名稱',
   location: '所在地',
   nativeDialect: '母語方言',
   bio: '簡介',
-  avatarUrl: '頭像網址',
-  dialects: '可貢獻的方言'
+  avatarUrl: '頭像網址'
 }
 
 export default defineEventHandler(async (event) => {
@@ -30,6 +26,15 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 401,
       message: '請先登錄'
+    })
+  }
+
+  const activeUser = await getActiveAuthUserById(session.user.id)
+  if (!activeUser) {
+    await clearUserSession(event)
+    throw createError({
+      statusCode: 401,
+      message: '帳戶已停用或不存在，請重新登錄'
     })
   }
 
@@ -47,19 +52,11 @@ export default defineEventHandler(async (event) => {
   if (updates.avatarUrl === '') {
     updates.avatarUrl = undefined
   }
-  // 只保留允許更新的欄位；dialects 單獨轉成 dialectPermissions
   const allowed: Record<string, unknown> = {}
   for (const key of ['displayName', 'location', 'nativeDialect', 'bio', 'avatarUrl']) {
     if (key in updates && updates[key] !== undefined) {
       allowed[key] = updates[key]
     }
-  }
-  if (updates.dialects !== undefined && Array.isArray(updates.dialects)) {
-    const unique = [...new Set(updates.dialects as string[])]
-    allowed.dialectPermissions = unique.map(name => ({
-      dialectName: name,
-      role: 'contributor'
-    }))
   }
 
   await connectDB()

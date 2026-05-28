@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getActiveAuthUserById } from '../../utils/auth'
 
 const ALL_MAX_LIMIT = 5000
 
@@ -33,6 +34,9 @@ const QuerySchema = z.object({
 export default defineEventHandler(async (event) => {
   try {
     await connectDB()
+
+    const session = await getUserSession(event)
+    const viewer = session?.user?.id ? await getActiveAuthUserById(session.user.id) : null
 
     const query = getQuery(event)
     const validated = QuerySchema.safeParse(query)
@@ -164,6 +168,17 @@ export default defineEventHandler(async (event) => {
     // 語域篩選
     if (register) filter['meta.register'] = register
 
+    const isReviewerOrAdmin = viewer?.role === 'admin' || viewer?.role === 'reviewer'
+    const visibilityFilter: Record<string, any> = isReviewerOrAdmin
+      ? {}
+      : viewer
+        ? { $or: [{ status: 'approved' }, { createdBy: viewer.id }] }
+        : { status: 'approved' }
+
+    const finalFilter = Object.keys(visibilityFilter).length > 0
+      ? { $and: [visibilityFilter, filter] }
+      : filter
+
     // Build sort
     const sort: Record<string, 1 | -1> = {}
     if (sortBy === 'headword') {
@@ -218,7 +233,7 @@ export default defineEventHandler(async (event) => {
       const sortStage = Object.keys(sort).length ? { $sort: sort } : { $sort: { 'headword.display': 1 } }
       const groupKey = { $ifNull: ['$headword.normalized', '$headword.display'] }
       const facetResult = await Entry.aggregate([
-        { $match: filter },
+        { $match: finalFilter },
         sortStage,
         {
           $facet: {
@@ -261,7 +276,7 @@ export default defineEventHandler(async (event) => {
         ]
       }
       const facetResult = await Entry.aggregate([
-        { $match: filter },
+        { $match: finalFilter },
         sortStage,
         {
           $facet: {
@@ -302,8 +317,8 @@ export default defineEventHandler(async (event) => {
     }
 
     const [entries, total] = await Promise.all([
-      Entry.find(filter).sort(sort).skip(skip).limit(effectiveLimit).lean(),
-      Entry.countDocuments(filter)
+      Entry.find(finalFilter).sort(sort).skip(skip).limit(effectiveLimit).lean(),
+      Entry.countDocuments(finalFilter)
     ])
     const data = entries.map((entry: any) => transformEntry(entry))
 

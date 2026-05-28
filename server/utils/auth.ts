@@ -156,7 +156,7 @@ export async function getAuthUserById(userId: string): Promise<AuthUser | null> 
 }
 
 // Convert IUser to AuthUser
-function toAuthUser(user: IUser): AuthUser {
+export function toAuthUser(user: IUser): AuthUser {
   return {
     id: user._id.toString(),
     email: user.email,
@@ -167,6 +167,16 @@ function toAuthUser(user: IUser): AuthUser {
       dialectName: p.dialectName,
       role: p.role ?? 'contributor'
     }))
+  }
+}
+
+export async function getActiveAuthUserById(userId: string): Promise<AuthUser | null> {
+  try {
+    await connectDB()
+    const user = await User.findOne({ _id: userId, isActive: true })
+    return user ? toAuthUser(user) : null
+  } catch {
+    return null
   }
 }
 
