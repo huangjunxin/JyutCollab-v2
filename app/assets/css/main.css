@@ -36,6 +36,7 @@
     --jc-font-serif: "Noto Serif HK", "Noto Serif TC", "Cactus Classical Serif", serif;
     --jc-font-sans: Inter, "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     --jc-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --jc-font-headword: "Noto Sans CJK TC", "Noto Sans TC", "Noto Sans HK", "PingFang TC", "PingFang HK", var(--jc-font-sans);
   }
 
   body {
@@ -104,6 +105,14 @@
 
   .jc-mono {
     font-family: var(--jc-font-mono);
+  }
+
+  .jc-entries-table-font {
+    font-family: "Noto Sans CJK TC", "Noto Sans TC", "Noto Sans HK", "PingFang TC", "PingFang HK", var(--jc-font-sans);
+  }
+
+  .jc-headword-rare-font {
+    font-family: var(--jc-font-headword);
   }
 
   .jc-square-control {

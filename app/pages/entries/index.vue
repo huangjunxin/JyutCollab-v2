@@ -312,7 +312,7 @@
         </div>
       </div>
       <div
-        class="flex-1 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] overflow-hidden flex flex-col"
+        class="jc-entries-table-font flex-1 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] overflow-hidden flex flex-col"
         :class="{ 'border-t-0': selectedCount > 0 }"
       >
       <div
@@ -379,7 +379,7 @@
               <td class="w-10 px-2 py-1 text-center border-r border-gray-200 dark:border-gray-700 text-xs text-gray-400 align-middle">
                 {{ (pagination.page - 1) * pagination.perPage + row.groupIndex + 1 }}
               </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 font-medium text-gray-900 dark:text-white">
+              <td class="jc-headword-rare-font px-3 py-2 border-r border-gray-200 dark:border-gray-700 font-medium text-gray-900 dark:text-white">
                 {{ row.group.headwordDisplay || '—' }}
               </td>
               <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700">
@@ -1005,6 +1005,12 @@ definePageMeta({
   layout: 'default',
   middleware: ['auth'],
   name: 'entries-index'
+})
+
+useHead({
+  link: [
+    { rel: 'stylesheet', href: '/fonts/jyutcollab-headword-rare.css' }
+  ]
 })
 
 const { isAuthenticated, user, refreshUser } = useAuth()

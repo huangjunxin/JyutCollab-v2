@@ -26,6 +26,9 @@ logs
 # Claude settings
 .claude
 
+# Local font sources for subset generation
+assets/fonts/
+
 # Documentation
 /docs
 server/api/admin/import-gz-practical.post.ts

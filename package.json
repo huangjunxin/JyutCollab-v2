@@ -7,6 +7,7 @@
     "dev": "nuxt dev --port 3100",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "generate:headword-font": "node scripts/generate-headword-rare-font.mjs",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {

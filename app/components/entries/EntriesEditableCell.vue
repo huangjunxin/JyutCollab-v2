@@ -4,6 +4,7 @@
     :class="[
       isSelected && !isEditing && 'ring-2 ring-primary/60 ring-inset',
       wrap && 'cell-td-wrap',
+      col.key === 'headword' && 'jc-headword-rare-font',
       !canEdit && 'cursor-default',
       hasValidationMatches && !isEditing && 'cell-has-validation-warning'
     ]"
