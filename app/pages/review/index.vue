@@ -180,7 +180,7 @@ const dialectOptions = dialectOptionsWithAll(ALL_DIALECT_VALUE)
 
 const cacheKey = computed(() => {
   const dialect = selectedDialect.value === ALL_DIALECT_VALUE ? 'all' : selectedDialect.value
-  return `review:${currentPage.value}:${dialect}`
+  return `review-live:${currentPage.value}:${dialect}`
 })
 
 interface ReviewResponse {
@@ -206,6 +206,7 @@ const { data: entries, pending: loading, refresh: refreshEntries } = useAsyncDat
   },
   {
     watch: [currentPage, selectedDialect],
+    getCachedData: () => undefined,
     transform: (response) => {
       pagination.total = response.total
       pagination.totalPages = response.totalPages

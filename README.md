@@ -19,6 +19,8 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **主題分類**——AI 三層主題自動分類（共 439 個類別）
 - **釋義生成**——自動生成香港繁體中文釋義建議
 - **例句生成**——生成附帶解釋的情境例句
+- **全站 AI 助手**——右側常駐面板可回答使用指南問題、查詢詞條、套用詞條表格篩選及切換視圖
+- **對話歷史與審計**——保存 AI 對話、工具調用摘要、確認流程與審計事件，方便追蹤 AI 輔助操作
 - **建議成效追蹤**——記錄 AI 建議的採納、拒絕、接受後修改與待處理狀態
 
 ### 儀表板與分析
@@ -48,6 +50,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 
 ### 其他功能
 - **圖片上傳**——整合 Cloudinary，支援 HEIC 格式及自動優化
+- **稀有漢字顯示**——支援為詞頭、審核與歷史頁載入稀有字體子集
 - **深色模式**——完整支援深色主題
 - **響應式設計**——支援流動裝置
 - **香港繁體中文**——所有文字自動轉換為香港繁體
@@ -141,6 +144,7 @@ JyutCollab-v2/
 │   │   ├── reviews/            # 審核流程
 │   │   ├── histories/          # 編輯歷史
 │   │   ├── ai/                 # AI 整合
+│   │   ├── agent/              # 全站 AI 助手對話、工具與審計
 │   │   ├── stats/              # 統計數據
 │   │   ├── upload/             # 檔案上傳
 │   │   ├── lexemes/            # 詞位管理
@@ -157,6 +161,9 @@ JyutCollab-v2/
 │       ├── Lexeme.ts           # 詞位分組模型
 │       ├── ExternalEtymon.ts   # 外部詞源參照模型
 │       ├── Notification.ts     # 通知模型
+│       ├── AgentConversation.ts # AI 助手對話模型
+│       ├── AgentMessage.ts     # AI 助手訊息模型
+│       ├── AgentAuditEvent.ts  # AI 助手審計事件模型
 │       ├── ai.ts               # AI 服務
 │       ├── auth.ts             # 認證工具
 │       ├── cloudinary.ts       # 圖片上傳工具
@@ -203,6 +210,14 @@ JyutCollab-v2/
 | POST | /api/ai/definitions | 生成釋義 |
 | POST | /api/ai/examples | 生成例句 |
 | POST | /api/ai/suggestions/:id/action | 記錄 AI 建議採納、拒絕或修改 |
+| POST | /api/agent/chat | AI 助手非串流對話與確認回覆 |
+| POST | /api/agent/chat.stream | AI 助手串流對話、工具調用與本地頁面操作 |
+| GET | /api/agent/conversations | 取得 AI 助手對話列表 |
+| POST | /api/agent/conversations | 建立 AI 助手對話 |
+| GET | /api/agent/conversations/:id | 取得單一 AI 助手對話 |
+| GET | /api/agent/conversations/:id/messages | 取得 AI 助手對話訊息 |
+| POST | /api/agent/conversations/:id/archive | 封存 AI 助手對話 |
+| GET | /api/agent/audit-events | 查詢 AI 助手審計事件 |
 
 ### 統計與儀表板
 | 方法 | 端點 | 說明 |
@@ -280,6 +295,9 @@ npm run build
 
 # 預覽生產建置
 npm run preview
+
+# 生成詞頭稀有字體子集
+npm run generate:headword-font
 
 # 準備 Nuxt
 npm run postinstall
