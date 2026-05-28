@@ -18,7 +18,7 @@
     </div>
 
     <div class="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-      <DocsSidebar class="lg:sticky lg:top-24 lg:self-start" :docs="docsList" :current-path="currentPath" />
+      <DocsSidebar class="lg:sticky lg:top-20 lg:self-start" :docs="docsList" :current-path="currentPath" />
 
       <article class="jc-card-lg min-w-0 border border-[var(--jc-border)] bg-white p-6 dark:border-[var(--jc-dark-border)] dark:bg-slate-900 lg:p-10">
         <div v-if="page" class="docs-prose">
