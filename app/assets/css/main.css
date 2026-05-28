@@ -216,7 +216,7 @@
   }
 
   .entry-detail-card h3 {
-    font-family: var(--jc-font-serif);
+    font-family: var(--jc-font-headword);
     color: var(--jc-ink-strong);
   }
 
@@ -241,6 +241,10 @@
     background: var(--jc-dark-surface);
     color: #F8FAFC;
     box-shadow: var(--jc-shadow-hard-dark) !important;
+  }
+
+  .review-dict-card-sans .entry-detail-card .card-body {
+    font-family: var(--jc-font-sans);
   }
 
   .cell-td {

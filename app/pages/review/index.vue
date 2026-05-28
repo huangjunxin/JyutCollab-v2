@@ -50,7 +50,7 @@
       <div
         v-for="entry in entryList"
         :key="entry.id"
-        class="review-dict-card transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 overflow-hidden"
+        class="review-dict-card review-dict-card-sans transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 overflow-hidden"
       >
         <EntriesEntryDetailCard :display-entry="entryToDisplay(entry)">
           <template #actions>
@@ -101,7 +101,7 @@
           </template>
 
           <div v-if="rejectingEntry" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <p class="font-medium text-gray-900 dark:text-white">
+            <p class="jc-headword-rare-font font-medium text-gray-900 dark:text-white">
               {{ rejectingEntry.headword?.display || rejectingEntry.text }}
             </p>
           </div>
@@ -145,12 +145,17 @@
 import type { Entry } from '~/types'
 import { dialectOptionsWithAll } from '~/utils/dialects'
 import { entryToDisplay } from '~/composables/useEntryDisplay'
-import { useCachedAsyncData, CACHE_TTL, clearCacheByKey } from '~/composables/useDataCache'
 
 definePageMeta({
   layout: 'default',
   middleware: ['reviewer'],
   name: 'review-index'
+})
+
+useHead({
+  link: [
+    { rel: 'stylesheet', href: '/fonts/jyutcollab-headword-rare.css' }
+  ]
 })
 
 const currentPage = ref(1)
@@ -184,7 +189,7 @@ interface ReviewResponse {
   totalPages: number
 }
 
-const { data: entries, pending: loading, refresh: refreshEntries } = useCachedAsyncData<ReviewResponse>(
+const { data: entries, pending: loading, refresh: refreshEntries } = useAsyncData<ReviewResponse>(
   () => cacheKey.value,
   async () => {
     const query: Record<string, any> = {
@@ -200,7 +205,6 @@ const { data: entries, pending: loading, refresh: refreshEntries } = useCachedAs
     return await $fetch('/api/reviews', { query })
   },
   {
-    ttl: CACHE_TTL.review,
     watch: [currentPage, selectedDialect],
     transform: (response) => {
       pagination.total = response.total
@@ -229,13 +233,11 @@ async function handleApprove(id: string) {
     await $fetch(`/api/reviews/${id}/approve`, {
       method: 'POST'
     })
-    clearCacheByKey('review:')
     await refreshEntries()
   } catch (error: any) {
     console.error('Failed to approve:', error)
     const errorMessage = error?.data?.message || error?.message || '審核操作失敗'
     alert(errorMessage)
-    clearCacheByKey('review:')
     await refreshEntries()
   } finally {
     processing.value = null
@@ -262,14 +264,12 @@ async function handleReject() {
       }
     })
     rejectModalOpen.value = false
-    clearCacheByKey('review:')
     await refreshEntries()
     rejectingEntry.value = null
   } catch (error: any) {
     console.error('Failed to reject:', error)
     const errorMessage = error?.data?.message || error?.message || '審核操作失敗'
     alert(errorMessage)
-    clearCacheByKey('review:')
     await refreshEntries()
   } finally {
     rejecting.value = false

@@ -98,7 +98,7 @@
 
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                <span class="jc-headword-rare-font text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                   {{ getEntryDisplay(history) }}
                 </span>
                 <UBadge
@@ -204,7 +204,7 @@
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400 pb-3 border-b border-gray-200 dark:border-gray-700">
               <span>
                 <span class="font-medium">詞條:</span>
-                {{ getEntryDisplay(selectedHistory) }}
+                <span class="jc-headword-rare-font">{{ getEntryDisplay(selectedHistory) }}</span>
               </span>
               <span v-if="selectedHistory.user">
                 <span class="font-medium">操作者:</span>
@@ -419,6 +419,12 @@ import type { EditHistory, PaginatedResponse } from '~/types'
 definePageMeta({
   layout: 'default',
   name: 'histories-index'
+})
+
+useHead({
+  link: [
+    { rel: 'stylesheet', href: '/fonts/jyutcollab-headword-rare.css' }
+  ]
 })
 
 const toast = useToast()
