@@ -120,6 +120,18 @@ npm run dev
 
 應用程式將在 `http://localhost:3100` 運行。
 
+## 稀有漢字字體子集
+
+詞頭、審核佇列及編輯歷史會載入 `public/fonts/` 內的稀有漢字字體子集，以支援部分系統字體缺字的粵方言用字。
+
+如果資料庫日後新增更多擴展區漢字，可重新生成字體子集：
+
+```bash
+npm run generate:headword-font
+```
+
+此指令會掃描資料庫中實際出現的詞頭與異形詞，重新產生 `public/fonts/jyutcollab-headword-rare-*.woff2` 及對應 CSS。只會打包實際用到的字，避免載入完整 CJK 字體造成前端體積過大。
+
 ## 專案結構
 
 ```
