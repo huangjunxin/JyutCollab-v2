@@ -138,7 +138,6 @@ const draft = ref('')
 const selectedConversationId = ref<string | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 let scrollFrame: number | null = null
-let hasAutoCreated = false
 
 function scrollToBottom() {
   const container = messagesContainer.value
@@ -161,9 +160,13 @@ watch(open, async (isOpen) => {
   if (isOpen) {
     await refreshConversations()
     const isFreshSession = messages.value.length === 1 && messages.value[0]?.id === 'agent-welcome'
-    if (isFreshSession && !hasAutoCreated) {
-      hasAutoCreated = true
-      await createConversation()
+    if (isFreshSession) {
+      const latest = conversations.value[0]
+      if (latest && latest.messageCount === 0) {
+        currentConversationId.value = latest.id
+      } else {
+        await createConversation()
+      }
     }
     await nextTick()
     scheduleScrollToBottom()
