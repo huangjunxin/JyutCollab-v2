@@ -215,7 +215,6 @@
               variant="ghost"
               size="sm"
               square
-              :class="agentOpen ? 'ring-2 ring-primary/40' : ''"
               aria-label="JyutCollab AI 助手"
               @click="toggleAgent"
             >

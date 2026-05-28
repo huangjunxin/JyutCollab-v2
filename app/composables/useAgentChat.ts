@@ -22,7 +22,8 @@ export function useAgentChat() {
   })
   const messages = useState<AgentChatMessage[]>('agent-chat-messages', () => [{ ...WELCOME_MESSAGE, createdAt: new Date().toISOString() }])
   const pending = useState('agent-chat-pending', () => false)
-  const loadingHistory = useState('agent-chat-loading-history', () => false)
+  const loadingConversations = useState('agent-chat-loading-conversations', () => false)
+  const loadingMessages = useState('agent-chat-loading-messages', () => false)
   const error = useState<string | null>('agent-chat-error', () => null)
 
   function welcomeMessages() {
@@ -77,13 +78,17 @@ export function useAgentChat() {
 
   async function refreshConversations() {
     if (!import.meta.client) return
-    const response = await $fetch<{ conversations: AgentConversationSummary[] }>('/api/agent/conversations')
-    conversations.value = response.conversations
+    loadingConversations.value = true
+    try {
+      const response = await $fetch<{ conversations: AgentConversationSummary[] }>('/api/agent/conversations')
+      conversations.value = response.conversations
+    } finally {
+      loadingConversations.value = false
+    }
   }
 
   async function createConversation() {
     pending.value = false
-    loadingHistory.value = true
     error.value = null
     try {
       const response = await $fetch<{ conversation: AgentConversationSummary }>('/api/agent/conversations', {
@@ -95,14 +100,12 @@ export function useAgentChat() {
       conversations.value = [response.conversation, ...conversations.value.filter(conversation => conversation.id !== response.conversation.id)]
     } catch (err: any) {
       error.value = err?.data?.message || err?.message || '無法建立新對話。'
-    } finally {
-      loadingHistory.value = false
     }
   }
 
   async function loadConversation(id: string) {
     if (pending.value) resetStalePendingMessages()
-    loadingHistory.value = true
+    loadingMessages.value = true
     error.value = null
     try {
       const response = await $fetch<{ messages: AgentChatMessage[] }>(`/api/agent/conversations/${id}/messages`)
@@ -111,13 +114,12 @@ export function useAgentChat() {
     } catch (err: any) {
       error.value = err?.data?.message || err?.message || '無法讀取對話記錄。'
     } finally {
-      loadingHistory.value = false
+      loadingMessages.value = false
     }
   }
 
   async function archiveConversation(id: string) {
     if (pending.value) resetStalePendingMessages()
-    loadingHistory.value = true
     error.value = null
     try {
       await $fetch(`/api/agent/conversations/${id}/archive`, { method: 'POST' })
@@ -128,8 +130,6 @@ export function useAgentChat() {
       }
     } catch (err: any) {
       error.value = err?.data?.message || err?.message || '無法封存對話。'
-    } finally {
-      loadingHistory.value = false
     }
   }
 
@@ -358,7 +358,8 @@ export function useAgentChat() {
     currentConversationId,
     messages,
     pending,
-    loadingHistory,
+    loadingConversations,
+    loadingMessages,
     error,
     refreshConversations,
     createConversation,

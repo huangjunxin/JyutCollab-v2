@@ -30,7 +30,7 @@
           label-key="title"
           :items="conversations"
           placeholder="歷史對話"
-          :loading="loadingHistory"
+          :loading="loadingConversations"
           @update:model-value="handleConversationChange"
         />
         <UButton
@@ -38,7 +38,6 @@
           variant="ghost"
           size="sm"
           icon="i-lucide-plus"
-          :loading="loadingHistory"
           aria-label="新對話"
           @click="createConversation"
         />
@@ -48,7 +47,6 @@
           variant="ghost"
           size="sm"
           icon="i-lucide-archive"
-          :loading="loadingHistory"
           aria-label="封存目前對話"
           @click="archiveConversation(currentConversationId)"
         />
@@ -93,9 +91,9 @@
             v-model="draft"
             class="flex-1"
             placeholder="例如：查 食飯；找粵拼 ang1；檢查重複"
-            :disabled="pending || loadingHistory"
+            :disabled="pending || loadingMessages"
           />
-          <UButton type="submit" color="primary" size="sm" :loading="pending" :disabled="!draft.trim() || loadingHistory">
+          <UButton type="submit" color="primary" size="sm" :loading="pending" :disabled="!draft.trim() || loadingMessages">
             發送
           </UButton>
         </div>
@@ -121,7 +119,8 @@ const {
   currentConversationId,
   messages,
   pending,
-  loadingHistory,
+  loadingConversations,
+  loadingMessages,
   error,
   refreshConversations,
   createConversation,
