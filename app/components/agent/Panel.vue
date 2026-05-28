@@ -161,7 +161,13 @@ watch(open, async (isOpen) => {
     await refreshConversations()
     const isFreshSession = messages.value.length === 1 && messages.value[0]?.id === 'agent-welcome'
     if (isFreshSession) {
-      await createConversation()
+      const currentConv = currentConversationId.value
+        ? conversations.value.find(c => c.id === currentConversationId.value)
+        : null
+      const alreadyFresh = currentConv && currentConv.messageCount === 0
+      if (!alreadyFresh) {
+        await createConversation()
+      }
     }
     await nextTick()
     scheduleScrollToBottom()
