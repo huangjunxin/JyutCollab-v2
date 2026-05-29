@@ -68,7 +68,7 @@
             class="flex items-center justify-between px-1 py-0.5 min-h-[24px] bg-blue-50 dark:bg-blue-900/20 rounded"
             @click.stop
           >
-            <span class="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
+            <span class="text-xs text-blue-600 dark:text-blue-400 break-words">
               {{ themeExpandHint }}
             </span>
             <div class="flex items-center gap-1">

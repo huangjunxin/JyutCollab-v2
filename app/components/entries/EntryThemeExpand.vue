@@ -89,11 +89,11 @@
     <!-- AI 建議區域 -->
     <div
       v-if="aiSuggestion"
-      class="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20"
+      class="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden"
     >
       <div class="flex items-start gap-2">
         <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0 break-words">
           <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
             AI 建議: {{ aiSuggestion.level3Name }}
           </div>
