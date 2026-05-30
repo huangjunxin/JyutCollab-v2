@@ -9,7 +9,8 @@ export interface IUser {
   _id: string
   username: string
   email: string
-  passwordHash: string
+  passwordHash?: string
+  googleId?: string
   displayName?: string
   avatarUrl?: string
   location?: string
@@ -42,7 +43,12 @@ const UserSchema = new mongoose.Schema<IUser>({
   },
   passwordHash: {
     type: String,
-    required: true
+    required: false
+  },
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true
   },
   displayName: {
     type: String,

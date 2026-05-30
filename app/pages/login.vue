@@ -115,6 +115,29 @@
             </UButton>
           </form>
 
+          <!-- Google OAuth -->
+          <div class="mt-5">
+            <div class="relative mb-4">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-200 dark:border-gray-700"></div>
+              </div>
+              <div class="relative flex justify-center text-xs">
+                <span class="bg-white dark:bg-gray-900 px-2 text-gray-500">或</span>
+              </div>
+            </div>
+            <UButton
+              block
+              size="xl"
+              variant="outline"
+              :loading="googleLoading"
+              @click="handleGoogleLogin"
+              class="w-full"
+            >
+              <UIcon name="i-heroicons-user-circle" class="w-5 h-5 mr-2" />
+              使用 Google 登錄
+            </UButton>
+          </div>
+
           <!-- Register link -->
           <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
             <p class="text-sm text-gray-600 dark:text-gray-400">
@@ -139,6 +162,7 @@ definePageMeta({
 import { useAuth } from '~/composables/useAuth'
 
 const { login, isAuthenticated } = useAuth()
+const { openInPopup } = useUserSession()
 const router = useRouter()
 const route = useRoute()
 
@@ -148,7 +172,15 @@ const form = reactive({
 })
 
 const loading = ref(false)
+const googleLoading = ref(false)
 const error = ref('')
+
+// Show error from Google OAuth failure (redirected back with ?error=)
+onMounted(() => {
+  if (route.query.error === 'google_auth_failed') {
+    error.value = 'Google 登錄失敗，請稍後重試'
+  }
+})
 
 // Redirect if already authenticated
 watchEffect(() => {
@@ -157,6 +189,19 @@ watchEffect(() => {
     router.push(redirectTo)
   }
 })
+
+function handleGoogleLogin() {
+  googleLoading.value = true
+  error.value = ''
+  try {
+    openInPopup('/auth/google')
+    // Popup auto-closes on success; reset loading after timeout
+    setTimeout(() => { googleLoading.value = false }, 30000)
+  } catch {
+    googleLoading.value = false
+    error.value = '無法打開 Google 登錄視窗，請檢查彈窗設定'
+  }
+}
 
 async function handleSubmit() {
   if (!form.email || !form.password) {

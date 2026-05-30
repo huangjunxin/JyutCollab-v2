@@ -3,6 +3,7 @@ export interface User {
   id: string
   email: string
   username: string
+  googleId?: string
   displayName?: string
   avatarUrl?: string
   location?: string
@@ -313,6 +314,7 @@ export interface AuthUser {
   email: string
   username: string
   displayName?: string
+  avatarUrl?: string
   role: 'contributor' | 'reviewer' | 'admin'
   dialectPermissions: AuthUserDialectPermission[]
 }

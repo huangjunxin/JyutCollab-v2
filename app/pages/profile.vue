@@ -41,6 +41,41 @@
           </div>
         </div>
 
+        <!-- 已連結帳號 -->
+        <div class="mb-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">已連結帳號</h3>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-lg">🔵</span>
+              <div>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">Google</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ profile.hasGoogle ? '已連結' : '未連結' }}
+                </p>
+              </div>
+            </div>
+            <UButton
+              v-if="profile.hasGoogle"
+              variant="outline"
+              color="error"
+              size="sm"
+              :loading="unlinkingGoogle"
+              @click="handleUnlinkGoogle"
+            >
+              解除連結
+            </UButton>
+            <UButton
+              v-else
+              variant="outline"
+              size="sm"
+              :loading="linkingGoogle"
+              @click="handleLinkGoogle"
+            >
+              連結 Google 帳號
+            </UButton>
+          </div>
+        </div>
+
         <!-- 統計（只讀） -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div class="rounded-lg bg-gray-100 dark:bg-gray-800 p-4 text-center">
@@ -206,6 +241,7 @@ interface Profile {
   nativeDialect?: string
   role: string
   bio?: string
+  hasGoogle?: boolean
   dialectPermissions: DialectPerm[]
   contributionCount: number
   reviewCount: number
@@ -217,8 +253,14 @@ const profile = ref<Profile | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const saving = ref(false)
+const linkingGoogle = ref(false)
+const unlinkingGoogle = ref(false)
 const error = ref('')
 const success = ref(false)
+
+const { openInPopup } = useUserSession()
+const toast = useToast()
+const route = useRoute()
 
 const form = reactive({
   displayName: '',
@@ -250,6 +292,14 @@ function dialectLabel(name: string) {
 }
 
 async function loadProfile() {
+  // Google OAuth link result (from redirect after popup)
+  if (route.query.google_linked === '1') {
+    toast.add({ title: '已連結 Google 帳號', description: '之後可以使用 Google 登錄', color: 'success', icon: 'i-heroicons-check-circle' })
+  }
+  if (route.query.google_link_error) {
+    toast.add({ title: '連結失敗', description: route.query.google_link_error as string, color: 'error', icon: 'i-heroicons-exclamation-triangle' })
+  }
+
   loading.value = true
   loadError.value = ''
   try {
@@ -267,6 +317,38 @@ async function loadProfile() {
     loadError.value = e.data?.message ?? e.message ?? '請先登錄'
   } finally {
     loading.value = false
+  }
+}
+
+function handleLinkGoogle() {
+  linkingGoogle.value = true
+  try {
+    openInPopup('/auth/google')
+    // Popup auto-closes on success; reset loading after timeout
+    setTimeout(() => { linkingGoogle.value = false }, 30000)
+  } catch {
+    linkingGoogle.value = false
+    toast.add({ title: '無法打開 Google 登錄視窗', description: '請檢查瀏覽器的彈窗設定', color: 'error', icon: 'i-heroicons-exclamation-triangle' })
+  }
+}
+
+async function handleUnlinkGoogle() {
+  if (!confirm('確定要解除 Google 帳號連結嗎？')) return
+  unlinkingGoogle.value = true
+  try {
+    const res = await $fetch<{ success: boolean; error?: string }>('/api/auth/me/unlink-google', {
+      method: 'POST'
+    })
+    if (res.success) {
+      if (profile.value) profile.value.hasGoogle = false
+      toast.add({ title: '已解除 Google 連結', color: 'success', icon: 'i-heroicons-check-circle' })
+    } else if (res.error) {
+      toast.add({ title: '解除連結失敗', description: res.error, color: 'error', icon: 'i-heroicons-exclamation-triangle' })
+    }
+  } catch (e: any) {
+    toast.add({ title: '解除連結失敗', description: e.data?.error ?? e.message ?? '請稍後重試', color: 'error', icon: 'i-heroicons-exclamation-triangle' })
+  } finally {
+    unlinkingGoogle.value = false
   }
 }
 

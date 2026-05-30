@@ -1233,6 +1233,7 @@ const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentP
 
 // Handle URL parameters - will be processed in onMounted before fetchEntries
 const route = useRoute()
+const toast = useToast()
 
 // 頁面跳轉輸入
 const jumpToPageInput = ref<string>('')
@@ -3013,6 +3014,11 @@ watch(
 
 // Initial fetch - process URL params first, then fetch
 onMounted(async () => {
+  // Google OAuth merge notification
+  if (route.query.google_merged === '1') {
+    toast.add({ title: '已連結 Google 帳號', description: '之後可以使用 Google 或密碼登錄', color: 'success', icon: 'i-heroicons-check-circle' })
+  }
+
   // Check if mobile device
   isMobile.value = window.innerWidth < 768
 
@@ -3022,6 +3028,12 @@ onMounted(async () => {
 
   // 從 DB 刷新 dialectPermissions，避免使用登入時的 session snapshot
   await refreshUser()
+
+  // 貢獻者若無方言權限 → 引導設定
+  if (user.value?.role === 'contributor' && (!user.value.dialectPermissions || user.value.dialectPermissions.length === 0)) {
+    await navigateTo('/setup')
+    return
+  }
 
   await fetchEntries()
 

@@ -82,6 +82,7 @@ export default defineEventHandler(async (event) => {
     email: u.email,
     username: u.username,
     displayName: u.displayName,
+    avatarUrl: u.avatarUrl,
     role: u.role,
     dialectPermissions: (u.dialectPermissions as Array<{ dialectName: string; role?: string }>)?.map(p => ({
       dialectName: p.dialectName,
@@ -115,6 +116,7 @@ export default defineEventHandler(async (event) => {
         dialectName: p.dialectName,
         role: p.role ?? 'contributor'
       })) ?? [],
+      hasGoogle: !!u.googleId,
       contributionCount,
       reviewCount,
       updatedAt: u.updatedAt

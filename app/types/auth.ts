@@ -8,6 +8,7 @@ export interface AuthUser {
   email: string
   username: string
   displayName?: string
+  avatarUrl?: string
   role: 'contributor' | 'reviewer' | 'admin'
   dialectPermissions: AuthUserDialectPermission[]
 }

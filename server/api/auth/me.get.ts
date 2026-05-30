@@ -55,6 +55,7 @@ export default defineEventHandler(async (event) => {
         dialectName: p.dialectName,
         role: p.role ?? 'contributor'
       })) ?? [],
+      hasGoogle: !!u.googleId,
       contributionCount,
       reviewCount,
       createdAt: u.createdAt,
