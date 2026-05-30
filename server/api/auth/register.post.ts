@@ -57,6 +57,12 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    // Verify Turnstile
+    const turnstileOk = await verifyTurnstile(body.turnstileToken || '')
+    if (!turnstileOk) {
+      return { success: false, error: '安全驗證失敗，請重新整理頁面後重試' }
+    }
+
     const result = await registerUser(validated.data)
 
     if (result.error) {

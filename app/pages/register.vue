@@ -157,6 +157,13 @@
               />
             </div>
 
+            <!-- Turnstile -->
+            <TurnstileWidget
+              ref="turnstileRef"
+              @token="turnstileToken = $event"
+              @error="turnstileToken = ''"
+            />
+
             <!-- Error message -->
             <UAlert
               v-if="error"
@@ -231,6 +238,8 @@ const formNativeDialectModel = computed({
 
 const loading = ref(false)
 const error = ref('')
+const turnstileToken = ref('')
+const turnstileRef = ref<{ reset: () => void }>()
 
 // Redirect if already authenticated
 watchEffect(() => {
@@ -264,12 +273,15 @@ async function handleSubmit() {
     password: form.password,
     displayName: form.displayName || undefined,
     dialects: form.dialects,
-    nativeDialect: (form.nativeDialect && form.nativeDialect !== NATIVE_DIALECT_NONE) ? form.nativeDialect : undefined
+    nativeDialect: (form.nativeDialect && form.nativeDialect !== NATIVE_DIALECT_NONE) ? form.nativeDialect : undefined,
+    turnstileToken: turnstileToken.value
   }
   const result = await register(payload)
 
   if (!result.success) {
     error.value = result.error || '註冊失敗'
+    turnstileRef.value?.reset()
+    turnstileToken.value = ''
   }
 
   loading.value = false

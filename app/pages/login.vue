@@ -91,6 +91,13 @@
               />
             </div>
 
+            <!-- Turnstile -->
+            <TurnstileWidget
+              ref="turnstileRef"
+              @token="turnstileToken = $event"
+              @error="turnstileToken = ''"
+            />
+
             <!-- Error message -->
             <UAlert
               v-if="error"
@@ -174,6 +181,8 @@ const form = reactive({
 const loading = ref(false)
 const googleLoading = ref(false)
 const error = ref('')
+const turnstileToken = ref('')
+const turnstileRef = ref<{ reset: () => void }>()
 
 // Show error from Google OAuth failure (redirected back with ?error=)
 onMounted(() => {
@@ -212,10 +221,12 @@ async function handleSubmit() {
   loading.value = true
   error.value = ''
 
-  const result = await login(form.email, form.password)
+  const result = await login(form.email, form.password, turnstileToken.value)
 
   if (!result.success) {
     error.value = result.error || '登錄失敗'
+    turnstileRef.value?.reset()
+    turnstileToken.value = ''
   }
 
   loading.value = false

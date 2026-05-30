@@ -7,6 +7,7 @@ export interface RegisterPayload {
   nativeDialect?: string
   /** 可編輯的方言點（多選，至少一項） */
   dialects: string[]
+  turnstileToken?: string
 }
 
 /** 個人資料更新後暫存的 user（含 dialectPermissions），供詞條頁等即時使用，登出時清空 */
@@ -43,11 +44,11 @@ export const useAuth = () => {
     return null
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, turnstileToken?: string) => {
     try {
       const res = await $fetch<{ success: boolean; data?: { user: any }; error?: string }>('/api/auth/login', {
         method: 'POST',
-        body: { email, password }
+        body: { email, password, turnstileToken }
       })
       if (res.success) {
         await fetchSession()
@@ -66,7 +67,7 @@ export const useAuth = () => {
     try {
       const res = await $fetch<{ success: boolean; data?: { user: any }; error?: string }>('/api/auth/register', {
         method: 'POST',
-        body: data
+        body: { ...data, turnstileToken: data.turnstileToken }
       })
       if (res.success) {
         await fetchSession()

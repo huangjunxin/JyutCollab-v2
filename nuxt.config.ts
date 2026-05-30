@@ -46,11 +46,15 @@ export default defineNuxtConfig({
     cloudinaryApiKey: process.env.NUXT_CLOUDINARY_API_KEY || '',
     cloudinaryApiSecret: process.env.NUXT_CLOUDINARY_API_SECRET || '',
 
+    // Cloudflare Turnstile（防止機器人攻擊）
+    turnstileSecretKey: process.env.NUXT_TURNSTILE_SECRET_KEY || '',
+
     // Public (e.g. for building image URLs with transforms)
     public: {
       cloudinaryCloudName: process.env.NUXT_CLOUDINARY_CLOUD_NAME || '',
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://localhost:3100',
-      siteName: process.env.NUXT_PUBLIC_SITE_NAME || 'JyutCollab v2'
+      siteName: process.env.NUXT_PUBLIC_SITE_NAME || 'JyutCollab v2',
+      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY || ''
     }
   },
 
