@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="cf-turnstile-wrapper min-h-[65px] flex justify-center"></div>
+  <div v-if="siteKey" ref="containerRef" class="cf-turnstile-wrapper min-h-[65px] flex justify-center"></div>
 </template>
 
 <script setup lang="ts">
