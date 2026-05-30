@@ -12,7 +12,10 @@ const SetupSchema = z.object({
       message: '請選擇有效的方言點'
     })
   ).min(1, '請至少選擇一個方言點'),
-  nativeDialect: z.string().trim().max(50).optional()
+  nativeDialect: z.string().trim().max(50).refine(
+    val => !val || VALID_DIALECTS.includes(val),
+    { message: '請選擇有效的方言點' }
+  ).optional()
 })
 
 /** OAuth 新用戶設定方言點 — 一次性的初始設定 */
@@ -26,6 +29,11 @@ export default defineEventHandler(async (event) => {
   if (!activeUser) {
     await clearUserSession(event)
     throw createError({ statusCode: 401, message: '帳戶已停用或不存在，請重新登錄' })
+  }
+
+  // 已有方言權限則拒絕覆蓋（防止直接 POST 繞過前端 guard）
+  if (activeUser.dialectPermissions && activeUser.dialectPermissions.length > 0) {
+    return { success: false, error: '您已設定過方言點，無需再次設定' }
   }
 
   const body = await readBody(event).catch(() => ({}))
