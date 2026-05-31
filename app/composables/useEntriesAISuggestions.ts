@@ -14,6 +14,8 @@ export interface ThemeAISuggestion {
   level3Id: number
   confidence?: number
   explanation?: string
+  /** 第二、第三候選分類（如有多候選時） */
+  alternatives?: ThemeAISuggestion[]
 }
 
 export interface DefinitionAISuggestion {
@@ -213,6 +215,27 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     }
   }
 
+  function buildThemeSuggestionItem(raw: {
+    themeId: number
+    explanation: string
+    confidence: number
+    suggestionId: string
+  }): ThemeAISuggestion | null {
+    const theme = getThemeById(raw.themeId)
+    if (!theme) return null
+    return {
+      suggestionId: raw.suggestionId,
+      level1Name: theme.level1Name,
+      level2Name: theme.level2Name,
+      level3Name: theme.level3Name,
+      level1Id: theme.level1Id,
+      level2Id: theme.level2Id,
+      level3Id: theme.level3Id,
+      confidence: raw.confidence,
+      explanation: raw.explanation
+    }
+  }
+
   function formatThemeSuggestion(s: { level1Name: string; level2Name: string; level3Name: string } | undefined): string {
     if (!s) return ''
     return `${s.level3Name} (${s.level1Name} > ${s.level2Name})`
@@ -289,13 +312,13 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
           })
 
           let definitionResponse: { success: boolean; data?: { definition?: string; suggestionId?: string } } | null = null
-          let categorizeResponse: { success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } } | null = null
+          let categorizeResponse: { success: boolean; data?: { suggestions?: Array<{ themeId: number; confidence: number; explanation: string; suggestionId: string }> } } | null = null
           let registerResponse: { success: boolean; data?: { register?: Register; confidence?: number; explanation?: string; suggestionId?: string } } | null = null
 
           if (firstDefinition) {
             [definitionResponse, categorizeResponse, registerResponse] = await Promise.all([
               definitionRequest,
-              $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/categorize', {
+              $fetch<{ success: boolean; data?: { suggestions?: Array<{ themeId: number; confidence: number; explanation: string; suggestionId: string }> } }>('/api/ai/categorize', {
                 method: 'POST',
                 body: categorizeBody,
                 signal
@@ -315,7 +338,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             if (generatedDefinition) {
               categorizeBody.context = generatedDefinition
             }
-            categorizeResponse = await $fetch<{ success: boolean; data?: { themeId?: number; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/categorize', {
+            categorizeResponse = await $fetch<{ success: boolean; data?: { suggestions?: Array<{ themeId: number; confidence: number; explanation: string; suggestionId: string }> } }>('/api/ai/categorize', {
               method: 'POST',
               body: categorizeBody,
               signal
@@ -347,21 +370,21 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             }
           }
 
-          if (categorizeResponse?.success && categorizeResponse.data?.themeId) {
-            const themeId = categorizeResponse.data.themeId
-            const theme = getThemeById(themeId)
-            if (theme) {
-              themeAISuggestions.value.set(entryId, {
-                suggestionId: categorizeResponse.data.suggestionId,
-                level1Name: theme.level1Name,
-                level2Name: theme.level2Name,
-                level3Name: theme.level3Name,
-                level1Id: theme.level1Id,
-                level2Id: theme.level2Id,
-                level3Id: theme.level3Id,
-                confidence: categorizeResponse.data.confidence,
-                explanation: categorizeResponse.data.explanation
-              })
+          if (categorizeResponse?.success && Array.isArray(categorizeResponse.data?.suggestions) && categorizeResponse.data.suggestions.length > 0) {
+            const suggestions = categorizeResponse.data.suggestions
+            const first = suggestions[0]!
+            const primary = buildThemeSuggestionItem(first)
+            if (primary) {
+              const alternatives: ThemeAISuggestion[] = []
+              for (let i = 1; i < suggestions.length; i++) {
+                const item = suggestions[i]!
+                const alt = buildThemeSuggestionItem(item)
+                if (alt) alternatives.push(alt)
+              }
+              if (alternatives.length > 0) {
+                primary.alternatives = alternatives
+              }
+              themeAISuggestions.value.set(entryId, primary)
               themeAISuggestions.value = new Map(themeAISuggestions.value)
             }
           }
@@ -522,21 +545,20 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
         method: 'POST',
         body
       })
-      if (response.success && response.data?.themeId) {
-        const themeId = response.data.themeId
-        const theme = getThemeById(themeId)
-        if (theme) {
-          themeAISuggestions.value.set(entryKey, {
-            suggestionId: response.data.suggestionId,
-            level1Name: theme.level1Name,
-            level2Name: theme.level2Name,
-            level3Name: theme.level3Name,
-            level1Id: theme.level1Id,
-            level2Id: theme.level2Id,
-            level3Id: theme.level3Id,
-            confidence: response.data.confidence,
-            explanation: response.data.explanation
-          })
+      if (response.success && Array.isArray(response.data?.suggestions) && response.data.suggestions.length > 0) {
+        const suggestions = response.data.suggestions
+        const primary = buildThemeSuggestionItem(suggestions[0])
+        if (primary) {
+          // Build alternatives from remaining suggestions
+          const alternatives: ThemeAISuggestion[] = []
+          for (let i = 1; i < suggestions.length; i++) {
+            const alt = buildThemeSuggestionItem(suggestions[i])
+            if (alt) alternatives.push(alt)
+          }
+          if (alternatives.length > 0) {
+            primary.alternatives = alternatives
+          }
+          themeAISuggestions.value.set(entryKey, primary)
           themeAISuggestions.value = new Map(themeAISuggestions.value)
         }
       } else {
@@ -659,40 +681,71 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     aiSuggestionForField.value = null
   }
 
-  function acceptThemeAI(entry: Entry) {
+  function acceptThemeAI(entry: Entry, alternativeIndex?: number) {
     const keyStr = String(getEntryKey(entry))
-    const suggestion = themeAISuggestions.value.get(keyStr)
-    if (suggestion) {
-      if (!entry.theme) entry.theme = {}
-      entry.theme.level1 = suggestion.level1Name
-      entry.theme.level2 = suggestion.level2Name
-      entry.theme.level3 = suggestion.level3Name
-      entry.theme.level1Id = suggestion.level1Id
-      entry.theme.level2Id = suggestion.level2Id
-      entry.theme.level3Id = suggestion.level3Id
-      ;(entry as any)._isDirty = true
-      const acceptedContent = getThemeActionContent(entry)
-      logAISuggestionAction(suggestion.suggestionId, 'accepted', {
+    const stored = themeAISuggestions.value.get(keyStr)
+    // If alternativeIndex is provided, use the alternative; otherwise use the primary
+    const suggestion = (alternativeIndex !== undefined && stored?.alternatives?.[alternativeIndex])
+      ? stored.alternatives[alternativeIndex]
+      : stored
+    if (!suggestion) return
+    if (!entry.theme) entry.theme = {}
+    entry.theme.level1 = suggestion.level1Name
+    entry.theme.level2 = suggestion.level2Name
+    entry.theme.level3 = suggestion.level3Name
+    entry.theme.level1Id = suggestion.level1Id
+    entry.theme.level2Id = suggestion.level2Id
+    entry.theme.level3Id = suggestion.level3Id
+    ;(entry as any)._isDirty = true
+    const acceptedContent = getThemeActionContent(entry)
+    logAISuggestionAction(suggestion.suggestionId, 'accepted', {
+      entryId: getRealEntryId(entry),
+      clientEntryKey: keyStr,
+      field: 'theme',
+      acceptedContent,
+      metadata: alternativeIndex !== undefined ? { selectedAlternative: alternativeIndex + 1 } : undefined
+    })
+    if (suggestion.suggestionId) {
+      trackAcceptedAISuggestion({
+        suggestionId: suggestion.suggestionId,
+        entryKey: keyStr,
         entryId: getRealEntryId(entry),
-        clientEntryKey: keyStr,
         field: 'theme',
         acceptedContent
       })
-      if (suggestion.suggestionId) {
-        trackAcceptedAISuggestion({
-          suggestionId: suggestion.suggestionId,
-          entryKey: keyStr,
+    }
+    // Log rejections for the non-selected suggestions, then clear all
+    if (stored) {
+      const primarySuggestionId = stored.suggestionId
+      const selectedSuggestionId = suggestion.suggestionId
+      // Reject primary if an alternative was selected
+      if (alternativeIndex !== undefined && primarySuggestionId && primarySuggestionId !== selectedSuggestionId) {
+        logAISuggestionAction(primarySuggestionId, 'rejected', {
           entryId: getRealEntryId(entry),
+          clientEntryKey: keyStr,
           field: 'theme',
-          acceptedContent
+          metadata: { reason: 'alternative_selected', selectedAlternative: alternativeIndex + 1 }
         })
       }
-      if (editingCell.value && String(editingCell.value.entryId) === keyStr && editingCell.value.field === 'theme') {
-        editValue.value = suggestion.level3Id as any
+      // Reject other alternatives that weren't selected
+      if (stored.alternatives) {
+        stored.alternatives.forEach((alt, i) => {
+          if (i !== alternativeIndex && alt.suggestionId && alt.suggestionId !== selectedSuggestionId) {
+            logAISuggestionAction(alt.suggestionId, 'rejected', {
+              entryId: getRealEntryId(entry),
+              clientEntryKey: keyStr,
+              field: 'theme',
+              metadata: { reason: 'alternative_not_selected', alternativeIndex: i + 1 }
+            })
+          }
+        })
       }
-      themeAISuggestions.value.delete(keyStr)
-      themeAISuggestions.value = new Map(themeAISuggestions.value)
     }
+    if (editingCell.value && String(editingCell.value.entryId) === keyStr && editingCell.value.field === 'theme') {
+      editValue.value = suggestion.level3Id as any
+    }
+    themeAISuggestions.value.delete(keyStr)
+    themeAISuggestions.value = new Map(themeAISuggestions.value)
   }
 
   function dismissThemeAI(entry: Entry) {
@@ -703,6 +756,17 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
       clientEntryKey: key,
       field: 'theme'
     })
+    // Also reject all alternatives
+    if (suggestion?.alternatives) {
+      suggestion.alternatives.forEach((alt) => {
+        logAISuggestionAction(alt.suggestionId, 'rejected', {
+          entryId: getRealEntryId(entry),
+          clientEntryKey: key,
+          field: 'theme',
+          metadata: { reason: 'all_dismissed' }
+        })
+      })
+    }
     themeAISuggestions.value.delete(key)
     themeAISuggestions.value = new Map(themeAISuggestions.value)
   }

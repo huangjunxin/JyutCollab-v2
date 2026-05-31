@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { convertToHongKongTraditional } from './textConversion'
-import type { Register } from './types'
+import type { Register, MultiCategorizationResult } from './types'
 
 // Configure OpenRouter client
 export const getOpenAIClient = () => {
@@ -36,6 +36,10 @@ const ThemeSchema = z.object({
   theme_id: z.number().min(60).max(498),
   explanation: z.string(),
   confidence: z.number().min(0).max(1)
+})
+
+const MultiThemeSchema = z.object({
+  top_3_themes: z.array(ThemeSchema).length(3)
 })
 
 const DefinitionSchema = z.object({
@@ -248,7 +252,7 @@ export async function categorizeExpression(
     usage_notes?: string
     region: string
   }>
-): Promise<CategorizationResult> {
+): Promise<MultiCategorizationResult> {
   try {
     const openai = getOpenAIClient()
 
@@ -263,22 +267,24 @@ ${index + 1}. ${ref.text}: ${ref.definition || ''}
 `
     }
 
-    const prompt = `請分析以下粵語表達，從上述三級主題分類中選擇最合適的一個分類。
+    const prompt = `請分析以下粵語表達，從上述三級主題分類中選擇最合適的**三個**分類（按可能性排序）。
 
 表達：${expression}
 ${context ? `語境：${context}` : ''}${referenceText}
 
-請仔細分析表達的核心含義，選擇最準確的三級分類ID。
+請仔細分析表達的核心含義，選出最準確的三個三級分類ID。
 考慮因素：
 1. 表達的字面意思和引申含義
 2. 使用場合和語境
 3. 粵語的文化特色
 4. 詞性和語法功能
 
-請返回JSON格式，包含：
+請返回JSON格式，包含一個 "top_3_themes" 陣列，每個元素包含：
 - theme_id: 選擇的三級主題ID (60-498之間)
 - explanation: 分類理由的詳細説明
 - confidence: 置信度 (0-1之間，1表示非常確定)
+
+請確保三個 theme_id 互不相同，第一個為最可能的結果。
 
 ${THEME_LIST}`
 
@@ -303,19 +309,23 @@ ${THEME_LIST}`
       throw new Error('No response from AI')
     }
 
-    const parsed = ThemeSchema.parse(JSON.parse(result))
+    const parsed = MultiThemeSchema.parse(JSON.parse(result))
 
     return {
-      themeId: parsed.theme_id,
-      explanation: convertToHongKongTraditional(parsed.explanation),
-      confidence: parsed.confidence
+      suggestions: parsed.top_3_themes.map(t => ({
+        themeId: t.theme_id,
+        explanation: convertToHongKongTraditional(t.explanation),
+        confidence: t.confidence
+      }))
     }
   } catch (error) {
     console.error('Error categorizing expression:', error)
     return {
-      themeId: 286, // Default to "七A1過日子"
-      explanation: convertToHongKongTraditional('分類失敗，使用默認分類'),
-      confidence: 0.1
+      suggestions: [{
+        themeId: 286, // Default to "七A1過日子"
+        explanation: convertToHongKongTraditional('分類失敗，使用默認分類'),
+        confidence: 0.1
+      }]
     }
   }
 }

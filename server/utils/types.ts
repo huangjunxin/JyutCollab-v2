@@ -335,15 +335,14 @@ export interface EntryFilters {
 }
 
 // AI Response types
-export interface CategorizationResult {
-  level1: string
-  level2: string
-  level3: string
-  level1Id: number
-  level2Id: number
-  level3Id: number
+export interface CategorizationSuggestion {
+  themeId: number
   explanation: string
   confidence: number
+}
+
+export interface MultiCategorizationResult {
+  suggestions: CategorizationSuggestion[]
 }
 
 export interface DefinitionResult {

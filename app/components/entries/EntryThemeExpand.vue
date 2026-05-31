@@ -87,44 +87,83 @@
     </div>
 
     <!-- AI 建議區域 -->
-    <div
-      v-if="aiSuggestion"
-      class="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden"
-    >
-      <div class="flex items-start gap-2">
-        <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div class="flex-1 min-w-0 break-words">
-          <div class="text-sm font-medium text-blue-800 dark:text-blue-200">
-            AI 建議: {{ aiSuggestion.level3Name }}
+    <div v-if="aiSuggestion" class="space-y-2">
+      <!-- 第一候選（最高信心度） -->
+      <div class="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden">
+        <div class="flex items-start gap-2">
+          <UIcon name="i-heroicons-sparkles" class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div class="flex-1 min-w-0 break-words">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-blue-500">🥇</span>
+              <span class="text-sm font-medium text-blue-800 dark:text-blue-200">
+                AI 建議: {{ aiSuggestion.level3Name }}
+              </span>
+              <span v-if="aiSuggestion.confidence" class="text-xs text-blue-500 font-medium">{{ Math.round(aiSuggestion.confidence * 100) }}%</span>
+            </div>
+            <div class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+              {{ aiSuggestion.level1Name }} > {{ aiSuggestion.level2Name }}
+            </div>
+            <div v-if="aiSuggestion.explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {{ aiSuggestion.explanation }}
+            </div>
           </div>
-          <div class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-            {{ aiSuggestion.level1Name }} > {{ aiSuggestion.level2Name }}
-          </div>
-          <div v-if="aiSuggestion.confidence" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            置信度: {{ Math.round(aiSuggestion.confidence * 100) }}%
-          </div>
-          <div v-if="aiSuggestion.explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {{ aiSuggestion.explanation }}
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <UButton
+              color="primary"
+              size="xs"
+              @click="acceptAISuggestion"
+            >
+              接受
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="$emit('dismiss-ai')"
+            >
+              忽略
+            </UButton>
           </div>
         </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <UButton
-            color="primary"
-            size="xs"
-            @click="acceptAISuggestion"
-          >
-            接受
-          </UButton>
+      </div>
+
+      <!-- 第二、三候選 -->
+      <div
+        v-for="(alt, index) in aiSuggestion.alternatives"
+        :key="index"
+        class="p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white/50 dark:bg-gray-800/30 overflow-hidden"
+      >
+        <div class="flex items-start gap-2">
+          <span class="text-xs font-bold text-gray-400 mt-0.5 flex-shrink-0">{{ ['🥈', '🥉'][index] || '📋' }}</span>
+          <div class="flex-1 min-w-0 break-words">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ alt.level3Name }}
+              </span>
+              <span v-if="alt.confidence" class="text-xs text-gray-400">{{ Math.round(alt.confidence * 100) }}%</span>
+            </div>
+            <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              {{ alt.level1Name }} > {{ alt.level2Name }}
+            </div>
+            <div v-if="alt.explanation" class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {{ alt.explanation }}
+            </div>
+          </div>
           <UButton
             color="neutral"
-            variant="ghost"
+            variant="outline"
             size="xs"
-            @click="$emit('dismiss-ai')"
+            @click="emit('accept-ai', alt)"
           >
-            忽略
+            選擇 ({{ index + 2 }})
           </UButton>
         </div>
       </div>
+
+      <!-- 提示文字 -->
+      <p class="text-xs text-gray-400 dark:text-gray-500 px-1">
+        💡 分類不準確？可以先填寫<span class="font-medium text-gray-500 dark:text-gray-400">釋義</span>，然後重新點擊 AI 按鈕 🔄
+      </p>
     </div>
   </div>
 </template>
@@ -146,6 +185,7 @@ interface AISuggestion {
   level3Id: number
   confidence?: number
   explanation?: string
+  alternatives?: AISuggestion[]
 }
 
 const props = defineProps<{

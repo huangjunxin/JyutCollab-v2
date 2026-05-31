@@ -536,10 +536,13 @@
             <AISuggestionRow
               v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === themeColIndex && themeAISuggestions.get(getEntryIdString(row.entry))"
               :text="formatThemeSuggestion(themeAISuggestions.get(getEntryIdString(row.entry)))"
+              :alternatives="getThemeAlternativesForRow(row.entry)"
+              :confidence="themeAISuggestions.get(getEntryIdString(row.entry))?.confidence"
               title="AI 分類建議"
               :colspan="editableColumns.length + 2"
               @accept="acceptThemeAI(row.entry)"
               @dismiss="dismissThemeAI(row.entry)"
+              @select-alternative="(idx: number) => acceptThemeAI(row.entry, idx)"
             />
             <!-- 行內 AI 語域建議 -->
             <AISuggestionRow
@@ -786,7 +789,7 @@
                   @close="toggleThemeExpand(row.entry)"
                   @update:theme="onThemeUpdate(row.entry, $event)"
                   @dismiss-ai="dismissThemeAI(row.entry)"
-                  @accept-ai="acceptThemeAI(row.entry)"
+                  @accept-ai="(suggestion: any) => onThemeExpandAcceptAI(row.entry, suggestion)"
                   @ai-categorize="generateAICategorization(row.entry)"
                 />
               </td>
@@ -1809,6 +1812,34 @@ const {
   clearAcceptedAITrackersForEntry,
   migrateAcceptedAITrackersEntryId
 } = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
+
+/** 將 ThemeAISuggestion 的 alternatives 轉為 AISuggestionRow 需要的格式 */
+function getThemeAlternativesForRow(entry: Entry) {
+  const suggestion = themeAISuggestions.value.get(getEntryIdString(entry))
+  if (!suggestion?.alternatives || suggestion.alternatives.length === 0) return undefined
+  return suggestion.alternatives.map(alt => ({
+    text: formatThemeSuggestion(alt),
+    confidence: alt.confidence
+  }))
+}
+
+/** 處理展開面板的 AI 接受事件（區分主建議與候選） */
+function onThemeExpandAcceptAI(entry: Entry, suggestion: any) {
+  const stored = themeAISuggestions.value.get(getEntryIdString(entry))
+  if (!stored) return
+  // 檢查是否為候選
+  if (stored.alternatives) {
+    const altIndex = stored.alternatives.findIndex(
+      (alt: any) => alt.level3Id === suggestion.level3Id
+    )
+    if (altIndex >= 0) {
+      acceptThemeAI(entry, altIndex)
+      return
+    }
+  }
+  // 預設：接受主建議
+  acceptThemeAI(entry)
+}
 
 const {
   logReferenceHelperEvent,

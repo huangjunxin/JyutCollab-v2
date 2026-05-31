@@ -47,28 +47,37 @@ export default defineEventHandler(async (event) => {
 
     await connectDB()
 
-    const suggestion = await AISuggestion.create({
-      entryId: validated.data.entryId,
-      clientEntryKey: validated.data.clientEntryKey,
-      suggestedTo: event.context.auth.id,
-      suggestionType: 'theme_classification',
-      field: validated.data.field || 'theme',
-      originalContent: validated.data.originalContent,
-      suggestedContent: result,
-      confidenceScore: result.confidence ?? 0.5,
-      userAction: 'pending',
-      metadata: {
-        expression: validated.data.expression,
-        context: validated.data.context,
-        themeId: result.themeId
+    // Create an AISuggestion record for each candidate
+    const suggestions = await Promise.all(result.suggestions.map(async (s, index) => {
+      const suggestion = await AISuggestion.create({
+        entryId: validated.data.entryId,
+        clientEntryKey: validated.data.clientEntryKey,
+        suggestedTo: event.context.auth.id,
+        suggestionType: 'theme_classification',
+        field: validated.data.field || 'theme',
+        originalContent: validated.data.originalContent,
+        suggestedContent: s,
+        confidenceScore: s.confidence ?? 0.5,
+        userAction: 'pending',
+        metadata: {
+          expression: validated.data.expression,
+          context: validated.data.context,
+          themeId: s.themeId,
+          rank: index + 1
+        }
+      })
+      return {
+        themeId: s.themeId,
+        explanation: s.explanation,
+        confidence: s.confidence,
+        suggestionId: suggestion._id.toString()
       }
-    })
+    }))
 
     return {
       success: true,
       data: {
-        ...result,
-        suggestionId: suggestion._id.toString()
+        suggestions
       }
     }
   } catch (error: any) {
