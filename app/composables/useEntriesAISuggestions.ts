@@ -74,6 +74,105 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
   const aiLoadingInlineFor = ref<{ entryId: string; field: string } | null>(null)
   const aiInlineError = ref<{ entryId: string; field: string; message: string } | null>(null)
 
+  /**
+   * 暫存待標記為 ignored 的建議 ID。
+   * 不立即發送請求以避免 race condition：在 saveEntryChanges 發 PUT 之前
+   * 由 flushPendingIgnored() 一次性送出，確保服務端 auto-match 只處理仍為 pending 的記錄。
+   */
+  interface PendingIgnoredEntry {
+    suggestionId: string
+    entryId: string
+    entryKey: string
+    field: string
+    reason: string
+  }
+  const pendingIgnoredIds = ref<Map<string, PendingIgnoredEntry>>(new Map())
+
+  /**
+   * 將建議加入 ignored 佇列（不立即發送網路請求）。
+   * 呼叫方應在保存前調用 flushPendingIgnored() 以確保記錄在 PUT 之前送達。
+   */
+  function enqueueIgnoredAISuggestion(
+    suggestionId: string | undefined | null,
+    entryKey: string,
+    entryId: string | undefined,
+    field: string,
+    reason: string
+  ) {
+    if (!suggestionId) return
+    const key = `${entryKey}:${suggestionId}`
+    if (pendingIgnoredIds.value.has(key)) return
+    pendingIgnoredIds.value.set(key, {
+      suggestionId,
+      entryId: entryId ?? '',
+      entryKey,
+      field,
+      reason
+    })
+    pendingIgnoredIds.value = new Map(pendingIgnoredIds.value)
+  }
+
+  /**
+   * 一次性送出所有 pending ignored 標記，然後清空佇列。
+   * 必須在 PUT/POST 條目之前調用，以避免與服務端 auto-match 產生 race condition。
+   */
+  async function flushPendingIgnored() {
+    const entries = Array.from(pendingIgnoredIds.value.values())
+    if (entries.length === 0) return
+    // 立即清空佇列，避免重複發送
+    pendingIgnoredIds.value = new Map()
+    await Promise.all(entries.map(e =>
+      logAISuggestionAction(e.suggestionId, 'ignored', {
+        entryId: e.entryId || undefined,
+        clientEntryKey: e.entryKey,
+        field: e.field,
+        metadata: { reason: e.reason }
+      })
+    ))
+  }
+
+  /** 從內聯建議文字中擷取建議值，用於比對用戶最終輸入是否與 AI 建議一致 */
+  function extractInlineSuggestedValue(): string | null {
+    if (!aiSuggestion.value || aiSuggestionForField.value !== 'definition') return null
+    const defMatch = aiSuggestion.value.match(/^建議釋義: (.+)$/s)
+    return defMatch ? (defMatch[1]?.trim() ?? null) : null
+  }
+
+  /**
+   * 掃描未被用戶操作的 theme/register 建議並標記為 ignored。
+   * 在保存時調用——這些建議在可展開行中顯示，如果用戶保存時未操作，
+   * 則視為未看到或不需要。
+   */
+  function markUninteractedSuggestionsIgnored(entry: Entry) {
+    const entryKey = getEntryIdString(entry)
+    const realEntryId = getRealEntryId(entry) || entry.id
+
+    // 未操作的 theme 建議（含 alternatives）
+    const themeSuggestion = themeAISuggestions.value.get(entryKey)
+    if (themeSuggestion) {
+      if (themeSuggestion.suggestionId) {
+        enqueueIgnoredAISuggestion(themeSuggestion.suggestionId, entryKey, realEntryId, 'theme', 'not_interacted')
+      }
+      if (themeSuggestion.alternatives) {
+        themeSuggestion.alternatives.forEach(alt => {
+          if (alt.suggestionId) {
+            enqueueIgnoredAISuggestion(alt.suggestionId, entryKey, realEntryId, 'theme', 'not_interacted')
+          }
+        })
+      }
+      themeAISuggestions.value.delete(entryKey)
+      themeAISuggestions.value = new Map(themeAISuggestions.value)
+    }
+
+    // 未操作的 register 建議
+    const registerSuggestion = registerAISuggestions.value.get(entryKey)
+    if (registerSuggestion?.suggestionId) {
+      enqueueIgnoredAISuggestion(registerSuggestion.suggestionId, entryKey, realEntryId, 'meta.register', 'not_interacted')
+      registerAISuggestions.value.delete(entryKey)
+      registerAISuggestions.value = new Map(registerAISuggestions.value)
+    }
+  }
+
   function getRealEntryId(entry: Entry): string | undefined {
     return (entry as any)._isNew ? undefined : entry.id
   }
@@ -95,7 +194,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
 
   function logAISuggestionAction(
     suggestionId: string | undefined | null,
-    action: AISuggestionAction,
+    action: AISuggestionAction | 'ignored',
     payload: {
       entryId?: string
       clientEntryKey?: string
@@ -104,9 +203,9 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
       finalContent?: unknown
       metadata?: Record<string, unknown>
     } = {}
-  ) {
-    if (!suggestionId) return
-    void $fetch(`/api/ai/suggestions/${suggestionId}/action`, {
+  ): Promise<void> {
+    if (!suggestionId) return Promise.resolve()
+    return $fetch(`/api/ai/suggestions/${suggestionId}/action`, {
       method: 'POST',
       body: {
         action,
@@ -114,7 +213,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
       }
     }).catch((error) => {
       console.warn('Failed to log AI suggestion action:', error)
-    })
+    }) as unknown as Promise<void>
   }
 
   function trackAcceptedAISuggestion(tracker: AcceptedAITracker) {
@@ -123,20 +222,22 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     acceptedAITrackers.value = new Map(acceptedAITrackers.value)
   }
 
-  function markModifiedAISuggestionsForEntry(entry: Entry) {
+  async function markModifiedAISuggestionsForEntry(entry: Entry) {
     const entryKey = getEntryIdString(entry)
     const realEntryId = getRealEntryId(entry) || entry.id
+    const promises: Promise<void>[] = []
+
     const definitionTracker = acceptedAITrackers.value.get(`${entryKey}:definition`)
     if (definitionTracker) {
       const currentDefinition = entry.senses?.[0]?.definition
       if (normalizeAICompareValue(currentDefinition) !== normalizeAICompareValue(definitionTracker.acceptedContent)) {
-        logAISuggestionAction(definitionTracker.suggestionId, 'modified', {
+        promises.push(logAISuggestionAction(definitionTracker.suggestionId, 'modified', {
           entryId: realEntryId,
           clientEntryKey: entryKey,
           field: 'senses.0.definition',
           finalContent: currentDefinition,
           metadata: { previousAction: 'accepted' }
-        })
+        }))
       }
     }
 
@@ -146,13 +247,13 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
       const currentTheme = getThemeActionContent(entry)
       const changed = acceptedTheme.level1Id !== currentTheme.level1Id || acceptedTheme.level2Id !== currentTheme.level2Id || acceptedTheme.level3Id !== currentTheme.level3Id
       if (changed) {
-        logAISuggestionAction(themeTracker.suggestionId, 'modified', {
+        promises.push(logAISuggestionAction(themeTracker.suggestionId, 'modified', {
           entryId: realEntryId,
           clientEntryKey: entryKey,
           field: 'theme',
           finalContent: currentTheme,
           metadata: { previousAction: 'accepted' }
-        })
+        }))
       }
     }
 
@@ -160,13 +261,13 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     if (examplesTracker) {
       const currentExamples = entry.senses?.[0]?.examples ?? []
       if (JSON.stringify(currentExamples) !== JSON.stringify(examplesTracker.acceptedContent)) {
-        logAISuggestionAction(examplesTracker.suggestionId, 'modified', {
+        promises.push(logAISuggestionAction(examplesTracker.suggestionId, 'modified', {
           entryId: realEntryId,
           clientEntryKey: entryKey,
           field: 'senses.0.examples',
           finalContent: currentExamples,
           metadata: { previousAction: 'accepted' }
-        })
+        }))
       }
     }
 
@@ -174,15 +275,17 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     if (registerTracker) {
       const currentRegister = entry.meta?.register
       if (normalizeAICompareValue(currentRegister) !== normalizeAICompareValue(registerTracker.acceptedContent)) {
-        logAISuggestionAction(registerTracker.suggestionId, 'modified', {
+        promises.push(logAISuggestionAction(registerTracker.suggestionId, 'modified', {
           entryId: realEntryId,
           clientEntryKey: entryKey,
           field: 'meta.register',
           finalContent: currentRegister,
           metadata: { previousAction: 'accepted' }
-        })
+        }))
       }
     }
+
+    if (promises.length > 0) await Promise.all(promises)
   }
 
   function clearAcceptedAITrackersForEntry(entry: Entry) {
@@ -361,6 +464,8 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             aiSuggestionForField.value = targetField
             const stillEditingThisCell = editingCell.value && String(editingCell.value.entryId) === entryId && editingCell.value.field === targetField
             if (!stillEditingThisCell) {
+              // 用戶已切換到其他儲存格，記錄為 ignored
+              enqueueIgnoredAISuggestion(definitionResponse.data.suggestionId, entryId, getRealEntryId(entry), 'senses.0.definition', 'cell_switched')
               const key = `${entryId}-${targetField}`
               pendingAISuggestions.value.set(key, { entryId, field: targetField, text: suggestionText, suggestionId: definitionResponse.data.suggestionId })
               pendingAISuggestions.value = new Map(pendingAISuggestions.value)
@@ -923,6 +1028,12 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     dismissDefinitionAI,
     markModifiedAISuggestionsForEntry,
     clearAcceptedAITrackersForEntry,
-    migrateAcceptedAITrackersEntryId
+    migrateAcceptedAITrackersEntryId,
+    // ignored 佇列管理
+    enqueueIgnoredAISuggestion,
+    flushPendingIgnored,
+    markUninteractedSuggestionsIgnored,
+    extractInlineSuggestedValue,
+    pendingIgnoredIds
   }
 }

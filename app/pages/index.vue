@@ -409,6 +409,10 @@
               <p class="text-xs text-blue-700 dark:text-blue-300">待審閱</p>
               <p class="text-xl font-bold text-blue-700 dark:text-blue-300">{{ aiSuggestionStats.pending }}</p>
             </div>
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">互動率</p>
+              <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatPercent(aiSuggestionStats.engagementRate) }}</p>
+            </div>
           </div>
 
           <div class="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800">
@@ -426,7 +430,11 @@
                 <span class="font-bold text-red-600 dark:text-red-400">{{ aiSuggestionStats.rejected }}</span>
               </div>
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-600 dark:text-gray-400">已決策</span>
+                <span class="text-gray-600 dark:text-gray-400">已忽略</span>
+                <span class="font-bold text-gray-500 dark:text-gray-400">{{ aiSuggestionStats.ignored }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm col-span-2">
+                <span class="text-gray-600 dark:text-gray-400">已決策（接受+修改+拒絕）</span>
                 <span class="font-bold text-gray-900 dark:text-white">{{ aiReviewedCount }}</span>
               </div>
             </div>
@@ -782,13 +790,17 @@ const displayedEnhancedUserStats = computed(() => enhancedUserStats.value || fal
 const displayedEnhancedReviewerStats = computed(() => enhancedReviewerStats.value || fallbackEnhancedReviewerStats)
 const aiReviewedCount = computed(() => {
   const stats = aiSuggestionStats.value
-  return stats ? stats.accepted + stats.modified + stats.rejected : 0
+  return stats ? stats.reviewedTotal : 0
 })
 const aiAdoptedCount = computed(() => {
   const stats = aiSuggestionStats.value
   return stats ? stats.accepted + stats.modified : 0
 })
-const aiAdoptionRate = computed(() => aiReviewedCount.value > 0 ? aiAdoptedCount.value / aiReviewedCount.value : 0)
+const aiAdoptionRate = computed(() => {
+  const stats = aiSuggestionStats.value
+  // 使用 API 回傳的 acceptanceRate（已正確以 reviewedTotal 為分母）
+  return stats ? stats.acceptanceRate : 0
+})
 const referenceReviewedCount = computed(() => {
   const stats = referenceHelperStats.value
   return stats ? stats.accepted + stats.modified + stats.rejected : 0

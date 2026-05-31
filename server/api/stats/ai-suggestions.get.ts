@@ -45,7 +45,8 @@ export default defineEventHandler(async (event) => {
       pending: 0,
       accepted: 0,
       rejected: 0,
-      modified: 0
+      modified: 0,
+      ignored: 0
     }
 
     byAction.forEach((item: { _id?: keyof typeof actions; count: number }) => {
@@ -67,9 +68,11 @@ export default defineEventHandler(async (event) => {
       accepted: number
       rejected: number
       modified: number
+      ignored: number
       acceptanceRate: number
       modificationRate: number
       rejectionRate: number
+      ignoredRate: number
     }>()
 
     ;(['definition', 'theme_classification', 'example', 'register'] as const).forEach((type) => {
@@ -81,9 +84,11 @@ export default defineEventHandler(async (event) => {
         accepted: 0,
         rejected: 0,
         modified: 0,
+        ignored: 0,
         acceptanceRate: 0,
         modificationRate: 0,
-        rejectionRate: 0
+        rejectionRate: 0,
+        ignoredRate: 0
       })
     })
 
@@ -97,19 +102,34 @@ export default defineEventHandler(async (event) => {
       row.total += item.count
     })
 
-    const byTypeRows = Array.from(byTypeMap.values()).map(row => ({
-      ...row,
-      acceptanceRate: row.total > 0 ? row.accepted / row.total : 0,
-      modificationRate: row.total > 0 ? row.modified / row.total : 0,
-      rejectionRate: row.total > 0 ? row.rejected / row.total : 0
-    }))
+    // 被評估過的建議（用戶明確操作過）= accepted + rejected + modified
+    const reviewedTotal = actions.accepted + actions.rejected + actions.modified
+
+    const byTypeRows = Array.from(byTypeMap.values()).map(row => {
+      const rowReviewed = row.accepted + row.rejected + row.modified
+      return {
+        ...row,
+        // 採納率 = 採納數 / 被評估數（只看用戶操作過的，不含 pending/ignored）
+        acceptanceRate: rowReviewed > 0 ? row.accepted / rowReviewed : 0,
+        modificationRate: rowReviewed > 0 ? row.modified / rowReviewed : 0,
+        rejectionRate: rowReviewed > 0 ? row.rejected / rowReviewed : 0,
+        // 忽略率 = 忽略數 / 總數
+        ignoredRate: row.total > 0 ? row.ignored / row.total : 0
+      }
+    })
 
     return {
       total,
+      reviewedTotal,
       ...actions,
-      acceptanceRate: total > 0 ? actions.accepted / total : 0,
-      modificationRate: total > 0 ? actions.modified / total : 0,
-      rejectionRate: total > 0 ? actions.rejected / total : 0,
+      // 採納率 = 採納數 / 被評估數
+      acceptanceRate: reviewedTotal > 0 ? actions.accepted / reviewedTotal : 0,
+      modificationRate: reviewedTotal > 0 ? actions.modified / reviewedTotal : 0,
+      rejectionRate: reviewedTotal > 0 ? actions.rejected / reviewedTotal : 0,
+      // 互動率 = 被評估數 / 總數
+      engagementRate: total > 0 ? reviewedTotal / total : 0,
+      // 忽略率 = 忽略數 / 總數
+      ignoredRate: total > 0 ? actions.ignored / total : 0,
       byType: byTypeRows
     }
   } catch (error: any) {

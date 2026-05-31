@@ -20,6 +20,7 @@ export interface IAISuggestion {
   acceptedAt?: Date
   rejectedAt?: Date
   modifiedAt?: Date
+  ignoredAt?: Date
   metadata?: unknown
   createdAt: Date
   updatedAt: Date
@@ -59,9 +60,10 @@ const AISuggestionSchema = new mongoose.Schema<IAISuggestion>({
   },
   userAction: {
     type: String,
-    enum: ['accepted', 'rejected', 'modified', 'pending'],
+    enum: ['accepted', 'rejected', 'modified', 'pending', 'ignored'],
     default: 'pending'
   },
+  ignoredAt: { type: Date },
   acceptedAt: { type: Date },
   rejectedAt: { type: Date },
   modifiedAt: { type: Date },

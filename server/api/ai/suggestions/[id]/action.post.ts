@@ -4,7 +4,7 @@ import { connectDB } from '../../../../utils/db'
 import { formatZodErrorToMessage } from '../../../../utils/validation'
 
 const ActionSchema = z.object({
-  action: z.enum(['accepted', 'rejected', 'modified']),
+  action: z.enum(['accepted', 'rejected', 'modified', 'ignored']),
   entryId: z.string().optional(),
   clientEntryKey: z.string().optional(),
   field: z.string().optional(),
@@ -82,6 +82,10 @@ export default defineEventHandler(async (event) => {
     if (data.action === 'modified') {
       suggestion.modifiedAt = now
       if (data.finalContent !== undefined) suggestion.finalContent = data.finalContent
+    }
+
+    if (data.action === 'ignored') {
+      suggestion.ignoredAt = now
     }
 
     if (data.metadata) {

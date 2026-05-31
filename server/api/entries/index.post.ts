@@ -4,6 +4,7 @@ import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
+import { AISuggestion } from '../../utils/AISuggestion'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -135,6 +136,8 @@ const CreateEntrySchema = z.object({
   status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
   // 詞級關聯（可選）：若未提供，後端會自動生成新的 lexemeId
   lexemeId: z.string().optional(),
+  // 客戶端暫存鍵，用於關聯新建詞條時產生的 AI 建議
+  clientEntryKey: z.string().optional(),
   // 詞素／單音節來源（僅屬於本方言點詞條，不跨方言共享）
   morphemeRefs: z.array(z.object({
     targetEntryId: z.string().optional(),
@@ -285,6 +288,57 @@ export default defineEventHandler(async (event) => {
       changedFields: Object.keys(entryData),
       action: 'create'
     })
+
+    // 服務端 auto-match：將 clientEntryKey 關聯的 pending 建議綁定 entryId 並比對
+    if (data.clientEntryKey) {
+      const pendingSuggestions = await AISuggestion.find({
+        userAction: 'pending',
+        clientEntryKey: data.clientEntryKey
+      })
+      for (const s of pendingSuggestions) {
+        // 綁定真正的 entryId（應用層 nanoid，與 [id].put.ts resolvePendingAISuggestions 一致）
+        s.entryId = entry.id
+        let currentValue: unknown = undefined
+        let suggestedValue: unknown = undefined
+
+        switch (s.suggestionType) {
+          case 'definition': {
+            currentValue = entry.senses?.[0]?.definition?.trim?.()
+            const sc = s.suggestedContent as Record<string, unknown> | undefined
+            suggestedValue = typeof sc?.definition === 'string' ? sc.definition.trim() : undefined
+            break
+          }
+          case 'theme_classification': {
+            currentValue = entry.theme?.level3Id
+            const sc = s.suggestedContent as Record<string, unknown> | undefined
+            suggestedValue = typeof sc?.themeId === 'number' ? sc.themeId : undefined
+            break
+          }
+          case 'register': {
+            currentValue = entry.meta?.register
+            const sc = s.suggestedContent as Record<string, unknown> | undefined
+            suggestedValue = typeof sc?.register === 'string' ? sc.register : undefined
+            break
+          }
+          case 'example':
+            continue
+          default:
+            continue
+        }
+
+        if (currentValue !== undefined && suggestedValue !== undefined && String(currentValue) === String(suggestedValue)) {
+          const now = new Date()
+          s.userAction = 'accepted'
+          s.acceptedAt = now
+          s.acceptedContent = s.suggestedContent
+          s.metadata = {
+            ...(typeof s.metadata === 'object' && s.metadata !== null ? (s.metadata as Record<string, unknown>) : {}),
+            resolution: 'auto_matched_on_save'
+          }
+        }
+        await s.save()
+      }
+    }
 
     return {
       success: true,

@@ -210,7 +210,7 @@ export interface EditHistory {
 
 // AI Suggestion types
 export type SuggestionType = 'theme_classification' | 'definition' | 'example' | 'polish' | 'register'
-export type UserAction = 'accepted' | 'rejected' | 'modified' | 'pending'
+export type UserAction = 'accepted' | 'rejected' | 'modified' | 'pending' | 'ignored'
 
 export interface AISuggestion {
   id: string

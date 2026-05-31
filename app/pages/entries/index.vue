@@ -1810,7 +1810,11 @@ const {
   dismissDefinitionAI,
   markModifiedAISuggestionsForEntry,
   clearAcceptedAITrackersForEntry,
-  migrateAcceptedAITrackersEntryId
+  migrateAcceptedAITrackersEntryId,
+  enqueueIgnoredAISuggestion,
+  flushPendingIgnored,
+  markUninteractedSuggestionsIgnored,
+  extractInlineSuggestedValue
 } = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
 
 /** 將 ThemeAISuggestion 的 alternatives 轉為 AISuggestionRow 需要的格式 */
@@ -2360,6 +2364,15 @@ function saveCellEdit(options?: { focusWrapper?: boolean }) {
     const key = `${String(entryId)}-${aiSuggestionForField.value}`
     pendingAISuggestions.value.set(key, { entryId: String(entryId), field: aiSuggestionForField.value, text: aiSuggestion.value, suggestionId: aiSuggestionId.value || undefined })
     pendingAISuggestions.value = new Map(pendingAISuggestions.value)
+    // 標記為 ignored：用戶退出儲存格時未點接受或拒絕
+    if (entry) {
+      const suggestedValue = extractInlineSuggestedValue()
+      const currentValue = editValue.value !== undefined ? String(editValue.value).trim() : ''
+      const reason = suggestedValue && currentValue === suggestedValue
+        ? 'cell_exited_value_matched'
+        : 'cell_exited'
+      enqueueIgnoredAISuggestion(aiSuggestionId.value, getEntryIdString(entry), entry.id || (entry as any)._tempId, aiSuggestionForField.value === 'definition' ? 'senses.0.definition' : aiSuggestionForField.value, reason)
+    }
   }
   editingCell.value = null
   aiSuggestion.value = null
@@ -2392,6 +2405,11 @@ function cancelCellEdit() {
       const key = `${String(entryId)}-${aiSuggestionForField.value}`
       pendingAISuggestions.value.set(key, { entryId: String(entryId), field: aiSuggestionForField.value, text: aiSuggestion.value })
       pendingAISuggestions.value = new Map(pendingAISuggestions.value)
+      // 標記為 ignored：用戶取消編輯時未點接受或拒絕
+      const entry = currentPageEntries.value.find(e => getEntryIdString(e) === String(entryId))
+      if (entry) {
+        enqueueIgnoredAISuggestion(aiSuggestionId.value, getEntryIdString(entry), entry.id || (entry as any)._tempId, aiSuggestionForField.value === 'definition' ? 'senses.0.definition' : aiSuggestionForField.value, 'cell_edit_cancelled')
+      }
     }
   }
   editingCell.value = null
@@ -2638,6 +2656,10 @@ async function saveNewEntry(entry: Entry) {
   if (isEntrySaving(entry)) return
   setEntrySaving(entry, true)
   try {
+    // 在 POST 之前送出所有 pending ignored 標記，確保服務端 auto-match 不會誤判
+    markUninteractedSuggestionsIgnored(entry)
+    await flushPendingIgnored()
+
     // 審核員/管理員新建即為已發佈；貢獻者新建為待審核
     const role = user.value?.role
     const statusForNew = (role === 'reviewer' || role === 'admin') ? 'approved' : 'pending_review'
@@ -2651,7 +2673,8 @@ async function saveNewEntry(entry: Entry) {
       senses: entry.senses,
       theme: entry.theme,
       meta: entry.meta,
-      status: statusForNew
+      status: statusForNew,
+      clientEntryKey: getEntryIdString(entry)
     }
     // 複製／用作範本時沿用原詞條的 lexemeId，方便按詞語聚合視圖自動歸類
     const lexemeId = (entry as any).lexemeId
@@ -2678,12 +2701,14 @@ async function saveNewEntry(entry: Entry) {
         if (prevTempId && savedId) {
           migrateSavedEntryTransientState(prevTempId, savedId)
         }
-        markModifiedAISuggestionsForEntry(saved)
         entries.value[index] = saved
         // 從本地儲存中移除已保存嘅詞條
         removeEntryFromLocalStorage(prev?._tempId || entry.id || '')
         // 更新 baseline（之後「取消編輯」應回滾到最新已保存狀態）
         setBaselineForEntry(saved)
+        // markModified 必須在 migrateTransientState 之後、clearTrackers 之前調用，
+        // 以確保 modified 請求攜帶真實 entryId（而非 tempId）
+        await markModifiedAISuggestionsForEntry(saved)
         clearAcceptedAITrackersForEntry(saved)
       }
       pagination.total++
@@ -2721,8 +2746,11 @@ async function saveAllChanges() {
     dirtyEntries.forEach(entry => {
       entry.status = getStatusForSave(entry)
     })
+    // 標記 modified + uninteracted ignored，並在 PUT 之前 flush
+    await Promise.all(dirtyEntries.map(entry => markModifiedAISuggestionsForEntry(entry)))
+    dirtyEntries.forEach(entry => markUninteractedSuggestionsIgnored(entry))
+    await flushPendingIgnored()
     await Promise.all(dirtyEntries.map(entry => {
-      markModifiedAISuggestionsForEntry(entry)
       const putBody: Record<string, unknown> = {
         headword: entry.headword,
         dialect: entry.dialect,
@@ -2779,7 +2807,10 @@ async function saveEntryChanges(entry: Entry) {
   // 先更新本地狀態（如審核員保存→已發佈），再發送請求，避免保存後比對仍顯示「有修改」
   entry.status = statusToSave
   try {
-    markModifiedAISuggestionsForEntry(entry)
+    await markModifiedAISuggestionsForEntry(entry)
+    markUninteractedSuggestionsIgnored(entry)
+    // 在 PUT 之前送出所有 pending ignored 標記，避免服務端 auto-match 將它們誤判為 pending
+    await flushPendingIgnored()
     const putBody: Record<string, unknown> = {
       headword: entry.headword,
       dialect: entry.dialect,
@@ -2828,6 +2859,17 @@ async function cancelEdit(entry: Entry) {
   }
 
   if (entry._isNew) {
+    // 標記所有未操作的 AI 建議為 ignored（詞條被取消，建議不再有用）
+    markUninteractedSuggestionsIgnored(entry)
+    // 內聯建議也一併標記
+    if (aiSuggestion.value && aiSuggestionId.value) {
+      enqueueIgnoredAISuggestion(aiSuggestionId.value, getEntryIdString(entry), entry.id || (entry as any)._tempId, 'senses.0.definition', 'entry_cancelled')
+      aiSuggestion.value = null
+      aiSuggestionId.value = null
+      aiSuggestionForField.value = null
+    }
+    // fire-and-forget：不阻塞 UI，即使失敗也不影響取消流程
+    void flushPendingIgnored()
     // Remove new entry
     const index = entries.value.findIndex(e => e.id === entry.id || e._tempId === entry.id)
     if (index !== -1) {

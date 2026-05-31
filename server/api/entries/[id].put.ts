@@ -3,6 +3,7 @@ import { DIALECT_IDS } from '../../../shared/dialects'
 import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
+import { AISuggestion } from '../../utils/AISuggestion'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -18,6 +19,65 @@ function formatMongoDuplicateMessage(error: any) {
   }
 
   return '已有相同資料，請檢查詞條內容或重新整理頁面後再試。'
+}
+
+/**
+ * 比對條目當前欄位值與 pending AI 建議的 suggestedContent。
+ * 若一致則標記為 accepted（auto_matched_on_save），否則保持 pending。
+ * 僅處理 userAction === 'pending' 的記錄——已由客戶端標記為 ignored/rejected 的記錄不處理。
+ */
+async function resolvePendingAISuggestions(entryDoc: any, entryId: string) {
+  const pendingSuggestions = await AISuggestion.find({
+    userAction: 'pending',
+    $or: [
+      { entryId },
+      // 新建詞條可能只有 clientEntryKey，在 PUT 場景通常已有 entryId，保留兼容
+      { clientEntryKey: entryId }
+    ]
+  })
+
+  for (const s of pendingSuggestions) {
+    let currentValue: unknown = undefined
+    let suggestedValue: unknown = undefined
+
+    switch (s.suggestionType) {
+      case 'definition': {
+        currentValue = entryDoc.senses?.[0]?.definition?.trim?.()
+        const sc = s.suggestedContent as Record<string, unknown> | undefined
+        suggestedValue = typeof sc?.definition === 'string' ? sc.definition.trim() : undefined
+        break
+      }
+      case 'theme_classification': {
+        currentValue = entryDoc.theme?.level3Id
+        const sc = s.suggestedContent as Record<string, unknown> | undefined
+        suggestedValue = typeof sc?.themeId === 'number' ? sc.themeId : undefined
+        break
+      }
+      case 'register': {
+        currentValue = entryDoc.meta?.register
+        const sc = s.suggestedContent as Record<string, unknown> | undefined
+        suggestedValue = typeof sc?.register === 'string' ? sc.register : undefined
+        break
+      }
+      case 'example':
+        // example 在客戶端總是即時接受（generateAIExamples），不應有 pending
+        continue
+      default:
+        continue
+    }
+
+    if (currentValue !== undefined && suggestedValue !== undefined && String(currentValue) === String(suggestedValue)) {
+      const now = new Date()
+      s.userAction = 'accepted'
+      s.acceptedAt = now
+      s.acceptedContent = s.suggestedContent
+      s.metadata = {
+        ...(typeof s.metadata === 'object' && s.metadata !== null ? (s.metadata as Record<string, unknown>) : {}),
+        resolution: 'auto_matched_on_save'
+      }
+      await s.save()
+    }
+  }
 }
 
 const UpdateEntrySchema = z.object({
@@ -373,6 +433,11 @@ export default defineEventHandler(async (event) => {
         }
       }
     }
+
+    // 服務端 auto-match：將欄位值與 AI 建議一致的 pending 記錄標記為 accepted
+    // 注意：existingEntry.id 是應用層 nanoid，與前端 getRealEntryId() 傳入 AI 建議的 entryId 一致
+    // 不可用 _id（MongoDB ObjectId），否則與 AI 建議記錄中的 entryId 無法匹配
+    await resolvePendingAISuggestions(existingEntry, existingEntry.id)
 
     return {
       success: true,
