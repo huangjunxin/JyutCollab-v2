@@ -5,7 +5,8 @@ import type { Entry } from '~/types'
 
 export function useEntriesSelection(
   currentPageEntries: ComputedRef<Entry[]>,
-  fetchEntries: () => Promise<void>
+  fetchEntries: () => Promise<void>,
+  invalidateCache: () => void
 ) {
   const selectedEntryIds = ref<Set<string>>(new Set())
   const selectAllChecked = computed(() => {
@@ -51,25 +52,39 @@ export function useEntriesSelection(
     if (headerCheckboxRef.value) headerCheckboxRef.value.indeterminate = val
   }, { immediate: true })
 
+  const toast = useToast()
   const batchDeleting = ref(false)
-  async function batchDeleteSelected() {
+  const deleteConfirmOpen = ref(false)
+
+  function batchDeleteSelected() {
+    if (selectedSavedEntries.value.length === 0) return
+    deleteConfirmOpen.value = true
+  }
+
+  async function confirmBatchDelete() {
     const toDelete = selectedSavedEntries.value
     if (toDelete.length === 0) return
-    if (!confirm(`確定要刪除所選的 ${toDelete.length} 條詞條嗎？此操作不可撤銷。`)) return
+    deleteConfirmOpen.value = false
     batchDeleting.value = true
     try {
       for (const entry of toDelete) {
         await $fetch<unknown>(`/api/entries/${entry.id}`, { method: 'DELETE' })
         selectedEntryIds.value = new Set([...selectedEntryIds.value].filter((id) => id !== String(entry.id)))
       }
+      invalidateCache()
       await fetchEntries()
       clearSelection()
+      toast.add({ title: `已成功刪除 ${toDelete.length} 條詞條`, color: 'success', icon: 'i-heroicons-check-circle' })
     } catch (error: any) {
       console.error('Batch delete failed:', error)
-      alert(error?.data?.message || '批量刪除失敗')
+      toast.add({ title: error?.data?.message || '批量刪除失敗', color: 'error', icon: 'i-heroicons-exclamation-circle' })
     } finally {
       batchDeleting.value = false
     }
+  }
+
+  function cancelBatchDelete() {
+    deleteConfirmOpen.value = false
   }
 
   return {
@@ -83,7 +98,10 @@ export function useEntriesSelection(
     toggleSelectAll,
     clearSelection,
     batchDeleting,
+    deleteConfirmOpen,
     batchDeleteSelected,
+    confirmBatchDelete,
+    cancelBatchDelete,
     headerCheckboxRef
   }
 }

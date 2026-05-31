@@ -947,6 +947,31 @@
       </UCard>
     </template>
   </UModal>
+
+  <!-- 批量刪除確認對話框 -->
+  <UModal v-model:open="deleteConfirmOpen" class="max-w-md">
+    <template #content>
+      <UCard class="jc-modal-card w-full rounded-none [&>*]:rounded-none">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5 text-red-500" />
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">確認批量刪除</h3>
+          </div>
+        </template>
+
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          確定要刪除所選的 <span class="font-semibold text-gray-900 dark:text-white">{{ selectedSavedEntries.length }}</span> 條詞條嗎？此操作不可撤銷。
+        </p>
+
+        <template #footer>
+          <div class="flex justify-end gap-3 w-full">
+            <UButton color="neutral" variant="ghost" @click="cancelBatchDelete">取消</UButton>
+            <UButton color="error" @click="confirmBatchDelete" :loading="batchDeleting">確認刪除</UButton>
+          </div>
+        </template>
+      </UCard>
+    </template>
+  </UModal>
 </template>
 
 <script setup lang="ts">
@@ -1229,7 +1254,7 @@ const isAnyEntrySaving = computed(() => savingEntryKeys.value.size > 0)
 const searchQuery = ref('')
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
-const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentPage, pagination, fetchEntries, fetchAllEntries, handleSearch, handleSort } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
+const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentPage, pagination, fetchEntries, fetchAllEntries, handleSearch, handleSort, invalidateCache } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
 
 // Handle URL parameters - will be processed in onMounted before fetchEntries
 const route = useRoute()
@@ -1743,9 +1768,12 @@ const {
   toggleSelectAll,
   clearSelection,
   batchDeleting,
+  deleteConfirmOpen,
   batchDeleteSelected,
+  confirmBatchDelete,
+  cancelBatchDelete,
   headerCheckboxRef
-} = useEntriesSelection(currentPageEntries, fetchEntries)
+} = useEntriesSelection(currentPageEntries, fetchEntries, invalidateCache)
 
 const {
   aiSuggestion,
