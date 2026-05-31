@@ -35,9 +35,9 @@ export interface IPhonetic {
 
 export interface IHeadword {
   display: string
-  search: string
   normalized: string
   isPlaceholder: boolean
+  variants?: string[]
 }
 
 export interface IDialect {

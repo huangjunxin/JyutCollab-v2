@@ -71,30 +71,36 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // 保存快照
     const beforeSnapshot = entry.toObject()
 
-    // 更新狀態
-    entry.status = 'pending_review'
-    await entry.save()
+    const updated = await Entry.findOneAndUpdate(
+      { _id: entry._id, status: { $in: ["draft", "rejected"] } },
+      { $set: { status: "pending_review" } },
+      { new: true }
+    )
+    if (!updated) {
+      throw createError({
+        statusCode: 409,
+        message: "詞條狀態已變更，請重新整理"
+      })
+    }
 
-    // 創建編輯歷史
     await EditHistory.create({
-      entryId: entry._id.toString(),
+      entryId: updated._id.toString(),
       userId,
       beforeSnapshot,
-      afterSnapshot: entry.toObject(),
-      changedFields: ['status'],
-      action: 'status_change',
-      comment: '提交審核'
+      afterSnapshot: updated.toObject(),
+      changedFields: ["status"],
+      action: "status_change",
+      comment: "提交審核"
     })
 
     return {
       success: true,
-      message: '詞條已提交審核',
+      message: "詞條已提交審核",
       data: {
-        id: entry.id,
-        status: entry.status
+        id: updated.id,
+        status: updated.status
       }
     }
   } catch (error: any) {

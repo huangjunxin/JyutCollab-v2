@@ -175,12 +175,12 @@ export default defineEventHandler(async (event) => {
       // 異形詞：優先使用 headword.variants，其次沿用現有 DB 內的 variants
       let variants: string[] = existingEntry.headword?.variants ?? []
       if (Array.isArray(data.headword.variants)) {
-        variants = data.headword.variants
+        variants = data.headword.variants.map(v => convertToHongKongTraditional(v))
       }
 
       existingEntry.headword = {
         display: displayText,
-        normalized: data.headword.normalized || displayText,
+        normalized: convertToHongKongTraditional(data.headword.normalized || displayText),
         isPlaceholder: displayText.includes('□'),
         variants
         // search 已棄用：保留現有值但不再主動更新

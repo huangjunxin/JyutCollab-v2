@@ -39,11 +39,13 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // 增加瀏覽計數
-    await Entry.updateOne(
-      { _id: entry._id },
-      { $inc: { viewCount: 1 } }
-    )
+    // 增加瀏覽計數並取回更新後的值
+    const viewCountResult = await Entry.findByIdAndUpdate(
+      entry._id,
+      { $inc: { viewCount: 1 } },
+      { new: true, projection: { viewCount: 1 } }
+    ).lean()
+    const currentViewCount = viewCountResult?.viewCount ?? ((entry.viewCount ?? 0) + 1)
 
     // 解析提交者顯示名稱（優先顯示名稱，其次用戶名）
     let createdByDisplay = entry.createdBy
@@ -104,7 +106,7 @@ export default defineEventHandler(async (event) => {
         reviewedBy: entry.reviewedBy,
         reviewedAt: entry.reviewedAt?.toISOString(),
         reviewNotes: entry.reviewNotes,
-        viewCount: (entry.viewCount ?? 0) + 1,
+        viewCount: currentViewCount,
         likeCount: entry.likeCount,
         createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
         updatedAt: entry.updatedAt?.toISOString?.() || entry.updatedAt
