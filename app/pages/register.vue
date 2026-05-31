@@ -1,14 +1,14 @@
 <template>
   <div class="min-h-screen flex">
     <!-- Left side - Decorative -->
-    <div class="hidden lg:flex lg:w-1/2 bg-[var(--jc-paper)] border-r border-[var(--jc-border)] relative overflow-hidden">
+    <div class="hidden lg:flex lg:w-1/2 bg-[var(--jc-paper)] dark:bg-[var(--jc-dark-bg)] border-r border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] relative overflow-hidden">
       <!-- Background pattern -->
       <div class="absolute inset-0 opacity-10">
-        <div class="absolute top-32 right-32 w-80 h-80 bg-white rounded-full blur-3xl"></div>
-        <div class="absolute bottom-32 left-32 w-64 h-64 bg-white rounded-full blur-3xl"></div>
+        <div class="absolute top-32 right-32 w-80 h-80 bg-white dark:bg-gray-600 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-32 left-32 w-64 h-64 bg-white dark:bg-gray-600 rounded-full blur-3xl"></div>
       </div>
 
-      <div class="relative z-10 flex flex-col justify-center items-center w-full p-12 text-[var(--jc-ink)]">
+      <div class="relative z-10 flex flex-col justify-center items-center w-full p-12 text-[var(--jc-ink)] dark:text-gray-100">
         <!-- Logo -->
         <div class="mb-8">
           <div class="w-24 h-24 bg-[var(--jc-accent)] flex items-center justify-center shadow-[var(--jc-shadow-hard-lg)]">
@@ -17,23 +17,23 @@
         </div>
 
         <h1 class="jc-serif text-4xl font-bold mb-4 text-center text-[var(--jc-accent)]">加入社區</h1>
-        <p class="jc-serif text-xl text-[var(--jc-body)] mb-8 text-center">成為粵語詞條貢獻者</p>
+        <p class="jc-serif text-xl text-[var(--jc-body)] dark:text-gray-300 mb-8 text-center">成為粵語詞條貢獻者</p>
 
         <!-- Benefits -->
         <div class="space-y-4 max-w-md">
-          <div class="flex items-center gap-4 bg-white/75 backdrop-blur-sm border border-[var(--jc-border)] shadow-[var(--jc-shadow-hard)] p-4">
+          <div class="flex items-center gap-4 bg-white/75 dark:bg-gray-800/75 backdrop-blur-sm border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)] p-4">
             <div class="w-10 h-10 bg-[var(--jc-accent-soft-strong)] text-[var(--jc-accent)] flex items-center justify-center flex-shrink-0">
               <UIcon name="i-heroicons-document-text" class="w-5 h-5" />
             </div>
             <span class="text-sm">創建和編輯粵語詞條</span>
           </div>
-          <div class="flex items-center gap-4 bg-white/75 backdrop-blur-sm border border-[var(--jc-border)] shadow-[var(--jc-shadow-hard)] p-4">
+          <div class="flex items-center gap-4 bg-white/75 dark:bg-gray-800/75 backdrop-blur-sm border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)] p-4">
             <div class="w-10 h-10 bg-[var(--jc-accent-soft-strong)] text-[var(--jc-accent)] flex items-center justify-center flex-shrink-0">
               <UIcon name="i-heroicons-clock" class="w-5 h-5" />
             </div>
             <span class="text-sm">追蹤您的編輯歷史</span>
           </div>
-          <div class="flex items-center gap-4 bg-white/75 backdrop-blur-sm border border-[var(--jc-border)] shadow-[var(--jc-shadow-hard)] p-4">
+          <div class="flex items-center gap-4 bg-white/75 dark:bg-gray-800/75 backdrop-blur-sm border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)] p-4">
             <div class="w-10 h-10 bg-[var(--jc-accent-soft-strong)] text-[var(--jc-accent)] flex items-center justify-center flex-shrink-0">
               <UIcon name="i-heroicons-users" class="w-5 h-5" />
             </div>
