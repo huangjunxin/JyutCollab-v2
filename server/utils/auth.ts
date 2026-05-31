@@ -184,12 +184,21 @@ export async function googleLoginUser(googleUser: GoogleUserInfo): Promise<{ use
     // 2. Find by email → auto-merge (email_verified checked above)
     dbUser = await User.findOne({ email: googleUser.email.toLowerCase(), isActive: true })
     if (dbUser) {
-      dbUser.googleId = googleUser.sub
-      if (!dbUser.avatarUrl && googleUser.picture) {
-        dbUser.avatarUrl = googleUser.picture
+      try {
+        dbUser.googleId = googleUser.sub
+        if (!dbUser.avatarUrl && googleUser.picture) {
+          dbUser.avatarUrl = googleUser.picture
+        }
+        await dbUser.save()
+        return { user: toAuthUser(dbUser), merged: true }
+      } catch (mergeErr: any) {
+        if (mergeErr?.code === 11000) {
+          // Concurrent login race — another request already set googleId; re-fetch and log in
+          const reloaded = await User.findOne({ googleId: googleUser.sub, isActive: true })
+          if (reloaded) return { user: toAuthUser(reloaded), merged: true }
+        }
+        throw mergeErr
       }
-      await dbUser.save()
-      return { user: toAuthUser(dbUser), merged: true }
     }
 
     // 3. Create new user — retry on duplicate key (concurrent signup race)

@@ -123,7 +123,6 @@ const CreateEntrySchema = z.object({
   themeIdL3: z.number().int().optional(),
   definition: z.string().optional(),
   usageNotes: z.string().optional(),
-  formalityLevel: z.enum(['formal', 'neutral', 'informal', 'slang', 'vulgar']).optional(),
   examples: z.array(z.object({
     sentence: z.string(),
     jyutping: z.string().optional(),
@@ -226,7 +225,7 @@ export default defineEventHandler(async (event) => {
 
     // 構建 meta
     const meta = {
-      register: data.meta?.register || data.formalityLevel,
+      register: data.meta?.register,
       usage: convertToHongKongTraditional(data.meta?.usage || data.usageNotes || ''),
       notes: convertToHongKongTraditional(data.meta?.notes || ''),
       etymology: data.meta?.etymology,

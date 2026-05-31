@@ -124,7 +124,6 @@ export interface Entry {
   themeIdL3?: number
   definition?: string
   usageNotes?: string
-  formalityLevel?: string
   examples?: Example[]
   phoneticNotation?: string
   contributorId?: string

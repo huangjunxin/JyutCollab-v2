@@ -80,14 +80,13 @@ export default defineEventHandler(async (event) => {
         meta: entry.meta,
         // 兼容舊格式字段
         text: entry.headword?.display,
-        textNormalized: entry.headword?.search,
+        textNormalized: entry.headword?.normalized,
         region: entry.dialect?.name,
         themeIdL1: entry.theme?.level1Id,
         themeIdL2: entry.theme?.level2Id,
         themeIdL3: entry.theme?.level3Id,
         definition: entry.senses?.[0]?.definition,
         usageNotes: entry.meta?.usage,
-        formalityLevel: entry.meta?.register,
         examples: entry.senses?.[0]?.examples?.map((ex: any) => ({
           sentence: ex.text,
           text: ex.text,

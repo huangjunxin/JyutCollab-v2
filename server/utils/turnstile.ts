@@ -16,7 +16,7 @@ export async function verifyTurnstile(token: string): Promise<boolean> {
     } else {
       console.error(msg)
     }
-    return true
+    return !!process.dev
   }
 
   if (!token) {
@@ -46,6 +46,6 @@ export async function verifyTurnstile(token: string): Promise<boolean> {
   } catch (err) {
     console.error('[Turnstile] siteverify 請求失敗:', err)
     // 網路錯誤時放行，避免擋住真實用戶
-    return true
+    return !!process.dev
   }
 }

@@ -14,6 +14,7 @@ const RegisterSchema = z.object({
   displayName: z.string().trim().max(100).optional(),
   location: z.string().trim().max(100).optional(),
   nativeDialect: z.string().trim().max(50).optional(),
+  turnstileToken: z.string().optional(),
   dialects: z.array(dialectString).min(1, '請至少選擇一個方言點')
 })
 
@@ -58,7 +59,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Verify Turnstile
-    const turnstileOk = await verifyTurnstile(body.turnstileToken || '')
+    const turnstileOk = await verifyTurnstile(validated.data.turnstileToken || '')
     if (!turnstileOk) {
       return { success: false, error: '安全驗證失敗，請重新整理頁面後重試' }
     }

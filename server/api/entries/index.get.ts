@@ -25,7 +25,6 @@ const QuerySchema = z.object({
   createdBy: z.string().optional(),
   contributorId: z.string().optional(), // 兼容舊字段
   register: z.enum(['口語', '書面', '粗俗', '文雅', '中性']).optional(),
-  formalityLevel: z.enum(['formal', 'neutral', 'informal', 'slang', 'vulgar']).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'viewCount', 'likeCount', 'headword']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   groupBy: z.enum(['headword', 'lexeme']).optional() // 聚合視圖：按詞形/按詞語(lexeme)分組
@@ -68,7 +67,6 @@ export default defineEventHandler(async (event) => {
       createdBy,
       contributorId,
       register,
-      formalityLevel,
       sortBy,
       sortOrder,
       groupBy
@@ -212,7 +210,6 @@ export default defineEventHandler(async (event) => {
       themeIdL3: entry.theme?.level3Id,
       definition: entry.senses?.[0]?.definition,
       usageNotes: entry.meta?.usage,
-      formalityLevel: entry.meta?.register,
       examples: entry.senses?.[0]?.examples,
       phoneticNotation: entry.phonetic?.jyutping?.join?.('; '),
       notationSystem: 'jyutping' as const,
