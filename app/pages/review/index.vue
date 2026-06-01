@@ -158,6 +158,7 @@
 <script setup lang="ts">
 import type { Entry } from '~/types'
 import { useSearchFilters } from '~/composables/useSearchFilters'
+import { useAgentActions } from '~/composables/useAgentActions'
 import { entryToDisplay } from '~/composables/useEntryDisplay'
 
 definePageMeta({
@@ -268,6 +269,45 @@ function handleSearch() {
   currentPage.value = 1
   refreshEntries()
 }
+
+provide('agentPageContext', computed(() => ({
+  route: '/review',
+  filters: {
+    query: searchQuery.value || undefined,
+    dialect: filters.dialect !== ALL_FILTER_VALUE ? filters.dialect : undefined,
+    status: filters.status !== ALL_FILTER_VALUE ? filters.status : undefined,
+    theme: filters.theme !== ALL_FILTER_VALUE ? filters.theme : undefined,
+    createdBy: filters.createdBy || undefined
+  },
+  totalCount: pagination.total,
+  currentPage: currentPage.value
+})))
+
+// Watch for agent local actions (from AI assistant panel)
+const { pending: agentActions, dequeue: dequeueAgentAction } = useAgentActions()
+watch(agentActions, async (queue) => {
+  if (!queue.length) return
+  const action = dequeueAgentAction()
+  if (!action) return
+
+  switch (action.kind) {
+    case 'apply_filters':
+      if (action.filters?.query !== undefined) searchQuery.value = action.filters.query
+      if (action.filters?.dialect) filters.dialect = action.filters.dialect
+      if (action.filters?.status) filters.status = action.filters.status
+      if (action.filters?.theme) filters.theme = action.filters.theme
+      if (action.filters?.createdBy) filters.createdBy = action.filters.createdBy
+      currentPage.value = 1
+      break
+
+    case 'open_entry':
+      if (action.entryId) {
+        searchQuery.value = action.entryId
+        currentPage.value = 1
+      }
+      break
+  }
+}, { deep: true })
 
 onMounted(() => {
   refreshEntries()

@@ -7,11 +7,11 @@ const NavigateInput = z.object({
 })
 
 const DESTINATIONS: Record<z.infer<typeof NavigateInput>['destination'], { label: string, to: string }> = {
-  entries: { label: '前往詞條列表。', to: '/entries' },
-  review: { label: '前往審核隊列。', to: '/review' },
+  entries: { label: '前往詞條列表（支援完整搜索欄、方言/主題/狀態/用戶篩選、進階篩選）。', to: '/entries' },
+  review: { label: '前往審核隊列（支援搜索欄、方言/主題/狀態/用戶篩選，狀態預設為待審核）。', to: '/review' },
   docs: { label: '前往使用指南。', to: '/docs' },
   home: { label: '前往首頁。', to: '/' },
-  histories: { label: '前往編輯歷史。', to: '/histories' }
+  histories: { label: '前往編輯歷史（支援搜索欄、方言/主題/用戶/操作類型篩選）。', to: '/histories' }
 }
 
 export const navigateTool: AgentToolDefinition<z.infer<typeof NavigateInput>, { action: { kind: 'navigate', label: string, to: string } }> = {

@@ -408,6 +408,7 @@
 <script setup lang="ts">
 import type { EditHistory, PaginatedResponse } from '~/types'
 import { useSearchFilters } from '~/composables/useSearchFilters'
+import { useAgentActions } from '~/composables/useAgentActions'
 
 definePageMeta({
   layout: 'default',
@@ -754,6 +755,44 @@ function handleSearch() {
   refreshHistories()
 }
 
+
+provide('agentPageContext', computed(() => ({
+  route: '/histories',
+  filters: {
+    query: searchQuery.value || undefined,
+    dialect: filters.dialect !== ALL_FILTER_VALUE ? filters.dialect : undefined,
+    theme: filters.theme !== ALL_FILTER_VALUE ? filters.theme : undefined,
+    createdBy: filters.createdBy || undefined
+  },
+  totalCount: historyTotal.value,
+  currentPage: currentPage.value
+})))
+
+// Watch for agent local actions (from AI assistant panel)
+const { pending: agentActions, dequeue: dequeueAgentAction } = useAgentActions()
+watch(agentActions, async (queue) => {
+  if (!queue.length) return
+  const action = dequeueAgentAction()
+  if (!action) return
+
+  switch (action.kind) {
+    case 'apply_filters':
+      if (action.filters?.query !== undefined) searchQuery.value = action.filters.query
+      if (action.filters?.dialect) filters.dialect = action.filters.dialect
+      if (action.filters?.theme) filters.theme = action.filters.theme
+      if (action.filters?.createdBy) filters.createdBy = action.filters.createdBy
+      filterAction.value = undefined // reset action filter when agent applies filters
+      currentPage.value = 1
+      break
+
+    case 'open_entry':
+      if (action.entryId) {
+        searchQuery.value = action.entryId
+        currentPage.value = 1
+      }
+      break
+  }
+}, { deep: true })
 
 onMounted(() => {
   const route = useRoute()

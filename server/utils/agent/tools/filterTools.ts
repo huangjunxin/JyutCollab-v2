@@ -203,7 +203,7 @@ export const planAdvancedFilterTool: AgentToolDefinition<z.infer<typeof PlanAdva
       },
       summary: result.humanExplanation,
       warnings: result.warnings,
-      nextAction: '使用 jyutcollab.apply_entry_filters 套用這些篩選條件到詞條表格。'
+      nextAction: '使用 jyutcollab.apply_entry_filters 套用這些篩選條件到當前頁面（僅 /entries 詞條表格支援進階篩選，/review 和 /histories 只支援基本搜尋和分類篩選）。'
     }
   }
 }
@@ -212,6 +212,8 @@ const ApplyEntryFiltersInput = z.object({
   query: z.string().trim().max(200).optional(),
   dialect: z.string().trim().max(100).optional(),
   status: z.string().trim().max(50).optional(),
+  theme: z.string().trim().max(100).optional(),
+  createdBy: z.string().trim().max(100).optional(),
   view: z.enum(['flat', 'aggregated', 'lexeme']).optional(),
   formula: z.string().trim().max(500).optional(),
   regexRows: z.array(FilterRow).max(10).optional(),
@@ -220,37 +222,54 @@ const ApplyEntryFiltersInput = z.object({
 
 export const applyEntryFiltersTool: AgentToolDefinition<z.infer<typeof ApplyEntryFiltersInput>> = {
   name: 'jyutcollab.apply_entry_filters',
-  description: '在前端詞條表格套用搜尋、方言、狀態、視圖和進階篩選條件。只修改前端狀態，不修改伺服器資料。',
+  description: '在前端頁面（詞條列表、審核隊列、編輯歷史）套用搜尋、方言、狀態、主題分類、用戶等篩選條件。只修改前端狀態，不修改伺服器資料。系統會根據當前頁面自動決定可用篩選：/entries 支援全部（含進階篩選）；/review 支援 query/dialect/status/theme/createdBy；/histories 支援 query/dialect/theme/createdBy（無狀態篩選）。',
   risk: 'local_ui',
   inputSchema: ApplyEntryFiltersInput,
-  async execute(input) {
+  async execute(input, ctx) {
+    const route = (ctx?.pageContext as any)?.route as string || '/entries'
+    const isReview = route === '/review' || route.startsWith('/review')
+    const isHistory = route === '/histories' || route.startsWith('/histories')
+    const isEntries = !isReview && !isHistory
+
     const applied: string[] = []
     const dialect = normalizeDialectName(input.dialect)
     if (input.query) applied.push(`搜尋「${input.query}」`)
     if (dialect) applied.push(`方言：${dialect}`)
-    if (input.status) applied.push(`狀態：${input.status}`)
-    if (input.view) applied.push(`視圖：${input.view}`)
-    if (input.formula) applied.push(`公式：${input.formula}`)
-    if (input.regexRows?.length) applied.push(`正則條件 ${input.regexRows.length} 條`)
+    if (input.status && !isHistory) applied.push(`狀態：${input.status}`)
+    if (input.theme) applied.push(`主題分類 ID：${input.theme}`)
+    if (input.createdBy) applied.push(`用戶：${input.createdBy}`)
+    if (input.view && isEntries) applied.push(`視圖：${input.view}`)
+    if (input.formula && isEntries) applied.push(`公式：${input.formula}`)
+    if (input.regexRows?.length && isEntries) applied.push(`正則條件 ${input.regexRows.length} 條`)
+
+    const filters: Record<string, unknown> = {
+      query: input.query,
+      dialect
+    }
+
+    if (!isHistory && input.status) filters.status = input.status
+    if (input.theme) filters.theme = input.theme
+    if (input.createdBy) filters.createdBy = input.createdBy
+
+    if (isEntries) {
+      if (input.view) filters.view = input.view
+      if (input.formula) filters.formula = input.formula
+      if (input.regexRows) filters.regexRows = input.regexRows
+      if (input.openAdvancedFilter) filters.openAdvancedFilter = input.openAdvancedFilter
+    }
+
+    const pageLabel = isReview ? '審核隊列' : isHistory ? '編輯歷史' : '詞條列表'
 
     return {
       ok: true,
       data: {
         action: {
           kind: 'apply_filters',
-          label: applied.length > 0 ? `套用篩選：${applied.join('、')}` : '清除所有篩選',
-          filters: {
-            query: input.query,
-            dialect,
-            status: input.status,
-            view: input.view,
-            formula: input.formula,
-            regexRows: input.regexRows,
-            openAdvancedFilter: input.openAdvancedFilter
-          }
+          label: applied.length > 0 ? `套用篩選（${pageLabel}）：${applied.join('、')}` : `清除${pageLabel}所有篩選`,
+          filters
         }
       },
-      summary: applied.length > 0 ? `已套用 ${applied.length} 項篩選條件。` : '已清除所有篩選條件。'
+      summary: applied.length > 0 ? `已在${pageLabel}套用 ${applied.length} 項篩選條件。` : `已清除${pageLabel}所有篩選條件。`
     }
   }
 }

@@ -110,7 +110,8 @@ function buildSystemPrompt() {
 核心規則：
 - 你應根據用戶自然語言意圖自主選擇合適工具，不要要求用戶使用固定命令格式。
 - 方言點資料是系統內建固定資料；工具會直接按 shared/dialects.ts 的方言 ID 與顯示名匹配。用戶指定「梧州」「廣州」等方言點時，直接把該名稱填入 dialect/dialectName，不要先說要查詢支援列表，也不要為了確認代碼而調用 jyutcollab.list_dialects。
-- 如果當前 route 是 /entries，且用戶要求搜尋、篩選、搜尋加篩選或查某方言詞語，優先使用 jyutcollab.apply_entry_filters 直接套用到左側詞條表格。完成後可在右側 AI 欄說明採用了哪些搜尋/篩選條件，但不要列出實際詞條結果清單或結果摘要。
+- 如果當前 route 是 /entries、/review 或 /histories，且用戶要求搜尋或篩選，請使用 jyutcollab.apply_entry_filters 直接套用到當前頁面的篩選欄。該工具會根據頁面自動決定可用篩選條件：/entries 支援全部篩選（含進階公式、正則、視圖切換）；/review 支援 query/dialect/status/theme/createdBy；/histories 支援 query/dialect/theme/createdBy。
+- /entries、/review、/histories 三個頁面頂部都有獨立的搜索欄同篩選器（搜索框、方言、主題分類、用戶篩選等），用戶可以直接在頁面上操作，不一定要通過 AI 助手。AI 助手可以使用導航工具將用戶帶到相應頁面，讓用戶自行使用頁面篩選器。
 - 用戶說「找」「查」「搵」「有哪些」「粵拼為」「讀音是」等查詢需求時，應優先調用搜尋或詳情工具；但在 /entries 頁面的列表型搜尋應優先套用詞條表格篩選。
 - 如果用戶指定粵拼，例如「找一下粵拼為 ang1 的詞」，請在 /entries 頁面調用 jyutcollab.apply_entry_filters 並填入 query: "ang1"；其他頁面可調用 jyutcollab.search_entries 並填入 jyutping: "ang1"。
 - 如果用戶指定詞頭，/entries 頁面用 jyutcollab.apply_entry_filters 的 query；其他頁面填入 search_entries 的 headword；如果只是泛查，才使用 query。
@@ -139,7 +140,7 @@ function summarizeToolResult(name: string, result: AgentToolResult) {
     warnings: result.warnings,
     nextAction: result.nextAction,
     presentationInstruction: name === 'jyutcollab.apply_entry_filters'
-      ? '這是詞條表格本地篩選動作。正文可以說明已套用的搜尋或篩選條件，並提醒用戶在左側詞條表格查看；不要列出、推測或摘要具體詞條結果。'
+      ? '這是頁面篩選動作。正文可以說明已套用的搜尋或篩選條件，並提醒用戶在當前頁面查看結果；不要列出、推測或摘要具體條目。'
       : '如果 data 內有 entries、dialects、sameDialect 或 otherDialects，正文不要重複列出完整表格或清單；只做摘要和下一步建議，讓前端結構化卡片展示具體資料。'
   })
 }

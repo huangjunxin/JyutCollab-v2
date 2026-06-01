@@ -92,11 +92,13 @@ app/
   components/         # Vue components
     layout/           # AppHeader, AppSidebar
     entries/          # EntryEditableCell, EntryDetailCard, EntryModal, etc.
+    shared/           # SearchFilterBar (共用搜索/篩選欄)
     auth/             # LoginForm, RegisterForm
     review/           # Review-related components
     history/          # History-related components
   composables/        # Reusable composition functions
     useAuth.ts        # Authentication logic
+    useSearchFilters.ts        # Shared search/filter state (searchQuery, filters, options)
     useEntriesAISuggestions.ts  # AI suggestions management
     useEntriesTableEdit.ts      # Table editing
     useColumnResize.ts          # Column resizing
@@ -175,6 +177,22 @@ The entries table (`app/pages/entries/index.vue`) is a 2000+ line component with
 - Batch selection with bulk delete
 - Search by headword/variants/definition
 - Filter by dialect, theme, status, entry type
+
+### Shared Search/Filter Bar
+
+A reusable search bar component (`app/components/shared/SearchFilterBar.vue`) is used by all three list pages:
+- **entries** (`/entries`) — full search + dialect/theme/status/user filters + advanced filter panel + rule overlay + views dropdown
+- **review** (`/review`) — search + dialect/theme/status/user filters (status defaults to `pending_review`)
+- **histories** (`/histories`) — search + dialect/theme/user filters + action type filter (no status filter)
+
+All three pages share filter state via `useSearchFilters()` composable (`app/composables/useSearchFilters.ts`), which provides:
+- `searchQuery` ref and `filters` reactive (`dialect`, `status`, `theme`, `createdBy`)
+- Computed wrappers (`filterDialect`, `filterStatus`, `filterTheme`, `filterUser`) for USelectMenu compatibility
+- Computed options: `dialectOptions`, `themeFilterOptions`, `userFilterOptions` (with contributor list), `statusOptions`
+- `fetchContributors()` for populating the user/creator dropdown
+- Configurable via `statusDefault`, `includeStatusFilter`, `userFilterAllLabel`
+
+The server APIs for review (`/api/reviews`) and histories (`/api/histories`) also support the expanded filter parameters: `query` (text search), `dialectName`, `themeIdL3`, `createdBy`/`userId`.
 
 ### Authentication & Authorization Flow
 

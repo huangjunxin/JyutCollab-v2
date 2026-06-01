@@ -9,6 +9,8 @@ export interface AgentLocalActionSummary {
     query?: string
     dialect?: string
     status?: string
+    theme?: string
+    createdBy?: string
     view?: string
     formula?: string
     regexRows?: Array<{ field: string, pattern: string, flags?: string }>
