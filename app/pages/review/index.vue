@@ -14,21 +14,35 @@
             待審核詞條 <span class="font-semibold text-amber-600 dark:text-amber-400">{{ pagination.total }}</span> 個
           </p>
         </div>
-        <div class="flex gap-2">
-          <USelectMenu
-            v-model="selectedDialect"
-            :items="dialectOptions"
-            value-key="value"
-            placeholder="方言篩選"
-            class="w-32"
-            @update:model-value="handleDialectChange"
-          />
-        </div>
       </div>
     </div>
 
+    <!-- Search and filters -->
+    <SharedSearchFilterBar
+      v-model:search-query="searchQuery"
+      v-model:filter-user="filterUser"
+      v-model:filter-dialect="filterDialect"
+      v-model:filter-theme="filterTheme"
+      v-model:filter-status="filterStatus"
+      :user-filter-options="userFilterOptions"
+      :dialect-options="dialectOptions"
+      :theme-filter-options="themeFilterOptions"
+      :status-options="statusOptions"
+      @search="handleSearch"
+    />
+
+    <!-- Error state -->
+    <div v-if="error" class="text-center py-16 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+        <UIcon name="i-heroicons-exclamation-triangle" class="w-10 h-10 text-red-500" />
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">載入失敗</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-4">{{ error?.message || '無法載入審核隊列，請檢查網絡後重新整理頁面' }}</p>
+      <UButton color="primary" size="sm" @click="refreshEntries">重新載入</UButton>
+    </div>
+
     <!-- Loading state -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-20">
+    <div v-else-if="entries == null || loading" class="flex flex-col items-center justify-center py-20">
       <div class="relative">
         <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
         <div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
@@ -43,16 +57,6 @@
       </div>
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">審核隊列已清空</h3>
       <p class="text-gray-500 dark:text-gray-400">所有詞條都已審核完畢</p>
-    </div>
-
-    <!-- Error state -->
-    <div v-else-if="error" class="text-center py-16 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
-      <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
-        <UIcon name="i-heroicons-exclamation-triangle" class="w-10 h-10 text-red-500" />
-      </div>
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">載入失敗</h3>
-      <p class="text-gray-500 dark:text-gray-400 mb-4">{{ error?.message || '無法載入審核隊列，請檢查網絡後重新整理頁面' }}</p>
-      <UButton color="primary" size="sm" @click="refreshEntries">重新載入</UButton>
     </div>
 
     <!-- Entry list (DictCard-style)，復用 EntryDetailCard -->
@@ -153,7 +157,7 @@
 
 <script setup lang="ts">
 import type { Entry } from '~/types'
-import { dialectOptionsWithAll } from '~/utils/dialects'
+import { useSearchFilters } from '~/composables/useSearchFilters'
 import { entryToDisplay } from '~/composables/useEntryDisplay'
 
 definePageMeta({
@@ -171,9 +175,21 @@ useHead({
 const currentPage = ref(1)
 const processing = ref<string | null>(null)
 const action = ref<string | null>(null)
-const ALL_DIALECT_VALUE = '__all__'
 
-const selectedDialect = ref<string | { value?: string; label?: string }>(ALL_DIALECT_VALUE)
+const {
+  searchQuery,
+  filters,
+  ALL_FILTER_VALUE,
+  filterDialect,
+  filterStatus,
+  filterTheme,
+  filterUser,
+  dialectOptions,
+  statusOptions,
+  themeFilterOptions,
+  userFilterOptions,
+  fetchContributors
+} = useSearchFilters({ statusDefault: 'pending_review' })
 
 const pagination = reactive({
   total: 0,
@@ -186,17 +202,13 @@ const rejectReason = ref('')
 const rejecting = ref(false)
 const rejectingEntry = ref<Entry | null>(null)
 
-const dialectOptions = dialectOptionsWithAll(ALL_DIALECT_VALUE)
-
-function getSelectedDialectValue() {
-  const value = selectedDialect.value
-  return typeof value === 'string' ? value : value?.value || ALL_DIALECT_VALUE
-}
-
 const cacheKey = computed(() => {
-  const selected = getSelectedDialectValue()
-  const dialect = selected === ALL_DIALECT_VALUE ? 'all' : selected
-  return `review-live:${currentPage.value}:${dialect}`
+  const dialect = filters.dialect === ALL_FILTER_VALUE ? 'all' : filters.dialect
+  const status = filters.status === ALL_FILTER_VALUE ? 'all' : filters.status
+  const theme = filters.theme === ALL_FILTER_VALUE ? 'all' : filters.theme
+  const user = filters.createdBy || 'all'
+  const q = searchQuery.value.trim() || 'none'
+  return `review-live:${currentPage.value}:${dialect}:${status}:${theme}:${user}:${q}`
 })
 
 interface ReviewResponse {
@@ -206,23 +218,34 @@ interface ReviewResponse {
 }
 
 const { data: entries, pending: loading, refresh: refreshEntries, error } = useAsyncData<ReviewResponse>(
-  () => cacheKey.value,
+  'review',
   async () => {
     const query: Record<string, any> = {
       page: currentPage.value,
-      perPage: pagination.perPage,
-      status: 'pending_review'
+      perPage: pagination.perPage
     }
 
-    const selectedDialectValue = getSelectedDialectValue()
-    if (selectedDialectValue && selectedDialectValue !== ALL_DIALECT_VALUE) {
-      query.dialectName = selectedDialectValue
+    if (searchQuery.value.trim()) {
+      query.query = searchQuery.value.trim()
+    }
+    if (filters.dialect && filters.dialect !== ALL_FILTER_VALUE) {
+      query.dialectName = filters.dialect
+    }
+    if (filters.status && filters.status !== ALL_FILTER_VALUE) {
+      query.status = filters.status
+    }
+    if (filters.theme && filters.theme !== ALL_FILTER_VALUE) {
+      query.themeIdL3 = Number(filters.theme)
+    }
+    if (filters.createdBy) {
+      query.createdBy = filters.createdBy
     }
 
     return await $fetch('/api/reviews', { query })
   },
   {
-    watch: [currentPage, selectedDialect],
+    default: () => null as any,
+    watch: [cacheKey],
     getCachedData: () => undefined,
     transform: (response) => {
       pagination.total = response.total
@@ -240,9 +263,15 @@ watch(entryList, (list) => {
   }
 })
 
-function handleDialectChange() {
+function handleSearch() {
   currentPage.value = 1
+  refreshEntries()
 }
+
+onMounted(() => {
+  refreshEntries()
+  fetchContributors()
+})
 
 async function handleApprove(id: string) {
   processing.value = id

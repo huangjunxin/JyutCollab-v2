@@ -91,133 +91,92 @@
     </div>
 
     <!-- Search and filters -->
-    <div class="mb-4 flex-shrink-0 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-      <div class="flex flex-wrap gap-3">
-        <div class="min-w-[12rem] flex-1">
-          <UInput
-            v-model="searchQuery"
-            placeholder="搜索詞頭、粵拼、分類、釋義..."
-            icon="i-heroicons-magnifying-glass"
-            size="sm"
-            class="w-full"
-            @keyup.enter="handleSearch"
-          />
+    <SharedSearchFilterBar
+      v-model:search-query="searchQuery"
+      v-model:filter-user="filterUser"
+      v-model:filter-dialect="filterDialect"
+      v-model:filter-theme="filterTheme"
+      v-model:filter-status="filterStatus"
+      :user-filter-options="userFilterOptions"
+      :dialect-options="dialectOptions"
+      :theme-filter-options="themeFilterOptions"
+      :status-options="statusOptions"
+      @search="handleSearch"
+    >
+      <template #extra-filters>
+        <EntriesAdvancedFilterPanel
+          v-model:expanded="advancedFilters.advancedFilterExpanded.value"
+          v-model:formula-input="advancedFilters.formulaInput.value"
+          teleport-to="#entries-advanced-filter-host"
+          :regex-rows="advancedFilters.regexRows.value"
+          :regex-row-errors="advancedFilters.advancedFilterErrors.regexRows"
+          :field-options="advancedFilterFieldOptions"
+          :formula-error="advancedFilters.advancedFilterErrors.formula?.message || ''"
+          :regex-error="advancedFilters.advancedFilterErrors.regex?.message || ''"
+          :has-active-advanced-filters="advancedFilters.hasActiveAdvancedFilters.value"
+          :visible-count="advancedFilters.visibleEntryCount.value"
+          :loaded-count="advancedFilters.loadedEntryCount.value"
+          @add-regex-row="advancedFilters.addRegexRow"
+          @remove-regex-row="advancedFilters.removeRegexRow"
+          @update-regex-row="advancedFilters.updateRegexRow"
+          @apply="advancedFilters.applyAdvancedFilters"
+          @clear="advancedFilters.clearAdvancedFilters"
+        />
+        <EntriesRuleOverlayPanel
+          v-model:expanded="ruleOverlays.ruleOverlayExpanded.value"
+          :draft-rule="ruleOverlays.draftRule"
+          teleport-to="#entries-rule-overlay-host"
+          @update:draft-rule="updateRuleOverlayDraft"
+          :rules="ruleOverlays.rules.value"
+          :errors="ruleOverlays.ruleOverlayErrors"
+          :active-rule-count="ruleOverlays.activeRuleCount.value"
+          :field-options="advancedFilterFieldOptions"
+          :editing-rule-id="ruleOverlays.editingRuleId.value"
+          @apply="ruleOverlays.applyRuleFromDraft"
+          @clear="ruleOverlays.clearRules"
+          @toggle-rule="ruleOverlays.toggleRule"
+          @remove-rule="ruleOverlays.removeRule"
+          @move-rule="ruleOverlays.moveRule"
+          @update-rule-color="ruleOverlays.updateRuleColor"
+          @edit-rule="ruleOverlays.startEditingRule"
+          @cancel-edit="ruleOverlays.cancelEditingRule"
+        />
+        <EntriesViewsDropdown
+          :view-mode="viewMode"
+          :saved-views="savedViews.views.value"
+          :selected-view-id="selectedViewId"
+          :current-user-id="user?.id || ''"
+          :loading="savedViews.isLoading.value"
+          :error="savedViews.error.value"
+          @update:view-mode="setViewMode"
+          @select-saved-view="applySavedView"
+          @save-current="openSaveCurrentViewModal"
+          @manage="openManageViewsModal"
+          @share-current="shareSavedView"
+        />
+        <div class="flex items-center gap-1 border-l border-gray-200 dark:border-gray-600 pl-2">
+          <UTooltip text="根據本頁內容自動調整各欄寬度">
+            <UButton
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              icon="i-heroicons-arrows-right-left"
+              @click="autoFit(tableRef, editableColumns.map(c => c.key))"
+            />
+          </UTooltip>
+          <UTooltip text="重置所有欄寬為默認值">
+            <UButton
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              icon="i-heroicons-arrow-path"
+              @click="resetWidths"
+            />
+          </UTooltip>
         </div>
-        <div class="flex flex-wrap items-start gap-2">
-          <USelectMenu
-            v-model="filterUser"
-            :items="userFilterOptions"
-            value-key="value"
-            placeholder="篩選"
-            size="sm"
-            class="w-28"
-          />
-          <USelectMenu
-            v-model="filterRegion"
-            :items="dialectOptions"
-            value-key="value"
-            placeholder="方言"
-            size="sm"
-            class="w-28"
-          />
-          <USelectMenu
-            v-model="filterTheme"
-            :items="themeFilterOptions"
-            value-key="value"
-            placeholder="主題分類"
-            size="sm"
-            class="min-w-28 max-w-[14rem]"
-            searchable
-            searchable-placeholder="搜索分類..."
-          />
-          <USelectMenu
-            v-model="filterStatus"
-            :items="statusOptions"
-            value-key="value"
-            placeholder="狀態"
-            size="sm"
-            class="w-28"
-          />
-          <UButton
-            color="primary"
-            size="sm"
-            @click="handleSearch"
-          >
-            搜索
-          </UButton>
-          <EntriesAdvancedFilterPanel
-            v-model:expanded="advancedFilters.advancedFilterExpanded.value"
-            v-model:formula-input="advancedFilters.formulaInput.value"
-            teleport-to="#entries-advanced-filter-host"
-            :regex-rows="advancedFilters.regexRows.value"
-            :regex-row-errors="advancedFilters.advancedFilterErrors.regexRows"
-            :field-options="advancedFilterFieldOptions"
-            :formula-error="advancedFilters.advancedFilterErrors.formula?.message || ''"
-            :regex-error="advancedFilters.advancedFilterErrors.regex?.message || ''"
-            :has-active-advanced-filters="advancedFilters.hasActiveAdvancedFilters.value"
-            :visible-count="advancedFilters.visibleEntryCount.value"
-            :loaded-count="advancedFilters.loadedEntryCount.value"
-            @add-regex-row="advancedFilters.addRegexRow"
-            @remove-regex-row="advancedFilters.removeRegexRow"
-            @update-regex-row="advancedFilters.updateRegexRow"
-            @apply="advancedFilters.applyAdvancedFilters"
-            @clear="advancedFilters.clearAdvancedFilters"
-          />
-          <EntriesRuleOverlayPanel
-            v-model:expanded="ruleOverlays.ruleOverlayExpanded.value"
-            :draft-rule="ruleOverlays.draftRule"
-            teleport-to="#entries-rule-overlay-host"
-            @update:draft-rule="updateRuleOverlayDraft"
-            :rules="ruleOverlays.rules.value"
-            :errors="ruleOverlays.ruleOverlayErrors"
-            :active-rule-count="ruleOverlays.activeRuleCount.value"
-            :field-options="advancedFilterFieldOptions"
-            :editing-rule-id="ruleOverlays.editingRuleId.value"
-            @apply="ruleOverlays.applyRuleFromDraft"
-            @clear="ruleOverlays.clearRules"
-            @toggle-rule="ruleOverlays.toggleRule"
-            @remove-rule="ruleOverlays.removeRule"
-            @move-rule="ruleOverlays.moveRule"
-            @update-rule-color="ruleOverlays.updateRuleColor"
-            @edit-rule="ruleOverlays.startEditingRule"
-            @cancel-edit="ruleOverlays.cancelEditingRule"
-          />
-          <EntriesViewsDropdown
-            :view-mode="viewMode"
-            :saved-views="savedViews.views.value"
-            :selected-view-id="selectedViewId"
-            :current-user-id="user?.id || ''"
-            :loading="savedViews.isLoading.value"
-            :error="savedViews.error.value"
-            @update:view-mode="setViewMode"
-            @select-saved-view="applySavedView"
-            @save-current="openSaveCurrentViewModal"
-            @manage="openManageViewsModal"
-            @share-current="shareSavedView"
-          />
-          <div class="flex items-center gap-1 border-l border-gray-200 dark:border-gray-600 pl-2">
-            <UTooltip text="根據本頁內容自動調整各欄寬度">
-              <UButton
-                size="xs"
-                variant="ghost"
-                color="neutral"
-                icon="i-heroicons-arrows-right-left"
-                @click="autoFit(tableRef, editableColumns.map(c => c.key))"
-              />
-            </UTooltip>
-            <UTooltip text="重置所有欄寬為默認值">
-              <UButton
-                size="xs"
-                variant="ghost"
-                color="neutral"
-                icon="i-heroicons-arrow-path"
-                @click="resetWidths"
-              />
-            </UTooltip>
-          </div>
-        </div>
-      </div>
-      <div id="entries-advanced-filter-host" class="w-full" />
+      </template>
+    </SharedSearchFilterBar>
+    <div id="entries-advanced-filter-host" class="w-full" />
       <div id="entries-rule-overlay-host" class="w-full" />
       <EntriesSharedViewBanner
         v-if="sharedViewBanner"
@@ -835,7 +794,6 @@
         </div>
       </div>
     </div>
-    </div>
   </div>
 
   <EntriesSaveViewModal
@@ -979,6 +937,7 @@
 
 <script setup lang="ts">
 import { useAuth, useProfileUpdatedUser } from '~/composables/useAuth'
+import { useSearchFilters } from '~/composables/useSearchFilters'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
 import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
@@ -1195,70 +1154,21 @@ const themeOptions = getFlatThemeList().map(t => ({
   label: `${t.level3Name} (${t.level1Name} > ${t.level2Name})`
 }))
 
-// Sentinel for "all" – ComboboxItem does not allow value to be empty string
-// Local filters managed by this page (right sidebar filters)
-const filters = reactive({ region: ALL_FILTER_VALUE, status: ALL_FILTER_VALUE, theme: ALL_FILTER_VALUE, createdBy: '' as string | undefined })
-
-// Normalize empty string to sentinel so USelectMenu/ComboboxItem never receives value=""
-const filterRegion = computed({
-  get: () => filters.region || ALL_FILTER_VALUE,
-  set: (v) => { filters.region = (v === '' || v == null) ? ALL_FILTER_VALUE : v }
-})
-const filterStatus = computed({
-  get: () => filters.status || ALL_FILTER_VALUE,
-  set: (v) => { filters.status = (v === '' || v == null) ? ALL_FILTER_VALUE : v }
-})
-const filterTheme = computed({
-  get: () => filters.theme ?? ALL_FILTER_VALUE,
-  set: (v) => { filters.theme = (v === '' || v == null || v === ALL_FILTER_VALUE) ? ALL_FILTER_VALUE : v }
-})
-
-/** 貢獻者列表（審核員/管理員可選全部貢獻者，貢獻者僅可選自己） */
-const contributorsList = ref<Array<{ id: string; displayName: string; username: string }>>([])
-const contributorsLoading = ref(false)
-
-async function fetchContributors() {
-  if (!isAuthenticated.value) return
-  try {
-    contributorsLoading.value = true
-    const res = await $fetch<{ data: Array<{ id: string; displayName: string; username: string }> }>('/api/entries/contributors')
-    contributorsList.value = res.data || []
-  } catch (e) {
-    console.error('Failed to fetch contributors:', e)
-  } finally {
-    contributorsLoading.value = false
-  }
-}
-
-const filterUser = computed({
-  get: () => filters.createdBy || ALL_FILTER_VALUE,
-  set: (v) => { filters.createdBy = (v === '' || v == null || v === ALL_FILTER_VALUE) ? '' : v }
-})
-
-const userFilterOptions = computed(() => {
-  const allOption = { value: ALL_FILTER_VALUE, label: '全部詞條' }
-  if (!isReviewerOrAdmin.value) {
-    // 貢獻者只看得到「全部詞條」和「我的詞條」
-    return [
-      allOption,
-      { value: user.value?.id || '', label: '我的詞條' }
-    ]
-  }
-  // 審核員/管理員：全部詞條 + 所有貢獻者列表
-  const contributorOptions = contributorsList.value
-    .filter(c => c.id) // 排除空 ID
-    .map(c => ({
-      value: c.id,
-      label: c.displayName || c.username
-    }))
-  return [allOption, ...contributorOptions]
-})
-
-// 頂部篩選用：全部分類 + 扁平化主題列表（與表格分類列同款，單一可搜尋下拉不佔三欄）
-const themeFilterOptions = [
-  { value: ALL_FILTER_VALUE, label: '全部分類' },
-  ...themeOptions
-]
+// 共用搜索/篩選狀態
+const {
+  searchQuery,
+  filters,
+  filterDialect,
+  filterStatus,
+  filterTheme,
+  filterUser,
+  dialectOptions,
+  statusOptions,
+  themeFilterOptions,
+  userFilterOptions,
+  fetchContributors,
+  isReviewerOrAdmin
+} = useSearchFilters()
 
 const advancedFilterFieldOptions = computed(() =>
   Object.entries(ADVANCED_FILTER_FIELD_LABELS).map(([value, label]) => ({ value: value as AdvancedFilterFieldKey, label: `${label} (${value})` }))
@@ -1285,7 +1195,6 @@ const expandedGroupKeys = ref<Set<string>>(new Set())
 const savingAll = ref(false)
 const savingEntryKeys = ref<Set<string>>(new Set())
 const isAnyEntrySaving = computed(() => savingEntryKeys.value.size > 0)
-const searchQuery = ref('')
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentPage, pagination, fetchEntries, fetchAllEntries, handleSearch, handleSort, invalidateCache } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
@@ -1383,22 +1292,7 @@ function isSelected(rowIndex: number, colIndex: number) {
 }
 
 // Options（方言選項由統一常數提供）
-const dialectOptions = dialectOptionsWithAll(ALL_FILTER_VALUE)
-
-const statusOptions = [
-  { value: ALL_FILTER_VALUE, label: '全部狀態' },
-  { value: 'draft', label: '草稿' },
-  { value: 'pending_review', label: '待審核' },
-  { value: 'approved', label: '已發佈' },
-  { value: 'rejected', label: '已拒絕' }
-]
-
 /** 狀態值 → 中文標籤（用於表格顯示，與角色無關，避免貢獻者看到 approved/rejected 時顯示英文） */
-
-const isReviewerOrAdmin = computed(() => {
-  const r = user.value?.role
-  return r === 'reviewer' || r === 'admin'
-})
 
 // 方言代碼到顯示名稱的映射（由統一常數提供）
 const dialectCodeToName = DIALECT_CODE_TO_NAME
@@ -2990,7 +2884,7 @@ watch(currentPage, () => {
 })
 
 // Watch for filter changes (sidebar or page dropdowns) - reset to page 1 and fetch
-watch([() => filters.region, () => filters.status, () => filters.theme, () => filters.createdBy], () => {
+watch([() => filters.dialect, () => filters.status, () => filters.theme, () => filters.createdBy], () => {
   if (isInitializing.value) return
   currentPage.value = 1
   if (hasActiveAdvancedFilters.value) fetchAllEntries()
@@ -3024,7 +2918,7 @@ provide('agentPageContext', computed(() => ({
   route: route.fullPath,
   filters: {
     query: searchQuery.value || undefined,
-    dialect: filters.region !== ALL_FILTER_VALUE ? filters.region : undefined,
+    dialect: filters.dialect !== ALL_FILTER_VALUE ? filters.dialect : undefined,
     status: filters.status !== ALL_FILTER_VALUE ? filters.status : undefined,
     theme: filters.theme !== ALL_FILTER_VALUE ? filters.theme : undefined,
     createdBy: filters.createdBy || undefined
@@ -3050,7 +2944,7 @@ watch(agentActions, async (queue) => {
   switch (action.kind) {
     case 'apply_filters':
       if (action.filters?.query !== undefined) searchQuery.value = action.filters.query
-      if (action.filters?.dialect) filters.region = action.filters.dialect
+      if (action.filters?.dialect) filters.dialect = action.filters.dialect
       if (action.filters?.status) {
         const statusMap: Record<string, string> = {
           draft: 'draft', pending_review: 'pending_review', approved: 'approved', rejected: 'rejected'
@@ -3100,7 +2994,7 @@ function dismissAgentFilterNotice() {
 function clearAgentFilter() {
   agentFilterLabel.value = null
   searchQuery.value = ''
-  filters.region = ALL_FILTER_VALUE
+  filters.dialect = ALL_FILTER_VALUE
   filters.status = ALL_FILTER_VALUE
   filters.theme = ALL_FILTER_VALUE
   filters.createdBy = ''

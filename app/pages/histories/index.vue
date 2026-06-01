@@ -17,39 +17,31 @@
       </div>
     </div>
 
-    <!-- Search filter -->
-    <div class="mb-4 p-3 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-      <div class="flex flex-col sm:flex-row gap-3">
-        <div class="flex-1">
-          <UInput
-            v-model="searchEntryId"
-            placeholder="搜索詞條 ID 或詞條文本..."
-            icon="i-heroicons-magnifying-glass"
-            size="sm"
-            class="w-full"
-          />
-        </div>
-        <div class="flex gap-2">
-          <USelectMenu
-            v-if="canViewAllHistories"
-            v-model="filterUser"
-            :items="userFilterOptions"
-            value-key="value"
-            placeholder="篩選"
-            size="sm"
-            class="w-32"
-          />
-          <USelectMenu
-            v-model="filterAction"
-            :items="actionOptions"
-            value-key="value"
-            placeholder="操作類型"
-            size="sm"
-            class="w-32"
-          />
-        </div>
-      </div>
-    </div>
+    <!-- Search and filters -->
+    <SharedSearchFilterBar
+      v-model:search-query="searchQuery"
+      v-model:filter-user="filterUser"
+      v-model:filter-dialect="filterDialect"
+      v-model:filter-theme="filterTheme"
+      v-model:filter-status="filterStatus"
+      :user-filter-options="userFilterOptions"
+      :dialect-options="dialectOptions"
+      :theme-filter-options="themeFilterOptions"
+      :status-options="statusOptions"
+      :show-status-filter="false"
+      @search="handleSearch"
+    >
+      <template #extra-filters>
+        <USelectMenu
+          v-model="filterAction"
+          :items="actionOptions"
+          value-key="value"
+          placeholder="操作類型"
+          size="sm"
+          class="w-28"
+        />
+      </template>
+    </SharedSearchFilterBar>
 
     <!-- Loading state -->
     <div v-if="loading" class="flex-1 flex flex-col items-center justify-center py-12">
@@ -415,6 +407,7 @@
 
 <script setup lang="ts">
 import type { EditHistory, PaginatedResponse } from '~/types'
+import { useSearchFilters } from '~/composables/useSearchFilters'
 
 definePageMeta({
   layout: 'default',
@@ -432,10 +425,22 @@ const requestFetch = useRequestFetch()
 const { user, isReviewer } = useAuth()
 
 const currentPage = ref(1)
-const searchEntryId = ref('')
 const filterAction = ref<string | undefined>(undefined)
-const filterUser = ref<string | undefined>(undefined)
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+const {
+  searchQuery,
+  filters,
+  ALL_FILTER_VALUE,
+  filterDialect,
+  filterStatus,
+  filterTheme,
+  filterUser,
+  dialectOptions,
+  statusOptions,
+  themeFilterOptions,
+  userFilterOptions,
+  fetchContributors
+} = useSearchFilters({ includeStatusFilter: false, userFilterAllLabel: '全部歷史' })
 
 const canViewAllHistories = computed(() => isReviewer.value)
 
@@ -446,10 +451,12 @@ const pagination = reactive({
 })
 
 const cacheKey = computed(() => {
-  const entryId = searchEntryId.value.trim() || 'all'
+  const q = searchQuery.value.trim() || 'all'
   const action = filterAction.value || 'all'
-  const userId = filterUser.value || 'all'
-  return `histories:${currentPage.value}:${entryId}:${action}:${userId}`
+  const user = filters.createdBy || 'all'
+  const dialect = filters.dialect === ALL_FILTER_VALUE ? 'all' : filters.dialect
+  const theme = filters.theme === ALL_FILTER_VALUE ? 'all' : filters.theme
+  return `histories:${currentPage.value}:${q}:${action}:${user}:${dialect}:${theme}`
 })
 
 const { data: historyResponse, pending: loading, error, refresh: refreshHistories } = useAsyncData<PaginatedResponse<EditHistory>>(
@@ -460,16 +467,24 @@ const { data: historyResponse, pending: loading, error, refresh: refreshHistorie
       perPage: pagination.perPage
     }
 
-    if (searchEntryId.value.trim()) {
-      query.entryId = searchEntryId.value.trim()
+    if (searchQuery.value.trim()) {
+      query.query = searchQuery.value.trim()
     }
 
     if (filterAction.value) {
       query.action = filterAction.value
     }
 
-    if (filterUser.value) {
-      query.userId = filterUser.value
+    if (filters.createdBy) {
+      query.userId = filters.createdBy
+    }
+
+    if (filters.dialect && filters.dialect !== ALL_FILTER_VALUE) {
+      query.dialectName = filters.dialect
+    }
+
+    if (filters.theme && filters.theme !== ALL_FILTER_VALUE) {
+      query.themeIdL3 = Number(filters.theme)
     }
 
     const response = await requestFetch<PaginatedResponse<EditHistory>>('/api/histories', {
@@ -496,11 +511,6 @@ const historyError = computed(() => {
   const data = error.value?.data as { message?: string } | undefined
   return data?.message || error.value?.message || null
 })
-
-const userFilterOptions = [
-  { value: undefined, label: '全部歷史' },
-  { value: 'me', label: '我的歷史' }
-]
 
 const diffModalOpen = ref(false)
 const selectedHistory = ref<EditHistory | null>(null)
@@ -738,23 +748,19 @@ function formatSnapshot(snapshot: Record<string, unknown> | null | undefined): s
   return JSON.stringify(filtered, null, 2)
 }
 
-// Debounce search
-watch(searchEntryId, () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    currentPage.value = 1
-  }, 300)
-})
-
-watch(currentPage, () => {
+function handleSearch() {
   clearCacheByKey('histories')
-})
+  currentPage.value = 1
+  refreshHistories()
+}
+
 
 onMounted(() => {
   const route = useRoute()
   if (route.query.entryId) {
-    searchEntryId.value = route.query.entryId as string
+    searchQuery.value = route.query.entryId as string
   }
+  fetchContributors()
 })
 
 // Helpers

@@ -18,7 +18,7 @@ type EntriesResponse = {
 export function useEntriesList(
   viewMode: Ref<string>,
   searchQuery: Ref<string>,
-  filters: Reactive<{ region: string; status: string; theme: string; createdBy?: string }>,
+  filters: Reactive<{ dialect: string; status: string; theme: string | number; createdBy?: string }>,
   sortBy: Ref<string>,
   sortOrder: Ref<'asc' | 'desc'>,
   entryBaselineById: Ref<Map<string, any>>,
@@ -28,7 +28,7 @@ export function useEntriesList(
   const entries = ref<Entry[]>([])
   const aggregatedGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
   const lexemeGroups = ref<Array<{ headwordDisplay: string; headwordNormalized: string; entries: Entry[] }>>([])
-  const loading = ref(false)
+  const loading = ref(true)
   const isAllFetched = ref(false)
   const currentPage = ref(1)
   const pagination = reactive({
@@ -43,7 +43,7 @@ export function useEntriesList(
       'entries-list',
       `v:${viewMode.value}`,
       `q:${searchQuery.value || 'none'}`,
-      `r:${filters.region || 'all'}`,
+      `r:${filters.dialect || 'all'}`,
       `s:${filters.status || 'all'}`,
       `t:${filters.theme || 'all'}`,
       `c:${filters.createdBy || 'all'}`,
@@ -60,7 +60,7 @@ export function useEntriesList(
       'entries-all',
       `v:${viewMode.value}`,
       `q:${searchQuery.value || 'none'}`,
-      `r:${filters.region || 'all'}`,
+      `r:${filters.dialect || 'all'}`,
       `s:${filters.status || 'all'}`,
       `t:${filters.theme || 'all'}`,
       `c:${filters.createdBy || 'all'}`,
@@ -79,7 +79,7 @@ export function useEntriesList(
     }
 
     if (searchQuery.value) query.query = searchQuery.value
-    if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
+    if (filters.dialect && filters.dialect !== ALL_FILTER_VALUE) query.dialectName = filters.dialect
     if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
     if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
     if (filters.createdBy) query.createdBy = filters.createdBy
@@ -113,7 +113,7 @@ export function useEntriesList(
         }
 
         if (searchQuery.value) query.query = searchQuery.value
-        if (filters.region && filters.region !== ALL_FILTER_VALUE) query.dialectName = filters.region
+        if (filters.dialect && filters.dialect !== ALL_FILTER_VALUE) query.dialectName = filters.dialect
         if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
         if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
         if (filters.createdBy) query.createdBy = filters.createdBy
@@ -163,7 +163,7 @@ export function useEntriesList(
     const canInsertOrphans =
       currentPage.value === 1 &&
       !searchQuery.value &&
-      filters.region === ALL_FILTER_VALUE &&
+      filters.dialect === ALL_FILTER_VALUE &&
       filters.status === ALL_FILTER_VALUE &&
       filters.theme === ALL_FILTER_VALUE
 
