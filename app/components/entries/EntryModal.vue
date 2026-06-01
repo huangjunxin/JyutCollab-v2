@@ -162,11 +162,26 @@
                   placeholder="例句內容"
                   size="sm"
                 />
-                <UInput
-                  v-model="example.jyutping"
-                  placeholder="粵拼（可選）"
-                  size="sm"
-                />
+                <div class="flex items-center gap-2">
+                  <UInput
+                    v-model="example.jyutping"
+                    placeholder="粵拼（可選）"
+                    size="sm"
+                    class="flex-1"
+                  />
+                  <UButton
+                    color="primary"
+                    variant="ghost"
+                    size="xs"
+                    icon="i-heroicons-book-open"
+                    :loading="exampleJyutpingLoading[`${index}`]"
+                    :disabled="!example.text"
+                    title="從泛粵典生成粵拼"
+                    @click="generateExampleJyutping(example, `${index}`)"
+                  >
+                    粵拼
+                  </UButton>
+                </div>
                 <UInput
                   v-model="example.translation"
                   placeholder="翻譯/解釋"
@@ -284,6 +299,7 @@
 <script setup lang="ts">
 import type { Example } from '~/types'
 import { DIALECT_OPTIONS_FOR_SELECT } from '~/utils/dialects'
+import { useExampleJyutping } from '~/composables/useExampleJyutping'
 
 const props = defineProps<{
   modelValue: boolean
@@ -375,6 +391,32 @@ function addExample() {
 
 function removeExample(index: number) {
   form.senses[0].examples.splice(index, 1)
+}
+
+const { isLoading: _entryModalJyutpingLoading, generate: doGenerateJyutping } = useExampleJyutping()
+const exampleJyutpingLoading = ref<Record<string, boolean>>({})
+
+async function generateExampleJyutping(
+  example: { text?: string; jyutping?: string },
+  key: string
+) {
+  if (!example.text || !form.dialect.name) return
+  exampleJyutpingLoading.value[key] = true
+  try {
+    const result = await doGenerateJyutping(
+      example.text,
+      form.dialect.name,
+      (partial) => {
+        // 逐字上屏：每查到一個字就即時更新輸入框
+        example.jyutping = partial
+      }
+    )
+    if (result) {
+      example.jyutping = result
+    }
+  } finally {
+    exampleJyutpingLoading.value[key] = false
+  }
 }
 
 function resetForm() {

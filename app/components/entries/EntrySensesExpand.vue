@@ -149,7 +149,21 @@
                   />
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">粵拼</label>
+                  <div class="flex items-center gap-1 mb-0.5">
+                    <label class="text-xs text-gray-500 dark:text-gray-400">粵拼</label>
+                    <UButton
+                      color="primary"
+                      variant="ghost"
+                      size="xs"
+                      icon="i-heroicons-book-open"
+                      :loading="exampleJyutpingLoading[`${senseIdx}-${exIdx}`]"
+                      :disabled="!ex.text"
+                      title="從泛粵典生成粵拼"
+                      @click="generateExampleJyutping(ex, `${senseIdx}-${exIdx}`)"
+                    >
+                      粵拼
+                    </UButton>
+                  </div>
                   <input
                     v-model="ex.jyutping"
                     type="text"
@@ -300,6 +314,18 @@
                         class="flex-1 min-w-[100px] px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-mono"
                         @input="entry._isDirty = true"
                       />
+                      <UButton
+                        color="primary"
+                        variant="ghost"
+                        size="xs"
+                        icon="i-heroicons-book-open"
+                        :loading="exampleJyutpingLoading[`sub-${senseIdx}-${subIdx}-${subExIdx}`]"
+                        :disabled="!subEx.text"
+                        title="從泛粵典生成粵拼"
+                        @click="generateExampleJyutping(subEx, `sub-${senseIdx}-${subIdx}-${subExIdx}`)"
+                      >
+                        粵拼
+                      </UButton>
                       <input
                         v-model="subEx.translation"
                         type="text"
@@ -354,6 +380,7 @@
 
 <script setup lang="ts">
 import type { Entry } from '~/types'
+import { useExampleJyutping } from '~/composables/useExampleJyutping'
 
 const props = withDefaults(
   defineProps<{
@@ -383,6 +410,37 @@ defineEmits([
   'add-sub-sense-example',
   'remove-sub-sense-example'
 ])
+
+const { isLoading: _jyutpingLoading, generate: doGenerateJyutping } = useExampleJyutping()
+const exampleJyutpingLoading = ref<Record<string, boolean>>({})
+
+/**
+ * 為指定例句生成粵拼
+ * @param example  例句物件（包含 text 和 jyutping 字段）
+ */
+async function generateExampleJyutping(
+  example: { text?: string; jyutping?: string },
+  key: string
+) {
+  if (!example.text || !props.entry.dialect?.name) return
+  exampleJyutpingLoading.value[key] = true
+  try {
+    const result = await doGenerateJyutping(
+      example.text,
+      props.entry.dialect.name,
+      (partial) => {
+        // 逐字上屏：每查到一個字就即時更新輸入框
+        example.jyutping = partial
+      }
+    )
+    if (result) {
+      example.jyutping = result
+      ;(props.entry as any)._isDirty = true
+    }
+  } finally {
+    exampleJyutpingLoading.value[key] = false
+  }
+}
 
 const MAX_IMAGES_PER_SENSE = 3
 
