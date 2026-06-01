@@ -16,12 +16,13 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **即時儲存指示器**——視覺化顯示儲存狀態與編輯狀態
 
 ### AI 智能功能
-- **主題分類**——AI 三層主題自動分類（共 439 個類別）
+- **主題分類（3 候選）**——AI 提供 3 個候選分類結果，附排名（🥇🥈🥉）與信心度，由人選擇最合適者
 - **釋義生成**——自動生成香港繁體中文釋義建議
-- **例句生成**——生成附帶解釋的情境例句
+- **例句生成**——生成附帶解釋的情境例句，支援自動生成例句粵拼（逐字查泛粵典）
+- **語域建議**——AI 自動判斷語域（口語、書面、粗俗、文雅、中性）
 - **全站 AI 助手**——右側常駐面板可回答使用指南問題、查詢詞條、套用詞條表格篩選及切換視圖
 - **對話歷史與審計**——保存 AI 對話、工具調用摘要、確認流程與審計事件，方便追蹤 AI 輔助操作
-- **建議成效追蹤**——記錄 AI 建議的採納、拒絕、接受後修改與待處理狀態
+- **建議成效追蹤**——記錄 AI 建議的採納、拒絕、接受後修改、忽略與待處理狀態，計算參與率與接受率
 
 ### 儀表板與分析
 - **全站統計**——顯示詞條總量、發佈狀態與審核狀態
@@ -54,6 +55,8 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **深色模式**——完整支援深色主題
 - **響應式設計**——支援流動裝置
 - **香港繁體中文**——所有文字自動轉換為香港繁體
+- **Google OAuth 登錄**——支援 Google 帳號登錄、帳號連結／解除連結、新用戶方言設定
+- **Cloudflare Turnstile**——登錄／註冊頁面人機驗證防護
 
 ## 技術棧
 
@@ -62,7 +65,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 | 框架 | Nuxt 4、Vue 3（Composition API） |
 | UI | @nuxt/ui、Tailwind CSS、Radix Vue |
 | 數據庫 | MongoDB、Mongoose ODM |
-| 認證 | nuxt-auth-utils、HttpOnly Cookie |
+| 認證 | nuxt-auth-utils、HttpOnly Cookie、Google OAuth、Cloudflare Turnstile |
 | AI | OpenRouter API（deepseek-v4-flash，可透過 `OPENROUTER_MODEL` 調整） |
 | 狀態管理 | Pinia |
 | 驗證 | Zod |
@@ -76,6 +79,8 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - MongoDB（本機或 Atlas）
 - OpenRouter API 金鑰（AI 功能所需）
 - Cloudinary 帳戶（圖片上傳所需）
+- Google OAuth 憑證（Google 登錄所需，可選）
+- Cloudflare Turnstile 金鑰（人機驗證防護，可選）
 
 ### 安裝步驟
 
@@ -111,6 +116,14 @@ OPENROUTER_MODEL=deepseek-v4-flash
 NUXT_CLOUDINARY_CLOUD_NAME=your_cloud_name
 NUXT_CLOUDINARY_API_KEY=your_api_key
 NUXT_CLOUDINARY_API_SECRET=your_api_secret
+
+# Google OAuth（可選）
+NUXT_OAUTH_GOOGLE_CLIENT_ID=your-google-client-id
+NUXT_OAUTH_GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Cloudflare Turnstile（可選）
+NUXT_TURNSTILE_SITE_KEY=your-turnstile-site-key
+NUXT_TURNSTILE_SECRET_KEY=your-turnstile-secret-key
 ```
 
 5. 啟動開發伺服器：
@@ -196,6 +209,9 @@ JyutCollab-v2/
 | POST | /api/auth/logout | 用戶登出 |
 | GET | /api/auth/me | 取得當前用戶資料 |
 | PATCH | /api/auth/me | 更新個人資料 |
+| GET | /api/auth/google | Google OAuth 登錄 |
+| POST | /api/auth/setup | 新用戶設定方言點 |
+| POST | /api/auth/me/unlink-google | 解除 Google 帳號連結 |
 
 ### 詞條
 | 方法 | 端點 | 說明 |
@@ -221,7 +237,8 @@ JyutCollab-v2/
 | POST | /api/ai/categorize | 主題分類 |
 | POST | /api/ai/definitions | 生成釋義 |
 | POST | /api/ai/examples | 生成例句 |
-| POST | /api/ai/suggestions/:id/action | 記錄 AI 建議採納、拒絕或修改 |
+| POST | /api/ai/register | 語域建議 |
+| POST | /api/ai/suggestions/:id/action | 記錄 AI 建議採納、拒絕、修改或忽略 |
 | POST | /api/agent/chat | AI 助手非串流對話與確認回覆 |
 | POST | /api/agent/chat.stream | AI 助手串流對話、工具調用與本地頁面操作 |
 | GET | /api/agent/conversations | 取得 AI 助手對話列表 |

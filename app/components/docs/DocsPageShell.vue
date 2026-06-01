@@ -56,7 +56,8 @@ const docsList = computed(() => (docs.value || []).map(doc => ({
   path: doc.path,
   title: doc.title,
   description: doc.description,
-  order: doc.order
+  order: doc.order,
+  category: doc.category
 })))
 
 const searchItems = computed(() => (docs.value || []).map(doc => ({
