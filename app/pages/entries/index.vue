@@ -1213,15 +1213,46 @@ const filterTheme = computed({
   set: (v) => { filters.theme = (v === '' || v == null || v === ALL_FILTER_VALUE) ? ALL_FILTER_VALUE : v }
 })
 
+/** 貢獻者列表（審核員/管理員可選全部貢獻者，貢獻者僅可選自己） */
+const contributorsList = ref<Array<{ id: string; displayName: string; username: string }>>([])
+const contributorsLoading = ref(false)
+
+async function fetchContributors() {
+  if (!isAuthenticated.value) return
+  try {
+    contributorsLoading.value = true
+    const res = await $fetch<{ data: Array<{ id: string; displayName: string; username: string }> }>('/api/entries/contributors')
+    contributorsList.value = res.data || []
+  } catch (e) {
+    console.error('Failed to fetch contributors:', e)
+  } finally {
+    contributorsLoading.value = false
+  }
+}
+
 const filterUser = computed({
-  get: () => filters.createdBy ? 'mine' : undefined,
-  set: (v) => { filters.createdBy = v === 'mine' ? user.value?.id : undefined }
+  get: () => filters.createdBy || ALL_FILTER_VALUE,
+  set: (v) => { filters.createdBy = (v === '' || v == null || v === ALL_FILTER_VALUE) ? '' : v }
 })
 
-const userFilterOptions = [
-  { value: undefined, label: '全部詞條' },
-  { value: 'mine', label: '我的詞條' }
-]
+const userFilterOptions = computed(() => {
+  const allOption = { value: ALL_FILTER_VALUE, label: '全部詞條' }
+  if (!isReviewerOrAdmin.value) {
+    // 貢獻者只看得到「全部詞條」和「我的詞條」
+    return [
+      allOption,
+      { value: user.value?.id || '', label: '我的詞條' }
+    ]
+  }
+  // 審核員/管理員：全部詞條 + 所有貢獻者列表
+  const contributorOptions = contributorsList.value
+    .filter(c => c.id) // 排除空 ID
+    .map(c => ({
+      value: c.id,
+      label: c.displayName || c.username
+    }))
+  return [allOption, ...contributorOptions]
+})
 
 // 頂部篩選用：全部分類 + 扁平化主題列表（與表格分類列同款，單一可搜尋下拉不佔三欄）
 const themeFilterOptions = [
@@ -2941,7 +2972,7 @@ function applyUrlParams(): boolean {
 
   // Handle filter=mine parameter
   const shouldFilterMine = query.filter === 'mine' && user.value?.id
-  const newCreatedBy = shouldFilterMine ? user.value.id : undefined
+  const newCreatedBy = shouldFilterMine ? user.value.id : ''
   if (newCreatedBy !== filters.createdBy) {
     filters.createdBy = newCreatedBy
     changed = true
@@ -3129,6 +3160,9 @@ onMounted(async () => {
 
   // 從 DB 刷新 dialectPermissions，避免使用登入時的 session snapshot
   await refreshUser()
+
+  // 加載貢獻者列表（供提交者篩選下拉使用）
+  await fetchContributors()
 
   // 貢獻者若無方言權限 → 引導設定
   if (user.value?.role === 'contributor' && (!user.value.dialectPermissions || user.value.dialectPermissions.length === 0)) {
