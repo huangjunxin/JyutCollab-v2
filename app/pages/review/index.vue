@@ -45,6 +45,16 @@
       <p class="text-gray-500 dark:text-gray-400">所有詞條都已審核完畢</p>
     </div>
 
+    <!-- Error state -->
+    <div v-else-if="error" class="text-center py-16 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+        <UIcon name="i-heroicons-exclamation-triangle" class="w-10 h-10 text-red-500" />
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">載入失敗</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-4">{{ error?.message || '無法載入審核隊列，請檢查網絡後重新整理頁面' }}</p>
+      <UButton color="primary" size="sm" @click="refreshEntries">重新載入</UButton>
+    </div>
+
     <!-- Entry list (DictCard-style)，復用 EntryDetailCard -->
     <div v-else class="space-y-4">
       <div
@@ -195,7 +205,7 @@ interface ReviewResponse {
   totalPages: number
 }
 
-const { data: entries, pending: loading, refresh: refreshEntries } = useAsyncData<ReviewResponse>(
+const { data: entries, pending: loading, refresh: refreshEntries, error } = useAsyncData<ReviewResponse>(
   () => cacheKey.value,
   async () => {
     const query: Record<string, any> = {
@@ -225,7 +235,7 @@ const { data: entries, pending: loading, refresh: refreshEntries } = useAsyncDat
 const entryList = computed(() => entries.value?.data ?? [])
 
 watch(entryList, (list) => {
-  if (list.length === 0 && pagination.total > 0 && currentPage.value > 1) {
+  if (list.length === 0 && pagination.total > 0 && currentPage.value > 1 && !loading) {
     currentPage.value = 1
   }
 })

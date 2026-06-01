@@ -346,6 +346,13 @@ export default defineEventHandler(async (event) => {
         existingEntry.reviewedBy = userId
         existingEntry.reviewedAt = new Date()
       }
+      // Block non-reviewers from moving pending_review back to draft (removes from review queue)
+      if (data.status === 'draft' && existingEntry.status === 'pending_review' && !isReviewerOrAdmin) {
+        throw createError({
+          statusCode: 403,
+          message: '無權將待審核詞條退回草稿'
+        })
+      }
       existingEntry.status = data.status
       changedFields.push('status')
     }

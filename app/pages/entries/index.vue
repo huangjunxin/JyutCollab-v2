@@ -2823,10 +2823,12 @@ async function saveAllChanges() {
 function getStatusForSave(entry: Entry): Entry['status'] {
   const role = user.value?.role
   const status = entry.status || 'draft'
+  // Reviewers/admins: keep original status when saving from entries table.
+  // Only the review page approve/reject endpoints should change review status.
   if (role === 'reviewer' || role === 'admin') {
-    if (status === 'draft' || status === 'pending_review') return 'approved'
     return status
   }
+  // Contributors: draft/rejected → pending_review (auto-submit on save)
   if (status === 'draft' || status === 'rejected') return 'pending_review'
   return status
 }
