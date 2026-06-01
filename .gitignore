@@ -26,6 +26,10 @@ logs
 # Claude settings
 .claude
 
+# Local agent artifacts
+.agents/
+.reasonix/
+
 # Local font sources for subset generation
 assets/fonts/
 

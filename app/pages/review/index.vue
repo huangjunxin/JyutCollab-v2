@@ -244,6 +244,7 @@ const { data: entries, pending: loading, refresh: refreshEntries, error } = useA
     return await $fetch('/api/reviews', { query })
   },
   {
+    server: false,
     default: () => null as any,
     watch: [cacheKey],
     getCachedData: () => undefined,
