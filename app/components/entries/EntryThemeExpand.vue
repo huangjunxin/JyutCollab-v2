@@ -33,8 +33,56 @@
         </UButton>
       </div>
 
-      <!-- 三級選擇器 -->
-      <div class="grid grid-cols-3 gap-3">
+      <!-- 搜索框 -->
+      <div class="relative">
+        <UInput
+          v-model="searchQuery"
+          placeholder="搜索主題分類..."
+          icon="i-heroicons-magnifying-glass"
+          size="sm"
+          color="neutral"
+          variant="outline"
+          class="w-full"
+        />
+      </div>
+
+      <!-- 搜索結果列表 -->
+      <div v-if="searchQuery.trim() && searchResults.length > 0" class="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-900">
+        <div
+          v-for="result in searchResults"
+          :key="result.theme.id"
+          class="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          @click="selectSearchResult(result)"
+        >
+          <div class="text-sm font-medium text-gray-800 dark:text-gray-200">
+            {{ result.theme.name }}
+          </div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            {{ result.theme.path }}
+          </div>
+        </div>
+      </div>
+      <div v-else-if="searchQuery.trim() && searchResults.length === 0" class="text-xs text-gray-400 dark:text-gray-500 text-center py-3">
+        無匹配結果
+      </div>
+
+      <!-- 分隔線 + 瀏覽切換 -->
+      <div class="relative my-2">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-gray-200 dark:border-gray-600"></div>
+        </div>
+        <div class="relative flex justify-center">
+          <button
+            class="px-2 text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/50 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            @click="showBrowser = !showBrowser"
+          >
+            {{ showBrowser ? '收起分類瀏覽 ▴' : '或按分類瀏覽 ▾' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 三級選擇器（折疊） -->
+      <div v-if="showBrowser" class="grid grid-cols-3 gap-3">
         <!-- 一級分類 -->
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">一級分類</label>
@@ -173,7 +221,9 @@ import {
   getLevel1Themes,
   getLevel2ThemesByLevel1,
   getLevel3ThemesByLevel2,
-  getThemeById
+  getThemeById,
+  searchThemes,
+  type ScoredTheme
 } from '~/composables/useThemeData'
 
 interface AISuggestion {
@@ -208,6 +258,37 @@ const emit = defineEmits<{
   'accept-ai': [theme: AISuggestion]
   'ai-categorize': []
 }>()
+
+// 搜索狀態
+const searchQuery = ref('')
+const showBrowser = ref(false)
+
+// 搜索結果（按匹配度排序，computed 自動響應 searchQuery 變化）
+const searchResults = computed(() => {
+  if (!searchQuery.value.trim()) return []
+  return searchThemes(searchQuery.value)
+})
+
+// 選擇搜索結果
+function selectSearchResult(result: ScoredTheme) {
+  const theme = result.theme
+  selectedLevel1.value = theme.level1Id
+  selectedLevel2.value = theme.level2Id
+  selectedLevel3.value = theme.level3Id
+
+  emit('update:theme', {
+    level1: theme.level1Name,
+    level2: theme.level2Name,
+    level3: theme.level3Name,
+    level1Id: theme.level1Id,
+    level2Id: theme.level2Id,
+    level3Id: theme.level3Id
+  })
+  props.entry._isDirty = true
+
+  // 清空搜索框
+  searchQuery.value = ''
+}
 
 // 一級分類選項（格式：一 人物）
 const level1Options = computed(() => {

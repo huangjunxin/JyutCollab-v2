@@ -3,6 +3,34 @@
  * 用於詞條的三級分類系統
  */
 
+import * as OpenCC from 'opencc-js'
+
+// 延遲初始化 OpenCC 轉換器（簡體/台灣繁體 → 香港繁體）
+let _cn2hk: ReturnType<typeof OpenCC.Converter> | null = null
+let _t2hk: ReturnType<typeof OpenCC.Converter> | null = null
+
+function getCN2HK() {
+  if (!_cn2hk) _cn2hk = OpenCC.Converter({ from: 'cn', to: 'hk' })
+  return _cn2hk
+}
+function getT2HK() {
+  if (!_t2hk) _t2hk = OpenCC.Converter({ from: 't', to: 'hk' })
+  return _t2hk
+}
+
+/**
+ * 將用戶輸入標準化為香港繁體，提高搜索準確率
+ * 例如：简体 → 簡體，台灣繁體 → 香港繁體
+ */
+function toHongKongTraditional(text: string): string {
+  if (!text) return text
+  try {
+    return getT2HK()(getCN2HK()(text))
+  } catch {
+    return text // 轉換失敗時降級為原始輸入
+  }
+}
+
 export interface Level1Theme {
   id: number
   name: string
@@ -452,29 +480,161 @@ export function getThemesByLevel1(level1Id: number): ThemeWithPath[] {
     .sort((a, b) => a.id - b.id)
 }
 
+export interface ScoredTheme {
+  theme: ThemeWithPath
+  score: number
+}
+
 /**
- * 搜索主題（根據名稱或路徑）
+ * 歸一化字串：去除標點符號和空格，轉小寫
+ * 用於中文搜索時忽略「、」「，」等分隔符
  */
-export function searchThemes(query: string): ThemeWithPath[] {
+function normalize(s: string): string {
+  return s.replace(/[、，,.\s·•▲▼►「」『』【】（）()《》〈〉\-—/\\|@#$%^&*+=~`'"“”‘’∶：；;！!？?…<>]+/g, '').toLowerCase()
+}
+
+/**
+ * 最長公共子序列 (LCS) 長度
+ * 例如 LCS("人稱", "人稱指代") = 2, LCS("稱人", "人稱指代") = 1
+ */
+function lcsLength(a: string, b: string): number {
+  const m = a.length
+  const n = b.length
+  // 用滾動陣列節省空間
+  let prev = new Array(n + 1).fill(0)
+  let curr = new Array(n + 1).fill(0)
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        curr[j] = prev[j - 1] + 1
+      } else {
+        curr[j] = Math.max(prev[j], curr[j - 1])
+      }
+    }
+    ;[prev, curr] = [curr, prev]
+  }
+  return prev[n]
+}
+
+/**
+ * LCS 比率：查詢在目標中的順序匹配程度
+ * 取值 [0, 1]，1 表示查詢的所有字符按順序出現在目標中
+ */
+function lcsRatio(query: string, target: string): number {
+  if (!query || !target) return 0
+  const nq = normalize(query)
+  const nt = normalize(target)
+  if (!nq || !nt) return 0
+  return lcsLength(nq, nt) / nq.length
+}
+
+/**
+ * 字符級 Jaccard 相似度
+ * 取值 [0, 1]，衡量兩個字符集合的重疊程度
+ * 對單字查詢提供區分度
+ */
+function charJaccard(query: string, target: string): number {
+  if (!query || !target) return 0
+  const nq = normalize(query)
+  const nt = normalize(target)
+  if (!nq || !nt) return 0
+
+  const qSet = new Set(nq)
+  const tSet = new Set(nt)
+
+  let intersection = 0
+  qSet.forEach(c => { if (tSet.has(c)) intersection++ })
+
+  const union = qSet.size + tSet.size - intersection
+  return union === 0 ? 0 : intersection / union
+}
+
+/**
+ * 計算查詢與單個欄位的匹配分數
+ * 混合 LCS 比率（捕捉順序匹配）和字符 Jaccard（提供單字區分度）
+ */
+function fieldMatchScore(query: string, target: string): number {
+  if (!query || !target) return 0
+  const nq = normalize(query)
+  const nt = normalize(target)
+  if (!nq || !nt) return 0
+
+  // 精確匹配快速路徑
+  if (nq === nt) return 1.0
+
+  const lcs = lcsRatio(nq, nt)
+  const jaccard = charJaccard(nq, nt)
+
+  // 混合：LCS 佔 0.6（捕捉順序），Jaccard 佔 0.4（捕捉覆蓋率）
+  let score = lcs * 0.6 + jaccard * 0.4
+
+  // 前綴加分：查詢出現在目標開頭時小幅加權
+  if (nt.startsWith(nq)) {
+    score = Math.min(1.0, score + 0.15)
+  }
+
+  return score
+}
+
+/**
+ * 計算單個主題的複合匹配分數
+ *
+ * 四個欄位加權累加（不是取最高分）：
+ *   name       × 1.0   （主題名稱，最重要）
+ *   level2Name × 0.5   （二級分類名）
+ *   level1Name × 0.3   （一級分類名）
+ *   path       × 0.1   （完整路徑）
+ *
+ * 加上查詢長度因子：單字查詢自動降權，避免「人」匹配所有人名
+ */
+function scoreTheme(theme: ThemeWithPath, query: string): number {
+  const nameScore = fieldMatchScore(query, theme.name)
+  const level2Score = fieldMatchScore(query, theme.level2Name)
+  const level1Score = fieldMatchScore(query, theme.level1Name)
+  const pathScore = fieldMatchScore(query, theme.path)
+
+  let total = nameScore * 1.0
+            + level2Score * 0.5
+            + level1Score * 0.3
+            + pathScore * 0.1
+
+  // 長度因子：單字查詢得分 ×0.5，雙字 ×0.75，三字及以上不懲罰
+  const qLen = normalize(query).length
+  const lengthFactor = Math.min(1.0, qLen / 2)
+  total *= lengthFactor
+
+  return total
+}
+
+/**
+ * 搜索主題（根據名稱或路徑），按匹配度從高到低排序
+ *
+ * 用戶輸入會先轉換為香港繁體再進行匹配，
+ * 這樣無論用戶輸入簡體（如「词」）還是台灣繁體（如「詞」）都能正確匹配到香港繁體的主題名。
+ */
+export function searchThemes(query: string): ScoredTheme[] {
   if (!query.trim()) {
     return []
   }
 
+  // 將用戶輸入標準化為香港繁體
+  const normalizedQuery = toHongKongTraditional(query.trim())
+
   const themes = getAllThemes()
-  const lowerQuery = query.toLowerCase()
-  const result: ThemeWithPath[] = []
+  const results: ScoredTheme[] = []
 
   themes.forEach((theme) => {
-    if (
-      theme.name.toLowerCase().includes(lowerQuery) ||
-      theme.path.toLowerCase().includes(lowerQuery) ||
-      theme.level1Name.toLowerCase().includes(lowerQuery)
-    ) {
-      result.push(theme)
+    const score = scoreTheme(theme, normalizedQuery)
+    if (score > 0) {
+      results.push({ theme, score })
     }
   })
 
-  return result.slice(0, 50) // 限制返回數量
+  // 按分數降序，同分按 ID 升序
+  results.sort((a, b) => b.score - a.score || a.theme.id - b.theme.id)
+
+  return results.slice(0, 50) // 限制返回數量
 }
 
 /**
