@@ -381,6 +381,7 @@
 <script setup lang="ts">
 import type { Entry } from '~/types'
 import { useExampleJyutping } from '~/composables/useExampleJyutping'
+import { getDialectLabel } from '~/utils/dialects'
 
 const props = withDefaults(
   defineProps<{
@@ -427,7 +428,7 @@ async function generateExampleJyutping(
   try {
     const result = await doGenerateJyutping(
       example.text,
-      props.entry.dialect.name,
+      getDialectLabel(props.entry.dialect.name),
       (partial) => {
         // 逐字上屏：每查到一個字就即時更新輸入框
         example.jyutping = partial

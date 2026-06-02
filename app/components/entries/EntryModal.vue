@@ -298,7 +298,7 @@
 
 <script setup lang="ts">
 import type { Example } from '~/types'
-import { DIALECT_OPTIONS_FOR_SELECT } from '~/utils/dialects'
+import { DIALECT_OPTIONS_FOR_SELECT, getDialectLabel } from '~/utils/dialects'
 import { useExampleJyutping } from '~/composables/useExampleJyutping'
 
 const props = defineProps<{
@@ -405,7 +405,7 @@ async function generateExampleJyutping(
   try {
     const result = await doGenerateJyutping(
       example.text,
-      form.dialect.name,
+      getDialectLabel(form.dialect.name),
       (partial) => {
         // 逐字上屏：每查到一個字就即時更新輸入框
         example.jyutping = partial
