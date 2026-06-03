@@ -7,6 +7,44 @@
  */
 import { queryJyutdict, getSuggestedPronunciation } from './useJyutdict'
 
+const CN_PUNCTUATION_TO_EN: Record<string, string> = {
+  '，': ',',
+  '。': '.',
+  '！': '!',
+  '？': '?',
+  '；': ';',
+  '：': ':',
+  '、': ',',
+  '（': '(',
+  '）': ')',
+  '【': '[',
+  '】': ']',
+  '「': '"',
+  '」': '"',
+  '『': '"',
+  '』': '"',
+  '…': '...',
+  '—': '—',
+  '～': '~',
+}
+
+const NO_SPACE_BEFORE = /^[,.!?;:)\]」』】》>%]$/
+
+function joinJyutpingTokens(tokens: string[]): string {
+  let out = ''
+  for (const token of tokens) {
+    if (!token) continue
+    if (NO_SPACE_BEFORE.test(token)) {
+      out = out.trimEnd() + token + ' '
+    } else if (/^[(\[「『【《<]$/.test(token)) {
+      out += token
+    } else {
+      out += token + ' '
+    }
+  }
+  return out.trim()
+}
+
 export function useExampleJyutping() {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -48,7 +86,7 @@ export function useExampleJyutping() {
         const char = chars[i]!
         if (!char) continue
 
-        // 只對漢字（Han script）查詢，標點、空格、數字等跳過
+        // 只對漢字（Han script）查詢
         if (/\p{Script=Han}/u.test(char)) {
           try {
             const charData = await queryJyutdict(char, dialectName)
@@ -62,7 +100,7 @@ export function useExampleJyutping() {
 
           // 每查到一個字就通知調用方（實現逐字上屏）
           if (onProgress) {
-            onProgress(results.filter(Boolean).join(' '))
+            onProgress(joinJyutpingTokens(results))
           }
 
           // 逐字延遲（僅在查詢後，且後續還有漢字時），避免對泛粵典服務器造成瞬間大量請求
@@ -71,14 +109,20 @@ export function useExampleJyutping() {
             await new Promise((resolve) => setTimeout(resolve, delayMs))
             if (signal.aborted) break
           }
+        } else if (CN_PUNCTUATION_TO_EN[char] !== undefined) {
+          // 中文標點轉英文標點，令粵拼與文字一一對應
+          results.push(CN_PUNCTUATION_TO_EN[char])
+          if (onProgress) {
+            onProgress(joinJyutpingTokens(results))
+          }
         }
-        // 非漢字字符不出現在粵拼輸出中，也不觸發延遲
+        // 其他字符（空格、數字、英文標點等）跳過
       }
 
       // 被中止則返回空串，避免寫入不完整的結果
       if (signal.aborted) return ''
 
-      return results.filter(Boolean).join(' ')
+      return joinJyutpingTokens(results)
     } catch (e: any) {
       if (e?.name === 'AbortError') return ''
       error.value = e instanceof Error ? e.message : '生成粵拼失敗'
