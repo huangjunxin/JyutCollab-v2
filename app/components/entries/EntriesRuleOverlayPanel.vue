@@ -26,7 +26,7 @@
   <Teleport v-if="expanded && teleportTo && canTeleport" :to="teleportTo">
     <div
       :id="panelId"
-      class="w-full flex flex-col gap-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2"
+      class="w-full flex flex-col gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 p-3 mt-2 mb-4"
     >
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">新增規則</h3>
@@ -327,7 +327,7 @@
   <div
     v-else-if="expanded"
     :id="panelId"
-    class="w-full flex flex-col gap-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2"
+    class="w-full flex flex-col gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 p-3 mt-2 mb-4"
   >
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">新增規則</h3>

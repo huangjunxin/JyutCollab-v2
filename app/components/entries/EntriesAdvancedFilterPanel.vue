@@ -82,7 +82,7 @@ const panelBody = computed(() => ({
 
     return h('div', {
       id: 'entries-advanced-filter-panel',
-      class: 'w-full flex flex-col gap-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2'
+      class: 'w-full flex flex-col gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 p-3 mt-2 mb-4'
     }, [
       h('div', { class: 'flex flex-col gap-1' }, [
         h('label', {
