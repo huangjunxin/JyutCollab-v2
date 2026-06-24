@@ -230,15 +230,26 @@
       <section class="px-4 py-3" aria-labelledby="mobile-saved-views-heading">
         <div class="flex items-center justify-between mb-2">
           <h3 id="mobile-saved-views-heading" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">已儲存視圖</h3>
-          <UButton
-            size="xs"
-            variant="ghost"
-            color="primary"
-            icon="i-heroicons-plus"
-            @click="$emit('save-current-view')"
-          >
-            儲存目前
-          </UButton>
+          <div class="flex items-center gap-1">
+            <UButton
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              icon="i-heroicons-cog-6-tooth"
+              @click="$emit('manage-views')"
+            >
+              管理
+            </UButton>
+            <UButton
+              size="xs"
+              variant="ghost"
+              color="primary"
+              icon="i-heroicons-plus"
+              @click="$emit('save-current-view')"
+            >
+              儲存目前
+            </UButton>
+          </div>
         </div>
         <div v-if="savedViews.length > 0" class="space-y-1 max-h-32 overflow-auto">
           <button
@@ -303,6 +314,7 @@ const emit = defineEmits<{
   'select-view': [mode: string]
   'apply-saved-view': [view: SavedViewRecord]
   'save-current-view': []
+  'manage-views': []
 
   // Layout
   'update:density': [value: 'standard' | 'compact']

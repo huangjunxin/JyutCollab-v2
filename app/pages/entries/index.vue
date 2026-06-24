@@ -415,6 +415,7 @@
       @apply-saved-view="(view: any) => applySavedView(view)"
       @toggle-group-expanded="(key: string) => toggleGroupExpanded(key)"
       @save-current-view="openSaveCurrentViewModal"
+      @manage-views="openManageViewsModal"
     />
     </div>
 

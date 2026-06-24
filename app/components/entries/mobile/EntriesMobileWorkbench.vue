@@ -38,6 +38,7 @@
       @select-view="(v) => { $emit('update:viewMode', v); closeViewPage() }"
       @apply-saved-view="(view) => { $emit('apply-saved-view', view); closeViewPage() }"
       @save-current-view="$emit('save-current-view')"
+      @manage-views="$emit('manage-views')"
       @update:density="(v) => density = v"
       @update:sticky-first-column="(v) => stickyFirstColumn = v"
       @toggle-column="toggleOptionalColumn"
@@ -292,6 +293,7 @@ const emit = defineEmits<{
   'update:sortBy': [value: string]
   'update:sortOrder': [value: 'asc' | 'desc']
   'save-current-view': []
+  'manage-views': []
 }>()
 
 const localSearchQuery = ref(props.searchQuery)
