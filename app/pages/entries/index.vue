@@ -397,6 +397,15 @@
       :expanded-group-keys="expandedGroupKeys"
       :sort-by="sortBy"
       :sort-order="sortOrder"
+      :theme-ai-suggestions="themeAISuggestions"
+      :definition-ai-suggestions="definitionAISuggestions"
+      :ai-loading-for="aiLoadingFor"
+      :duplicate-entries="duplicateCheckEntriesMap"
+      :other-dialect-entries="otherDialectEntriesMap"
+      :jyutjyu-results="jyutjyuResultsMap"
+      :unlinked-morpheme-candidates="unlinkedMorphemeCandidates"
+      :morpheme-search-results="morphemeSearchResults"
+      :morpheme-search-loading="morphemeSearchLoading"
       @search="handleSearch"
       @add-new="addNewRow"
       @save-all="saveAllChanges"
@@ -416,6 +425,22 @@
       @toggle-group-expanded="(key: string) => toggleGroupExpanded(key)"
       @save-current-view="openSaveCurrentViewModal"
       @manage-views="openManageViewsModal"
+      @ai-definition="(entry: any) => generateAIDefinition(entry)"
+      @ai-examples="(entry: any) => generateAIExamples(entry)"
+      @ai-categorize="(entry: any) => generateAICategorization(entry)"
+      @accept-theme-ai="(entry: any) => acceptThemeAI(entry)"
+      @dismiss-theme-ai="(entry: any) => dismissThemeAI(entry)"
+      @accept-definition-ai="(entry: any) => acceptDefinitionAI(entry)"
+      @dismiss-definition-ai="(entry: any) => dismissDefinitionAI(entry)"
+      @apply-other-dialect="(entry: any, sourceId: string) => applyOtherDialectTemplate(entry, sourceId)"
+      @apply-jyutjyu="(entry: any, sourceId: string) => applyJyutjyuTemplate(entry, sourceId)"
+      @remove-morpheme-ref="(entry: any, idx: number) => removeMorphemeRef(entry, idx)"
+      @open-unlinked-form="(entry: any) => openUnlinkedMorphemeForm(entry)"
+      @confirm-unlinked-morpheme="(entry: any) => confirmUnlinkedMorphemeRefs(entry)"
+      @add-morpheme-ref="(id: string, item: any) => addMorphemeRef(id, item)"
+      @search-morphemes="(q: string) => { morphemeSearchQuery = q }"
+      @make-new-lexeme="(entry: any) => makeEntryNewLexeme(entry)"
+      @join-lexeme="(entry: any) => openMergeModalForEntry(entry)"
     />
     </div>
 
@@ -1460,6 +1485,39 @@ const dismissJyutdict = rowHints.dismissJyutdict
 const dismissJyutjyuRef = rowHints.dismissJyutjyuRef
 
 const referenceHeadwordVisibleEntryId = ref<string | null>(null)
+
+// --- Mobile: pre-computed maps for workbench Phase 4 ---
+const duplicateCheckEntriesMap = computed(() => {
+  const map = new Map<string, any[]>()
+  for (const entry of currentPageEntries.value) {
+    const id = getEntryIdString(entry)
+    const formatted = getDuplicateCheckEntriesFormatted(id)
+    if (formatted.length > 0) map.set(id, formatted)
+  }
+  return map
+})
+
+const otherDialectEntriesMap = computed(() => {
+  const map = new Map<string, any[]>()
+  for (const entry of currentPageEntries.value) {
+    const id = getEntryIdString(entry)
+    const formatted = getOtherDialectsFormatted(id)
+    if (formatted.length > 0) map.set(id, formatted)
+  }
+  return map
+})
+
+const jyutjyuResultsMap = computed(() => {
+  const map = new Map<string, any[]>()
+  for (const entry of currentPageEntries.value) {
+    const id = getEntryIdString(entry)
+    const raw = jyutjyuRefResult.value.get(id)
+    if (raw?.results?.length) map.set(id, formatJyutjyuResults(raw.results))
+  }
+  return map
+})
+
+const morphemeSearchQuery = ref('')
 
 function dismissTopHintForEntry(entry: Entry, colIndex?: number): boolean {
   const entryId = getEntryIdString(entry)

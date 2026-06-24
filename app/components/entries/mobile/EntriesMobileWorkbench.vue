@@ -1,19 +1,78 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
+    <!-- Senses sub-page -->
+    <EntriesMobileSensesPage
+      v-if="activeEntry && showSensesPage"
+      :entry="activeEntry"
+      :ai-definition-suggestion="definitionAISuggestionForActive"
+      :ai-loading-definition="aiLoadingFor?.action === 'definition'"
+      :ai-loading-examples="aiLoadingFor?.action === 'examples'"
+      @back="closeSensesPage"
+      @ai-definition="activeEntry && $emit('ai-definition', activeEntry)"
+      @ai-examples="activeEntry && $emit('ai-examples', activeEntry)"
+      @accept-definition-ai="activeEntry && $emit('accept-definition-ai', activeEntry)"
+      @dismiss-definition-ai="activeEntry && $emit('dismiss-definition-ai', activeEntry)"
+    />
+
+    <!-- Theme sub-page -->
+    <EntriesMobileThemePage
+      v-else-if="activeEntry && showThemePage"
+      :entry="activeEntry"
+      :ai-suggestion="themeAISuggestionForActive"
+      :ai-loading="aiLoadingFor?.action === 'theme'"
+      @back="closeThemePage"
+      @update:theme="(theme) => { if (activeEntry) { activeEntry.theme = { ...theme }; activeEntry._isDirty = true; $emit('update:entry', activeEntry) } }"
+      @accept-ai="(s) => activeEntry && $emit('accept-theme-ai', activeEntry)"
+      @dismiss-ai="activeEntry && $emit('dismiss-theme-ai', activeEntry)"
+      @ai-categorize="activeEntry && $emit('ai-categorize', activeEntry)"
+    />
+
+    <!-- Morpheme sub-page -->
+    <EntriesMobileMorphemePage
+      v-else-if="activeEntry && showMorphemePage"
+      :entry="activeEntry"
+      :morpheme-refs="activeEntry.morphemeRefs || []"
+      :unlinked-candidates="unlinkedMorphemeCandidates"
+      :search-results="morphemeSearchResults"
+      :search-loading="morphemeSearchLoading"
+      @back="closeMorphemePage"
+      @remove-morpheme-ref="(idx) => $emit('remove-morpheme-ref', activeEntry, idx)"
+      @open-unlinked-form="activeEntry && $emit('open-unlinked-form', activeEntry)"
+      @confirm-unlinked-morpheme="activeEntry && $emit('confirm-unlinked-morpheme')"
+      @add-morpheme-ref="(item) => $emit('add-morpheme-ref', item.id, item)"
+      @search-morphemes="(q) => $emit('search-morphemes', q)"
+    />
+
     <!-- Row editor view -->
     <EntriesMobileRowEditor
-      v-if="activeEntry"
+      v-else-if="activeEntry"
       :entry="activeEntry"
       :dialect-options="dialectOptions"
       :status-options="statusOptions"
       :can-change-status="canChangeStatus"
       :is-saving="isEntrySaving(activeEntry)"
+      :theme-ai-suggestion="themeAISuggestionForActive"
+      :definition-ai-suggestion="definitionAISuggestionForActive"
+      :duplicate-entries="duplicateEntriesForActive"
+      :other-dialect-entries="otherDialectEntriesForActive"
+      :jyutjyu-results="jyutjyuResultsForActive"
       @back="closeRowEditor"
       @save="(entry) => $emit('save-entry', entry)"
       @cancel="(entry) => { $emit('cancel-entry', entry); closeRowEditor() }"
       @duplicate="(entry) => $emit('duplicate-entry', entry)"
       @delete="(entry) => $emit('delete-entry', entry)"
       @update:entry="(entry) => $emit('update:entry', entry)"
+      @make-new-lexeme="(entry) => $emit('make-new-lexeme', entry)"
+      @join-lexeme="(entry) => $emit('join-lexeme', entry)"
+      @open-theme-page="openSubPage('theme')"
+      @open-senses-page="openSubPage('senses')"
+      @open-morpheme-page="openSubPage('morpheme')"
+      @accept-theme-ai="activeEntry && $emit('accept-theme-ai', activeEntry)"
+      @dismiss-theme-ai="activeEntry && $emit('dismiss-theme-ai', activeEntry)"
+      @accept-definition-ai="activeEntry && $emit('accept-definition-ai', activeEntry)"
+      @dismiss-definition-ai="activeEntry && $emit('dismiss-definition-ai', activeEntry)"
+      @apply-other-dialect="(sourceId) => activeEntry && $emit('apply-other-dialect', activeEntry, sourceId)"
+      @apply-jyutjyu="(sourceId) => activeEntry && $emit('apply-jyutjyu', activeEntry, sourceId)"
     />
 
     <!-- View page -->
@@ -219,9 +278,14 @@
 import type { Entry } from '~/types'
 import type { SavedViewRecord } from '~/composables/useEntriesSavedViews'
 import { ALL_FILTER_VALUE } from '~/utils/entriesTableConstants'
+import { getEntryIdString } from '~/utils/entryKey'
 import EntriesMobileRowEditor from './EntriesMobileRowEditor.vue'
 import EntriesMobileGrid from './EntriesMobileGrid.vue'
+import EntriesMobileViewChips from './EntriesMobileViewChips.vue'
 import EntriesMobileViewPage from './EntriesMobileViewPage.vue'
+import EntriesMobileSensesPage from './EntriesMobileSensesPage.vue'
+import EntriesMobileThemePage from './EntriesMobileThemePage.vue'
+import EntriesMobileMorphemePage from './EntriesMobileMorphemePage.vue'
 
 type MobileGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type MobileRow =
@@ -271,6 +335,21 @@ const props = defineProps<{
 
   // Expanded groups (from parent for persistence)
   expandedGroupKeys: Set<string>
+
+  // Phase 4: AI suggestions (per-entry maps from index.vue)
+  themeAISuggestions: Map<string, any>
+  definitionAISuggestions: Map<string, any>
+  aiLoadingFor: { entryKey: string; action: string } | null
+
+  // Phase 4: Reference helpers (per-entry data)
+  duplicateEntries: Map<string, any[]>
+  otherDialectEntries: Map<string, any[]>
+  jyutjyuResults: Map<string, any[]>
+
+  // Phase 4: Morpheme refs
+  unlinkedMorphemeCandidates: Array<{ position: number; char: string; jyutping: string; note: string }>
+  morphemeSearchResults: Array<{ id: string; headword: string; jyutping: string; definition: string; dialect: string; entryType: string }>
+  morphemeSearchLoading: boolean
 }>()
 
 const emit = defineEmits<{
@@ -294,6 +373,31 @@ const emit = defineEmits<{
   'update:sortOrder': [value: 'asc' | 'desc']
   'save-current-view': []
   'manage-views': []
+  'clear-filters': []
+
+  // Phase 4: AI
+  'ai-definition': [entry: Entry]
+  'ai-examples': [entry: Entry]
+  'ai-categorize': [entry: Entry]
+  'accept-theme-ai': [entry: Entry]
+  'dismiss-theme-ai': [entry: Entry]
+  'accept-definition-ai': [entry: Entry]
+  'dismiss-definition-ai': [entry: Entry]
+
+  // Phase 4: Reference helpers
+  'apply-other-dialect': [entry: Entry, sourceId: string]
+  'apply-jyutjyu': [entry: Entry, sourceId: string]
+
+  // Phase 4: Morpheme refs
+  'remove-morpheme-ref': [entry: Entry, idx: number]
+  'open-unlinked-form': [entry: Entry]
+  'confirm-unlinked-morpheme': []
+  'add-morpheme-ref': [targetEntryId: string, morphemeEntry: any]
+  'search-morphemes': [query: string]
+
+  // Phase 4: Row editor extra actions
+  'make-new-lexeme': [entry: Entry]
+  'join-lexeme': [entry: Entry]
 }>()
 
 const localSearchQuery = ref(props.searchQuery)
@@ -305,6 +409,31 @@ watch(() => props.searchQuery, (val) => {
 
 const activeEntry = ref<Entry | null>(null)
 const showViewPage = ref(false)
+const activeSubPage = ref<'senses' | 'theme' | 'morpheme' | null>(null)
+
+// --- Computed AI / reference data for the active entry ---
+const activeEntryKey = computed(() => activeEntry.value ? getEntryIdString(activeEntry.value) : '')
+
+const themeAISuggestionForActive = computed(() =>
+  activeEntryKey.value ? props.themeAISuggestions.get(activeEntryKey.value) ?? null : null
+)
+const definitionAISuggestionForActive = computed(() =>
+  activeEntryKey.value ? props.definitionAISuggestions.get(activeEntryKey.value) ?? null : null
+)
+const duplicateEntriesForActive = computed(() =>
+  activeEntryKey.value ? props.duplicateEntries.get(activeEntryKey.value) ?? [] : []
+)
+const otherDialectEntriesForActive = computed(() =>
+  activeEntryKey.value ? props.otherDialectEntries.get(activeEntryKey.value) ?? [] : []
+)
+const jyutjyuResultsForActive = computed(() =>
+  activeEntryKey.value ? props.jyutjyuResults.get(activeEntryKey.value) ?? [] : []
+)
+
+// Sub-page flags
+const showSensesPage = computed(() => activeSubPage.value === 'senses')
+const showThemePage = computed(() => activeSubPage.value === 'theme')
+const showMorphemePage = computed(() => activeSubPage.value === 'morpheme')
 
 // In-page back closes local state first, then consumes the pushed history entry.
 const skipNextPopState = ref(false)
@@ -341,14 +470,36 @@ function closeViewPage() {
   }
 }
 
+// --- Navigation: Sub-pages (senses, theme, morpheme) ---
+function openSubPage(page: 'senses' | 'theme' | 'morpheme') {
+  activeSubPage.value = page
+  history.pushState({ mobileSubPage: page }, '')
+}
+
+function closeSubPage() {
+  if (history.state?.mobileSubPage) {
+    activeSubPage.value = null
+    skipNextPopState.value = true
+    history.back()
+  } else {
+    activeSubPage.value = null
+  }
+}
+
+function closeSensesPage() { closeSubPage() }
+function closeThemePage() { closeSubPage() }
+function closeMorphemePage() { closeSubPage() }
+
 // --- Browser back button ---
 function handlePopState() {
   if (skipNextPopState.value) {
     skipNextPopState.value = false
     return
   }
-  // Close whichever sub-page is active (row editor takes priority)
-  if (activeEntry.value) {
+  // Close in priority: sub-page > row editor > view page
+  if (activeSubPage.value) {
+    activeSubPage.value = null
+  } else if (activeEntry.value) {
     activeEntry.value = null
   } else if (showViewPage.value) {
     showViewPage.value = false
