@@ -365,14 +365,14 @@ watch(density, (v) => {
 const CORE_COLUMN_KEYS = ['headword', 'dialect', 'phonetic', 'status'] as const
 
 const ALL_COLUMN_DEFS: EditableColumnDef[] = [
-  { key: 'headword', label: '詞頭', width: '96', type: 'text', get: (e) => e.headword?.display || e.text || '', set: () => {} },
-  { key: 'dialect', label: '方言', width: '56', type: 'select', get: (e) => e.dialect?.name || '', set: () => {} },
-  { key: 'phonetic', label: '粵拼', width: '106', type: 'phonetic', get: (e) => e.phonetic?.jyutping?.[0] || '', set: () => {} },
+  { key: 'headword', label: '詞頭', width: '94', type: 'text', get: (e) => e.headword?.display || e.text || '', set: () => {} },
+  { key: 'dialect', label: '方言', width: '52', type: 'select', get: (e) => e.dialect?.name || '', set: () => {} },
+  { key: 'phonetic', label: '粵拼', width: '92', type: 'phonetic', get: (e) => e.phonetic?.jyutping?.[0] || '', set: () => {} },
   { key: 'entryType', label: '類型', width: '56', type: 'select', get: (e) => e.entryType || 'word', set: () => {} },
   { key: 'theme', label: '分類', width: '96', type: 'theme', get: (e) => e.theme?.level3Id ? (e.theme.level3 || '') : '', set: () => {} },
   { key: 'definition', label: '釋義', width: '140', type: 'text', get: (e) => e.senses?.[0]?.definition || '', set: () => {} },
   { key: 'register', label: '語域', width: '56', type: 'select', get: (e) => e.meta?.register || '', set: () => {} },
-  { key: 'status', label: '狀態', width: '48', type: 'select', get: (e) => e.status || 'draft', set: () => {} },
+  { key: 'status', label: '狀態', width: '66', type: 'select', get: (e) => e.status || 'draft', set: () => {} },
 ]
 
 const enabledOptionalKeys = ref<string[]>(

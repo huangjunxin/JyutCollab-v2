@@ -9,28 +9,34 @@
       class="w-full border-collapse"
       :style="{ tableLayout: 'fixed', minWidth: tableMinWidth + 'px' }"
     >
+      <colgroup>
+        <col :style="{ width: firstColumnWidth + 'px' }">
+        <col
+          v-for="col in columns.slice(1)"
+          :key="col.key"
+          :style="{ width: columnWidth(col) + 'px' }"
+        >
+      </colgroup>
       <thead class="sticky top-0 z-20">
         <tr class="bg-[var(--jc-canvas-soft)] dark:bg-slate-950 border-b border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
           <!-- Sticky first column header -->
           <th
-            class="sticky left-0 z-30 bg-[var(--jc-canvas-soft)] dark:bg-slate-950 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r-2 border-r-gray-300 dark:border-r-gray-600"
+            class="sticky left-0 z-30 bg-[var(--jc-canvas-soft)] dark:bg-slate-950 px-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r-2 border-r-gray-300 dark:border-r-gray-600"
             :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
-            style="width: 110px; min-width: 110px;"
+            :style="{ width: firstColumnWidth + 'px', minWidth: firstColumnWidth + 'px' }"
           >
-            {{ columns[0]?.label || '詞頭' }}
+            <span class="block truncate">{{ columns[0]?.label || '詞頭' }}</span>
           </th>
           <!-- Scrollable column headers -->
           <th
             v-for="col in columns.slice(1)"
             :key="col.key"
-            class="px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700"
+            class="px-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700"
             :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
-            :style="{ width: col.width + 'px', minWidth: col.width + 'px' }"
+            :style="{ width: columnWidth(col) + 'px', minWidth: columnWidth(col) + 'px' }"
           >
-            {{ col.label }}
+            <span class="block truncate">{{ col.label }}</span>
           </th>
-          <!-- Dirty/status indicator column -->
-          <th class="w-8 min-w-[32px]" />
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -42,8 +48,8 @@
             @click="$emit('toggle-group', row.group.headwordNormalized)"
           >
             <td
-              :colspan="columns.length + 1"
-              class="px-3 border-r border-gray-200 dark:border-gray-700"
+              :colspan="columns.length"
+              class="px-2 border-r border-gray-200 dark:border-gray-700"
               :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
             >
               <div class="flex items-center justify-between gap-2">
@@ -92,8 +98,9 @@
           >
             <!-- Sticky first column (headword) -->
             <td
-              class="sticky left-0 z-10 bg-white dark:bg-slate-800 font-medium text-gray-900 dark:text-white border-r-2 border-r-gray-200 dark:border-r-gray-700 px-3"
+              class="sticky left-0 z-10 bg-white dark:bg-slate-800 font-medium text-gray-900 dark:text-white border-r-2 border-r-gray-200 dark:border-r-gray-700 px-2"
               :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
+              :style="{ width: firstColumnWidth + 'px', minWidth: firstColumnWidth + 'px' }"
             >
               <div class="flex items-center gap-1.5 min-w-0">
                 <span class="truncate text-sm">
@@ -107,13 +114,14 @@
             <td
               v-for="col in columns.slice(1)"
               :key="col.key"
-              class="px-3 text-sm border-r border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+              class="px-2 text-sm border-r border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
               :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
+              :style="{ width: columnWidth(col) + 'px', minWidth: columnWidth(col) + 'px' }"
             >
               <!-- Status column with badge -->
               <template v-if="col.key === 'status'">
                 <span
-                  class="inline-block px-1.5 py-0.5 text-xs rounded whitespace-nowrap"
+                  class="inline-block max-w-full overflow-hidden text-ellipsis px-1.5 py-0.5 text-xs rounded whitespace-nowrap align-middle"
                   :class="getStatusClass(row.entry.status)"
                 >
                   {{ getStatusLabel(row.entry.status) }}
@@ -121,7 +129,7 @@
               </template>
               <!-- Dialect column with badge -->
               <template v-else-if="col.key === 'dialect'">
-                <span class="inline-block px-1.5 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <span class="inline-block max-w-full overflow-hidden text-ellipsis px-1 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap align-middle">
                   {{ getCellDisplay(row.entry, col) || '—' }}
                 </span>
               </template>
@@ -138,8 +146,6 @@
                 </span>
               </template>
             </td>
-            <!-- Indicator column (empty, dirty state moved to headword cell) -->
-            <td class="w-8 min-w-[32px]" />
           </tr>
         </template>
       </tbody>
@@ -174,6 +180,8 @@ const emit = defineEmits<{
 }>()
 
 const scrollContainer = ref<HTMLElement | null>(null)
+
+const firstColumnWidth = computed(() => parseColumnWidth(props.columns[0]?.width, 94))
 
 // Track touch start position to distinguish horizontal swipe from tap
 let touchStartX = 0
@@ -214,12 +222,19 @@ function handleEntryClick(event: MouseEvent, entry: Entry) {
   emit('row-click', entry)
 }
 
-// Table min-width: sticky column + sum of scrollable columns + indicator
 const tableMinWidth = computed(() => {
-  const sticky = 110
-  const scrollable = props.columns.slice(1).reduce((sum, c) => sum + parseInt(c.width, 10), 0)
-  return sticky + scrollable + 32
+  const scrollable = props.columns.slice(1).reduce((sum, c) => sum + columnWidth(c), 0)
+  return firstColumnWidth.value + scrollable
 })
+
+function parseColumnWidth(width: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(width || '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function columnWidth(column: MobileColumnDef): number {
+  return parseColumnWidth(column.width, 72)
+}
 
 function rowKey(row: MobileRow, index: number): string {
   if (row.type === 'group') return `group-${row.group.headwordNormalized}-${row.groupIndex}`
