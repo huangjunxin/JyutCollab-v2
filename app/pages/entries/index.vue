@@ -395,6 +395,8 @@
       :saved-views="savedViews.views.value"
       :selected-view-id="selectedViewId"
       :expanded-group-keys="expandedGroupKeys"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       @search="handleSearch"
       @add-new="addNewRow"
       @save-all="saveAllChanges"
@@ -404,12 +406,15 @@
       @update:filterDialect="(v: string) => { filterDialect = v }"
       @update:filterStatus="(v: string) => { filterStatus = v }"
       @update:filterTheme="(v: string) => { filterTheme = v }"
+      @update:sortBy="setMobileSortBy"
+      @update:sortOrder="setMobileSortOrder"
       @save-entry="(entry: any) => (entry as any)._isNew ? saveNewEntry(entry) : saveEntryChanges(entry)"
       @cancel-entry="(entry: any) => cancelEdit(entry)"
       @duplicate-entry="(entry: any) => duplicateEntry(entry)"
       @delete-entry="(entry: any) => deleteEntry(entry)"
       @apply-saved-view="(view: any) => applySavedView(view)"
       @toggle-group-expanded="(key: string) => toggleGroupExpanded(key)"
+      @save-current-view="openSaveCurrentViewModal"
     />
     </div>
 
@@ -882,6 +887,24 @@ function setViewMode(v: string) {
   viewMode.value = mode
   currentPage.value = 1
   fetchEntries()
+}
+
+function setMobileSortBy(key: string) {
+  if (!SORTABLE_COLUMN_KEYS.includes(key as any)) return
+  if (sortBy.value === key) return
+  sortBy.value = key
+  sortOrder.value = 'asc'
+  currentPage.value = 1
+  if (isAllFetched.value) fetchAllEntries()
+  else fetchEntries()
+}
+
+function setMobileSortOrder(order: 'asc' | 'desc') {
+  if (sortOrder.value === order) return
+  sortOrder.value = order
+  currentPage.value = 1
+  if (isAllFetched.value) fetchAllEntries()
+  else fetchEntries()
 }
 
 const isEmpty = computed(() => {

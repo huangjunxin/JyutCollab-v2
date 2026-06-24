@@ -23,13 +23,29 @@
       :selected-view-id="selectedViewId"
       :saved-views="savedViews"
       :density="density"
+      :sticky-first-column="stickyFirstColumn"
       :optional-columns="optionalColumns"
       :enabled-column-keys="enabledOptionalKeys"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
+      :filter-dialect="filterDialect"
+      :filter-status="filterStatus"
+      :filter-theme="filterTheme"
+      :filter-dialect-options="filterDialectOptions"
+      :theme-filter-options="themeFilterOptions"
+      :status-filter-options="statusFilterOptions"
       @back="closeViewPage"
       @select-view="(v) => { $emit('update:viewMode', v); closeViewPage() }"
       @apply-saved-view="(view) => { $emit('apply-saved-view', view); closeViewPage() }"
+      @save-current-view="$emit('save-current-view')"
       @update:density="(v) => density = v"
+      @update:sticky-first-column="(v) => stickyFirstColumn = v"
       @toggle-column="toggleOptionalColumn"
+      @update:sort-by="(v) => $emit('update:sortBy', v)"
+      @update:sort-order="(v) => $emit('update:sortOrder', v)"
+      @update:filter-dialect="(v) => $emit('update:filterDialect', v)"
+      @update:filter-status="(v) => $emit('update:filterStatus', v)"
+      @update:filter-theme="(v) => $emit('update:filterTheme', v)"
     />
 
     <!-- Grid view -->
@@ -162,6 +178,7 @@
         :columns="mobileColumns"
         :expanded-groups="expandedGroupKeys"
         :density="density"
+        :sticky-first-column="stickyFirstColumn"
         :get-cell-display="getCellDisplay"
         :get-cell-class="getCellClass"
         @row-click="handleRowClick"
@@ -243,6 +260,10 @@ const props = defineProps<{
   themeFilterOptions: Array<{ value: string; label: string }>
   statusFilterOptions: Array<{ value: string; label: string }>
 
+  // Sort
+  sortBy: string
+  sortOrder: 'asc' | 'desc'
+
   // Saved views
   savedViews: SavedViewRecord[]
   selectedViewId: string | null
@@ -268,6 +289,9 @@ const emit = defineEmits<{
   'update:filterTheme': [value: string]
   'apply-saved-view': [view: SavedViewRecord]
   'toggle-group-expanded': [key: string]
+  'update:sortBy': [value: string]
+  'update:sortOrder': [value: 'asc' | 'desc']
+  'save-current-view': []
 }>()
 
 const localSearchQuery = ref(props.searchQuery)
@@ -359,6 +383,16 @@ const density = ref<GridDensity>(
 )
 watch(density, (v) => {
   if (import.meta.client) localStorage.setItem('jyutcollab-mobile-density', v)
+})
+
+// --- Sticky first column (persisted) ---
+const stickyFirstColumn = ref(
+  import.meta.client
+    ? localStorage.getItem('jyutcollab-mobile-sticky-first') !== 'false' // default true
+    : true
+)
+watch(stickyFirstColumn, (v) => {
+  if (import.meta.client) localStorage.setItem('jyutcollab-mobile-sticky-first', String(v))
 })
 
 // --- Column settings (persisted) ---

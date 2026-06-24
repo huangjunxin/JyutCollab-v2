@@ -19,10 +19,13 @@
       </colgroup>
       <thead class="sticky top-0 z-20">
         <tr class="bg-[var(--jc-canvas-soft)] dark:bg-slate-950 border-b border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-          <!-- Sticky first column header -->
+          <!-- First column header -->
           <th
-            class="sticky left-0 z-30 bg-[var(--jc-canvas-soft)] dark:bg-slate-950 px-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r-2 border-r-gray-300 dark:border-r-gray-600"
-            :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
+            class="bg-[var(--jc-canvas-soft)] dark:bg-slate-950 px-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r-2 border-r-gray-300 dark:border-r-gray-600"
+            :class="[
+              density === 'compact' ? 'py-1.5' : 'py-2.5',
+              stickyFirstColumn ? 'sticky left-0 z-30' : ''
+            ]"
             :style="{ width: firstColumnWidth + 'px', minWidth: firstColumnWidth + 'px' }"
           >
             <span class="block truncate">{{ columns[0]?.label || '詞頭' }}</span>
@@ -96,10 +99,13 @@
             :style="{ minHeight: density === 'compact' ? '36px' : '48px' }"
             @click="handleEntryClick($event, row.entry)"
           >
-            <!-- Sticky first column (headword) -->
+            <!-- First column (headword) -->
             <td
-              class="sticky left-0 z-10 bg-white dark:bg-slate-800 font-medium text-gray-900 dark:text-white border-r-2 border-r-gray-200 dark:border-r-gray-700 px-2"
-              :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
+              class="bg-white dark:bg-slate-800 font-medium text-gray-900 dark:text-white border-r-2 border-r-gray-200 dark:border-r-gray-700 px-2"
+              :class="[
+                density === 'compact' ? 'py-1.5' : 'py-2.5',
+                stickyFirstColumn ? 'sticky left-0 z-10' : ''
+              ]"
               :style="{ width: firstColumnWidth + 'px', minWidth: firstColumnWidth + 'px' }"
             >
               <div class="flex items-center gap-1.5 min-w-0">
@@ -170,6 +176,7 @@ const props = defineProps<{
   columns: MobileColumnDef[]
   expandedGroups: Set<string>
   density: 'standard' | 'compact'
+  stickyFirstColumn: boolean
   getCellDisplay: (entry: Entry, col: MobileColumnDef) => string
   getCellClass: (entry: Entry, field: string) => string[]
 }>()
