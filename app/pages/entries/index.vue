@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col">
+  <div class="flex h-full min-h-0 flex-col">
     <!-- Page header -->
     <div v-if="!isMobile" class="mb-4 flex-shrink-0">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -230,7 +230,7 @@
     </div>
 
     <!-- Desktop table / Mobile workbench split -->
-    <div v-else class="flex-1 flex flex-col gap-0 overflow-hidden">
+    <div v-else class="flex-1 min-h-0 flex flex-col gap-0 overflow-hidden">
     <EntriesDesktopTable
       v-if="!isMobile"
       ref="desktopTableRef"

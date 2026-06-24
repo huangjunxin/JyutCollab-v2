@@ -1,0 +1,91 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const root = resolve(__dirname, '../../../..')
+const readSource = (path: string) => readFileSync(resolve(root, path), 'utf8')
+
+describe('mobile entries stage 2 scope guard', () => {
+  const viewPageSource = readSource('app/components/entries/mobile/EntriesMobileViewPage.vue')
+  const gridSource = readSource('app/components/entries/mobile/EntriesMobileGrid.vue')
+  const workbenchSource = readSource('app/components/entries/mobile/EntriesMobileWorkbench.vue')
+
+  it('keeps density and optional-column controls in the mobile view subpage', () => {
+    expect(viewPageSource).toContain('視圖與設定')
+    expect(viewPageSource).toContain('列表密度')
+    expect(viewPageSource).toContain('顯示欄位')
+    expect(viewPageSource).toContain('詞頭、方言、粵拼、狀態為固定欄位。')
+    expect(viewPageSource).toContain('densityOptions')
+    expect(viewPageSource).toContain('optionalColumns')
+    expect(viewPageSource).toContain('enabledColumnKeys')
+    expect(viewPageSource).toContain('aria-label="返回詞條列表"')
+    expect(viewPageSource).toContain(':aria-pressed="currentViewMode === view.value"')
+    expect(viewPageSource).toContain(':aria-pressed="selectedViewId === view.id"')
+    expect(viewPageSource).toContain(':aria-pressed="density === d.value"')
+    expect(viewPageSource).toContain(':aria-label="`顯示${col.label}欄位`"')
+    expect(viewPageSource).toContain(':for="`mobile-column-${col.key}`"')
+    expect(viewPageSource).toContain(':id="`mobile-column-${col.key}`"')
+    expect(viewPageSource).toContain('aria-labelledby="mobile-builtin-views-heading"')
+    expect(viewPageSource).toContain('id="mobile-builtin-views-heading"')
+    expect(viewPageSource).toContain('aria-labelledby="mobile-saved-views-heading"')
+    expect(viewPageSource).toContain('id="mobile-saved-views-heading"')
+    expect(viewPageSource).toContain('aria-labelledby="mobile-density-heading"')
+    expect(viewPageSource).toContain('id="mobile-density-heading"')
+    expect(viewPageSource).toContain('role="group"')
+    expect(viewPageSource).toContain('aria-labelledby="mobile-columns-heading"')
+    expect(viewPageSource).toContain('aria-describedby="mobile-columns-description"')
+    expect(viewPageSource).toContain('id="mobile-columns-heading"')
+    expect(viewPageSource).toContain('id="mobile-columns-description"')
+    expect(viewPageSource).toMatch(/'update:density':\s*\[value:\s*'standard' \| 'compact'\]/)
+    expect(viewPageSource).toMatch(/'toggle-column':\s*\[key:\s*string\]/)
+  })
+
+  it('keeps the view subpage presentational and free of entry mutation or persistence side effects', () => {
+    expect(viewPageSource).not.toMatch(/localStorage|sessionStorage|\$fetch|navigateTo|router\.|saveEntry|saveNewEntry|saveAllChanges|deleteEntry|duplicateEntry/)
+    expect(viewPageSource).not.toMatch(/EntriesMobileGrid|EntriesMobileWorkbench|Entry|IEntry/)
+  })
+
+  it('does not move stage 2 settings UI into the mobile grid homepage', () => {
+    expect(gridSource).not.toContain('列表密度')
+    expect(gridSource).not.toContain('顯示欄位')
+    expect(gridSource).not.toContain('已儲存視圖')
+    expect(gridSource).not.toContain('內建視圖')
+    expect(gridSource).not.toContain('toggle-column')
+    expect(gridSource).not.toContain('update:density')
+    expect(gridSource).not.toMatch(/localStorage|sessionStorage|\$fetch|EntriesMobileViewPage/)
+  })
+
+  it('keeps mobile settings state wired through the workbench without new grid-homepage settings copy', () => {
+    expect(workbenchSource).toContain('jyutcollab-mobile-density')
+    expect(workbenchSource).toContain('jyutcollab-mobile-columns')
+    expect(workbenchSource).toContain('<EntriesMobileViewPage')
+    expect(workbenchSource).toContain(':density="density"')
+    expect(workbenchSource).toContain(':optional-columns="optionalColumns"')
+    expect(workbenchSource).toContain(':enabled-column-keys="enabledOptionalKeys"')
+    expect(workbenchSource).toContain('@update:density="(v) => density = v"')
+    expect(workbenchSource).toContain('@toggle-column="toggleOptionalColumn"')
+    expect(workbenchSource).not.toMatch(/<EntriesMobileGrid[\s\S]{0,500}optional-columns|<EntriesMobileGrid[\s\S]{0,500}enabled-column-keys|<EntriesMobileGrid[\s\S]{0,500}toggle-column/)
+  })
+
+  it('freezes the repaired mobile grid homepage structure without reintroducing the empty indicator column', () => {
+    expect(gridSource).toContain('<colgroup>')
+    expect(gridSource).toContain(':style="{ width: firstColumnWidth + \'px\' }"')
+    expect(gridSource).toContain(':style="{ width: columnWidth(col) + \'px\' }"')
+    expect(gridSource).toContain(':colspan="columns.length"')
+    expect(gridSource).toContain('const firstColumnWidth = computed(() => parseColumnWidth(props.columns[0]?.width, 94))')
+    expect(gridSource).toContain('return firstColumnWidth.value + scrollable')
+    expect(gridSource).toContain('class="inline-block max-w-full overflow-hidden text-ellipsis px-1.5 py-0.5 text-xs rounded whitespace-nowrap align-middle"')
+    expect(gridSource).toContain('class="inline-block max-w-full overflow-hidden text-ellipsis px-1 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap align-middle"')
+    expect(gridSource).not.toContain('columns.length + 1')
+    expect(gridSource).not.toContain('+ 32')
+    expect(gridSource).not.toMatch(/<th[^>]*w-8|<td[^>]*w-8|min-w-\[32px\]|Indicator column|indicator column/i)
+  })
+
+  it('freezes the repaired core mobile column widths in the workbench configuration', () => {
+    expect(workbenchSource).toContain("const CORE_COLUMN_KEYS = ['headword', 'dialect', 'phonetic', 'status'] as const")
+    expect(workbenchSource).toContain("{ key: 'headword', label: '詞頭', width: '94'")
+    expect(workbenchSource).toContain("{ key: 'dialect', label: '方言', width: '52'")
+    expect(workbenchSource).toContain("{ key: 'phonetic', label: '粵拼', width: '92'")
+    expect(workbenchSource).toContain("{ key: 'status', label: '狀態', width: '66'")
+  })
+})

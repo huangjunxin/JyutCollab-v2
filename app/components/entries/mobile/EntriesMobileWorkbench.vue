@@ -139,7 +139,7 @@
       </div>
 
       <!-- Loading state -->
-      <div v-if="loading" class="flex-1 flex items-center justify-center">
+      <div v-if="loading" class="flex-1 min-h-0 flex items-center justify-center">
         <div class="relative">
           <div class="w-10 h-10 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
           <div class="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>

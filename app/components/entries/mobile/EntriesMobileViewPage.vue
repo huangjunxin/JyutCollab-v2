@@ -8,6 +8,7 @@
           variant="ghost"
           color="neutral"
           size="sm"
+          aria-label="返回詞條列表"
           @click="$emit('back')"
         />
         <h2 class="text-base font-semibold text-gray-900 dark:text-white">視圖與設定</h2>
@@ -16,13 +17,16 @@
 
     <div class="flex-1 overflow-auto">
       <!-- Built-in views -->
-      <div class="px-4 py-3">
-        <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">內建視圖</h3>
+      <section class="px-4 py-3" aria-labelledby="mobile-builtin-views-heading">
+        <h3 id="mobile-builtin-views-heading" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">內建視圖</h3>
         <div class="space-y-1">
           <button
             v-for="view in builtinViews"
             :key="view.value"
+            type="button"
             class="w-full flex items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            :aria-pressed="currentViewMode === view.value"
+            :aria-label="`切換到${view.label}視圖`"
             @click="$emit('select-view', view.value)"
           >
             <div class="flex items-center gap-3">
@@ -36,16 +40,19 @@
             />
           </button>
         </div>
-      </div>
+      </section>
 
       <!-- Saved views -->
-      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-        <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">已儲存視圖</h3>
+      <section class="px-4 py-3 border-t border-gray-200 dark:border-gray-700" aria-labelledby="mobile-saved-views-heading">
+        <h3 id="mobile-saved-views-heading" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">已儲存視圖</h3>
         <div v-if="savedViews.length > 0" class="space-y-1">
           <button
             v-for="view in savedViews"
             :key="view.id"
+            type="button"
             class="w-full flex items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            :aria-pressed="selectedViewId === view.id"
+            :aria-label="`套用${view.name}視圖`"
             @click="$emit('apply-saved-view', view)"
           >
             <div class="min-w-0">
@@ -60,46 +67,52 @@
           </button>
         </div>
         <p v-else class="text-sm text-gray-500 dark:text-gray-400">暫無已儲存視圖</p>
-      </div>
+      </section>
 
       <!-- Grid density -->
-      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-        <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">列表密度</h3>
-        <div class="flex gap-2">
+      <section class="px-4 py-3 border-t border-gray-200 dark:border-gray-700" aria-labelledby="mobile-density-heading">
+        <h3 id="mobile-density-heading" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">列表密度</h3>
+        <div class="flex gap-2" role="group" aria-labelledby="mobile-density-heading">
           <button
             v-for="d in densityOptions"
             :key="d.value"
+            type="button"
             class="flex-1 px-3 py-2 text-sm text-center border transition-colors"
             :class="density === d.value
               ? 'bg-primary text-white border-primary'
               : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]'"
+            :aria-pressed="density === d.value"
+            :aria-label="`切換到${d.label}密度`"
             @click="$emit('update:density', d.value)"
           >
             {{ d.label }}
           </button>
         </div>
-      </div>
+      </section>
 
       <!-- Column settings -->
-      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-        <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">顯示欄位</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">詞頭、方言、粵拼、狀態為固定欄位。</p>
+      <section class="px-4 py-3 border-t border-gray-200 dark:border-gray-700" aria-labelledby="mobile-columns-heading" aria-describedby="mobile-columns-description">
+        <h3 id="mobile-columns-heading" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">顯示欄位</h3>
+        <p id="mobile-columns-description" class="text-xs text-gray-500 dark:text-gray-400 mb-2">詞頭、方言、粵拼、狀態為固定欄位。</p>
         <div class="space-y-1">
           <label
             v-for="col in optionalColumns"
             :key="col.key"
+            :for="`mobile-column-${col.key}`"
             class="flex items-center justify-between px-3 py-2 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] cursor-pointer"
           >
             <span class="text-sm text-gray-900 dark:text-white">{{ col.label }}</span>
             <input
+              :id="`mobile-column-${col.key}`"
               type="checkbox"
               class="rounded border-gray-300"
               :checked="enabledColumnKeys.includes(col.key)"
+              :aria-label="`顯示${col.label}欄位`"
               @change="$emit('toggle-column', col.key)"
             />
           </label>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
