@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col">
     <!-- Page header -->
-    <div class="mb-4 flex-shrink-0">
+    <div v-if="!isMobile" class="mb-4 flex-shrink-0">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 class="jc-serif text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
@@ -55,22 +55,9 @@
       </div>
     </div>
 
-    <!-- Mobile warning banner -->
-    <UAlert
-      v-if="isMobile && !mobileWarningDismissed"
-      color="warning"
-      variant="subtle"
-      icon="i-heroicons-computer-desktop"
-      title="建議使用電腦端編輯"
-      description="詞條表格為多欄位設計，在電腦上編輯體驗更佳。手機端目前僅支援瀏覽，如需編輯請使用電腦訪問。"
-      :close-button="{ icon: 'i-heroicons-x-mark-20-solid', color: 'gray', variant: 'link' }"
-      class="mb-4"
-      @close="mobileWarningDismissed = true"
-    />
-
     <!-- Agent filter applied banner -->
     <div
-      v-if="agentFilterLabel"
+      v-if="!isMobile && agentFilterLabel"
       class="mb-4 flex flex-wrap items-center justify-between gap-3 border border-[var(--jc-border)] bg-white p-3 shadow-[var(--jc-shadow-hard)] dark:bg-slate-800"
     >
       <div class="flex min-w-0 items-center gap-3">
@@ -92,6 +79,7 @@
 
     <!-- Search and filters -->
     <SharedSearchFilterBar
+      v-if="!isMobile"
       v-model:search-query="searchQuery"
       v-model:filter-user="filterUser"
       v-model:filter-dialect="filterDialect"
@@ -176,7 +164,8 @@
         </div>
       </template>
     </SharedSearchFilterBar>
-    <div id="entries-advanced-filter-host" class="w-full" />
+    <template v-if="!isMobile">
+      <div id="entries-advanced-filter-host" class="w-full" />
       <div id="entries-rule-overlay-host" class="w-full" />
       <EntriesSharedViewBanner
         v-if="sharedViewBanner"
@@ -188,10 +177,10 @@
         @save-as-own="saveSharedViewBannerAsOwn"
         @close="clearSharedViewQuery"
       />
-    </div>
+    </template>
 
     <!-- Loading state -->
-    <div v-if="loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
+    <div v-if="!isMobile && loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
       <div class="relative">
         <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
         <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
@@ -200,7 +189,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="isEmpty" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
+    <div v-else-if="!isMobile && isEmpty" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
       <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
         <UIcon name="i-heroicons-table-cells" class="w-10 h-10 text-gray-400" />
       </div>
@@ -240,561 +229,189 @@
       </UButton>
     </div>
 
-    <!-- Notion 風格表格：方向鍵選格、Enter 進入/確認並下一行、Tab 右移並編輯、Shift+Tab 左移並編輯 -->
+    <!-- Desktop table / Mobile workbench split -->
     <div v-else class="flex-1 flex flex-col gap-0 overflow-hidden">
-      <!-- 多選時顯示批量操作欄 -->
-      <div
-        v-if="selectedCount > 0"
-        class="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 border-b-0 rounded-t-xl"
-      >
-        <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
-          已選 <span class="font-semibold">{{ selectedCount }}</span> 項
-          <span v-if="selectedSavedEntries.length < selectedCount" class="text-primary-600 dark:text-primary-400 ml-1">
-            （其中 {{ selectedSavedEntries.length }} 條可批量刪除）
-          </span>
-        </span>
-        <div class="flex items-center gap-2">
-          <UButton color="neutral" variant="soft" size="sm" @click="clearSelection">
-            取消選擇
-          </UButton>
-          <UButton
-            v-if="selectedSavedEntries.length > 0"
-            color="error"
-            variant="soft"
-            size="sm"
-            icon="i-heroicons-trash"
-            :loading="batchDeleting"
-            @click="batchDeleteSelected"
-          >
-            批量刪除
-          </UButton>
-        </div>
-      </div>
-      <div
-        class="jc-entries-table-font flex-1 bg-white dark:bg-slate-800 shadow-[var(--jc-shadow-hard)] border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] overflow-hidden flex flex-col"
-        :class="{ 'border-t-0': selectedCount > 0 }"
-      >
-      <div
-        ref="tableWrapperRef"
-        tabindex="0"
-        class="flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
-        @keydown="handleTableKeydown"
-      >
-        <table class="border-collapse w-full" style="table-layout: fixed" ref="tableRef">
-          <colgroup>
-            <col style="width: 40px" />
-            <col
-              v-for="col in editableColumns"
-              :key="col.key"
-              :style="{ width: (columnWidths[col.key] ?? parseInt(col.width, 10)) + 'px' }"
-            />
-            <col style="width: 128px" />
-          </colgroup>
-          <thead class="sticky top-0 z-10">
-            <tr class="bg-[var(--jc-canvas-soft)] dark:bg-slate-950 border-b border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-              <th class="w-10 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700">
-                <input
-                  ref="headerCheckboxRef"
-                  type="checkbox"
-                  class="rounded border-gray-300"
-                  :checked="selectAllChecked"
-                  :aria-label="selectAllChecked ? '取消全選' : '全選本頁'"
-                  @change="toggleSelectAll"
-                />
-              </th>
-              <th
-                v-for="col in editableColumns"
-                :key="col.key"
-                class="relative select-none px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 overflow-hidden"
-                :class="SORTABLE_COLUMN_KEYS.includes(col.key as any) ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800' : ''"
-                @click="handleSort(col.key)"
-              >
-                <div class="flex items-center gap-1 overflow-hidden">
-                  <span class="truncate">{{ col.label }}</span>
-                  <UIcon
-                    v-if="SORTABLE_COLUMN_KEYS.includes(col.key as any) && sortBy === col.key"
-                    :name="sortOrder === 'asc' ? 'i-heroicons-arrow-up' : 'i-heroicons-arrow-down'"
-                    class="w-3 h-3 flex-shrink-0"
-                  />
-                </div>
-                <!-- 拖動手柄 -->
-                <div
-                  class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize z-20 hover:bg-primary/40 active:bg-primary/60 transition-colors"
-                  @mousedown.stop="startResize($event, col.key, columnWidths[col.key] ?? parseInt(col.width, 10))"
-                />
-              </th>
-              <th class="min-w-[8rem] w-32 px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
-                操作
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            <template v-for="(row, rowIndex) in tableRows" :key="row.type === 'group' ? `group-${row.group.headwordNormalized}-${row.groupIndex}` : getEntryKey(row.entry) ?? `entry-${rowIndex}`">
-            <!-- 聚合視圖：詞形組標題行 -->
-            <tr
-              v-if="row.type === 'group'"
-              class="bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-l-2 border-primary/40"
-            >
-              <td class="w-10 px-2 py-1 text-center border-r border-gray-200 dark:border-gray-700 text-xs text-gray-400 align-middle">
-                {{ (pagination.page - 1) * pagination.perPage + row.groupIndex + 1 }}
-              </td>
-              <td class="jc-headword-rare-font px-3 py-2 border-r border-gray-200 dark:border-gray-700 font-medium text-gray-900 dark:text-white">
-                {{ row.group.headwordDisplay || '—' }}
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700">
-                <div class="flex flex-wrap gap-1">
-                  <UBadge
-                    v-for="e in row.group.entries"
-                    :key="e.id ?? (e as any)._tempId"
-                    size="xs"
-                    variant="soft"
-                    color="neutral"
-                  >
-                    {{ getDialectLabel(e.dialect?.name || '') || e.dialect?.name || '—' }}
-                  </UBadge>
-                </div>
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
-                {{ getGroupPhonetic(row.group) }}
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
-                {{ getGroupEntryType(row.group) }}
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
-                {{ getGroupTheme(row.group) }}
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                {{ row.group.entries.length > 1 ? `共 ${row.group.entries.length} 個方言點` : (row.group.entries[0]?.senses?.[0]?.definition || row.group.entries[0]?.definition || '—') }}
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
-                {{ getGroupRegister(row.group) }}
-              </td>
-              <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
-                {{ getGroupStatus(row.group) }}
-              </td>
-              <td class="min-w-[8rem] w-32 px-2 py-2 text-center border-r border-gray-200 dark:border-gray-700 align-middle">
-                <div class="flex items-center justify-center gap-1 flex-nowrap">
-                  <UButton
-                    v-if="viewMode === 'lexeme'"
-                    icon="i-heroicons-globe-asia-australia"
-                    color="primary"
-                    variant="ghost"
-                    size="xs"
-                    :disabled="!canEditExternalEtymons"
-                    :title="!canEditExternalEtymons ? '只有審核員及以上可編輯' : (String(row.group.headwordNormalized || '').startsWith('__unassigned__:') ? '編輯域外方音（將自動創建詞語組）' : '編輯域外方音')"
-                    :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
-                    @click="openExternalEtymonsForGroup(String(row.group.headwordNormalized || ''), String(row.group.headwordDisplay || ''), row.group.entries)"
-                  />
-                  <UButton
-                    v-if="viewMode === 'lexeme' && canEditExternalEtymons && !String(row.group.headwordNormalized || '').startsWith('__unassigned__:')"
-                    icon="i-heroicons-folder-plus"
-                    color="primary"
-                    variant="ghost"
-                    size="xs"
-                    title="合併到其他詞語組"
-                    :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
-                    @click="openMergeModalForGroup(String(row.group.headwordNormalized || ''), String(row.group.headwordDisplay || ''), row.group.entries.map(e => String(e.id || (e as any)._tempId || '')).filter(Boolean))"
-                  />
-                  <UButton
-                    :icon="expandedGroupKeys.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
-                    color="primary"
-                    variant="ghost"
-                    size="xs"
-                    :aria-label="expandedGroupKeys.has(row.group.headwordNormalized) ? '收合' : '展開'"
-                    :ui="{ base: 'hover:bg-primary-500/10 dark:hover:bg-primary-500/20' }"
-                    @click="toggleGroupExpanded(row.group.headwordNormalized)"
-                  />
-                </div>
-              </td>
-            </tr>
-            <!-- 平鋪詞條行 或 聚合視圖下展開的詞條行 -->
-            <tr
-              v-else
-              class="group hover:bg-[var(--jc-accent-soft)] dark:hover:bg-red-950/10 transition-colors"
-              :class="{ 'bg-amber-50 dark:bg-amber-900/10': row.entry._isDirty }"
-            >
-              <td
-                class="w-10 px-2 py-1 text-center border-r border-gray-200 dark:border-gray-700 text-xs text-gray-400"
-                @click.stop
-              >
-                <div class="flex items-center justify-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    class="rounded border-gray-300 cursor-pointer"
-                    :checked="isEntrySelected(row.entry)"
-                    :aria-label="`${isEntrySelected(row.entry) ? '取消選中' : '選中'}此詞條`"
-                    @click.stop="toggleSelectEntry(row.entry, $event)"
-                  />
-                  <span class="text-gray-400">{{ row.groupIndex >= 0 ? `${(pagination.page - 1) * pagination.perPage + row.groupIndex + 1}-${(row.entryIndexInGroup ?? 0) + 1}` : (pagination.page - 1) * pagination.perPage + rowIndex + 1 }}</span>
-                </div>
-              </td>
-              <EntriesEditableCell
-                v-for="(col, colIndex) in editableColumns"
-                :key="`${getEntryKey(row.entry)}-${col.key}`"
-                :col="col"
-                :can-edit="canEditEntry(row.entry)"
-                :is-editing="isEditing(getEntryKey(row.entry), col.key)"
-                v-model:edit-value="editValue"
-                :display-text="getCellDisplay(row.entry, col)"
-                :cell-class="getCellClass(row.entry, col.key).join(' ')"
-                :cell-meta="isAdvancedFilterFieldKey(col.key) ? ruleOverlays.getCellOverlayMeta(row.entry, col.key) : undefined"
-                :wrap="useWrapForField(col.key)"
-                :is-selected="isSelected(rowIndex, colIndex)"
-                :column-options="getColumnOptions(col)"
-                :review-notes="col.key === 'status' && row.entry.status === 'rejected' ? row.entry.reviewNotes : undefined"
-                :show-ai-definition="col.key === 'definition' && !!row.entry.headword?.display && !row.entry.senses?.[0]?.definition"
-                :show-ai-theme="col.key === 'theme' && !!row.entry.headword?.display && !row.entry.theme?.level3Id"
-                :show-ai-register="col.key === 'register' && !!row.entry.headword?.display && !row.entry.meta?.register"
-                :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
-                :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
-                :ai-loading-register="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'register') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
-                :show-expand="col.key === 'definition'"
-                :is-expanded="expandedEntryId === getEntryIdString(row.entry)"
-                :expand-hint="col.key === 'definition' ? getDefinitionExpandHint(row.entry) : undefined"
-                :headword-expand-hint="col.key === 'headword' ? getHeadwordExpandHint(row.entry) : undefined"
-                :phonetic-hint="col.key === 'phonetic' ? getPhoneticHint(row.entry) : undefined"
-                :theme-id="col.key === 'theme' ? row.entry.theme?.level3Id : undefined"
-                :is-theme-expanded="expandedThemeEntryId === getEntryIdString(row.entry)"
-                @click="handleCellClick(row.entry, col.key, $event, rowIndex, colIndex)"
-                @set-ref="(el: any) => setInputRef(el, getEntryIdString(row.entry), col.key)"
-                @keydown="handleKeydown($event, row.entry, col.key)"
-                @blur="handleBlur(row.entry, col.key)"
-                @ai-definition="generateAIDefinition(row.entry)"
-                @ai-theme="generateAICategorization(row.entry)"
-                @ai-register="focusedCell = { rowIndex, colIndex }; generateAIRegister(row.entry)"
-                @expand-click="toggleSensesExpand(row.entry)"
-                @theme-expand-click="toggleThemeExpand(row.entry)"
-                @accept-theme-ai="acceptThemeAI(row.entry)"
-                @dismiss-theme-ai="dismissThemeAI(row.entry)"
-              />
-              <EntryRowActions
-                :entry="row.entry"
-                :can-edit="canEditEntry(row.entry)"
-                :show-lexeme-actions="viewMode === 'lexeme' && canEditExternalEtymons"
-                :is-morpheme-refs-expanded="expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
-                :is-saving="isEntrySaving(row.entry)"
-                @save="(row.entry as any)._isNew ? saveNewEntry(row.entry) : saveEntryChanges(row.entry)"
-                @duplicate="duplicateEntry(row.entry)"
-                @delete="deleteEntry(row.entry)"
-                @cancel="cancelEdit(row.entry)"
-                @make-new-lexeme="makeEntryNewLexeme(row.entry)"
-                @join-lexeme="openMergeModalForEntry(row.entry)"
-                @toggle-morpheme-refs="toggleMorphemeRefsExpand(row.entry)"
-              />
-            </tr>
-            <!-- 行內 AI 釋義建議（Tab 落在釋義格且有待處理建議時顯示） -->
-            <AISuggestionRow
-              v-if="row.type === 'entry' && aiSuggestion && aiSuggestionForField && editingCell && editingCell.field === aiSuggestionForField && getEntryIdString(row.entry) === String(editingCell.entryId)"
-              :text="aiSuggestion"
-              :title="aiSuggestionForField === 'theme' ? 'AI 分類建議' : 'AI 釋義建議'"
-              :colspan="editableColumns.length + 2"
-              @accept="acceptAISuggestion"
-              @dismiss="dismissAISuggestion"
-            />
-            <!-- 行內 AI 分類建議 -->
-            <AISuggestionRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === themeColIndex && themeAISuggestions.get(getEntryIdString(row.entry))"
-              :text="formatThemeSuggestion(themeAISuggestions.get(getEntryIdString(row.entry)))"
-              :alternatives="getThemeAlternativesForRow(row.entry)"
-              :confidence="themeAISuggestions.get(getEntryIdString(row.entry))?.confidence"
-              title="AI 分類建議"
-              :colspan="editableColumns.length + 2"
-              @accept="acceptThemeAI(row.entry)"
-              @dismiss="dismissThemeAI(row.entry)"
-              @select-alternative="(idx: number) => acceptThemeAI(row.entry, idx)"
-            />
-            <!-- 行內 AI 語域建議 -->
-            <AISuggestionRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === registerColIndex && registerAISuggestions.get(getEntryIdString(row.entry))"
-              :text="formatRegisterSuggestion(registerAISuggestions.get(getEntryIdString(row.entry)))"
-              title="AI 語域建議"
-              :colspan="editableColumns.length + 2"
-              @accept="acceptRegisterAI(row.entry)"
-              @dismiss="dismissRegisterAI(row.entry)"
-            />
-            <!-- 泛粵典粵拼建議 -->
-            <JyutdictSuggestionRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === phoneticColIndex && getJyutdictVisible(getEntryIdString(row.entry))"
-              :colspan="editableColumns.length + 2"
-              :char-data="getJyutdictData(getEntryIdString(row.entry))"
-              :dialect-name="getDialectLabel(row.entry.dialect?.name || '') || row.entry.dialect?.name || ''"
-              :suggested-pronunciation="getJyutdictSuggested(getEntryIdString(row.entry))"
-              :is-loading="getJyutdictLoading(getEntryIdString(row.entry))"
-              @accept="(pronunciation: string) => acceptJyutdict(row.entry, pronunciation)"
-              @dismiss="dismissJyutdict(row.entry)"
-            />
-            <!-- 詞頭重複檢測 -->
-            <DuplicateCheckRow
-              v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(getEntryIdString(row.entry)) || getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry)).length > 0)"
-              :colspan="editableColumns.length + 2"
-              :entries="getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry))"
-              :is-loading="getDuplicateCheckLoading(getEntryIdString(row.entry))"
-              @dismiss="dismissDuplicateCheck(row.entry)"
-              @open-reference="referenceHeadwordVisibleEntryId = getEntryIdString(row.entry)"
-            />
-            <!-- 手動輸入另一個參考詞條
-                 - 若已有詞頭重複 / 其他方言 / Jyutjyu 提示：需點擊提示裏的小按鈕才展開
-                 - 若沒有任何提示，則自動顯示，方便直接輸入參考詞頭 -->
-            <ReferenceHeadwordRow
-              v-if="
-                row.type === 'entry' &&
-                focusedCell?.rowIndex === rowIndex &&
-                referenceHeadwordVisibleEntryId === getEntryIdString(row.entry)
-              "
-              :colspan="editableColumns.length + 2"
-              :query="getReferenceSearchQuery(getEntryIdString(row.entry))"
-              :is-loading="getReferenceSearchLoading(getEntryIdString(row.entry))"
-              @update:query="(q: string) => setReferenceSearchQuery(getEntryIdString(row.entry), q)"
-              @search="(q: string) => runReferenceSearchForEntry(row.entry, q)"
-              @dismiss="referenceHeadwordVisibleEntryId = null"
-            />
-            <!-- 其他方言點已有該詞條（若已觸發同方言詞頭重複檢測則不再顯示，避免重複提示） -->
-            <OtherDialectsRefRow
-              v-if="
-                row.type === 'entry' &&
-                focusedCell?.rowIndex === rowIndex &&
-                getOtherDialectsFormatted(getEntryIdString(row.entry)).length > 0 &&
-                getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry)).length === 0
-              "
-              :colspan="editableColumns.length + 2"
-              :entries="getOtherDialectsFormatted(getEntryIdString(row.entry))"
-              @dismiss="dismissDuplicateCheck(row.entry)"
-              @apply-template="applyOtherDialectTemplate(row.entry, $event)"
-              @open-reference="referenceHeadwordVisibleEntryId = getEntryIdString(row.entry)"
-            />
-            <!-- Jyutjyu 參考（新建詞條：填寫詞頭後自動查詢） -->
-            <JyutjyuRefRow
-              v-if="
-                row.type === 'entry' &&
-                focusedCell?.rowIndex === rowIndex &&
-                getJyutjyuRowVisible(getEntryIdString(row.entry))
-              "
-              :colspan="editableColumns.length + 2"
-              :query="getJyutjyuQuery(getEntryIdString(row.entry))"
-              :results="formatJyutjyuResults(jyutjyuRefResult.get(getEntryIdString(row.entry))?.results || [])"
-              :raw-results="jyutjyuRefResult.get(getEntryIdString(row.entry))?.results || []"
-              :total="getJyutjyuTotal(getEntryIdString(row.entry))"
-              :is-loading="getJyutjyuLoading(getEntryIdString(row.entry))"
-              :error-message="getJyutjyuError(getEntryIdString(row.entry))"
-              @dismiss="dismissJyutjyuRef(row.entry)"
-              @apply-template="applyJyutjyuTemplate(row.entry, $event)"
-              @open-reference="referenceHeadwordVisibleEntryId = getEntryIdString(row.entry)"
-            />
-            <!-- 行內釋義建議錯誤 + 重試 -->
-            <tr
-              v-if="row.type === 'entry' && aiInlineError && getEntryIdString(row.entry) === aiInlineError.entryId && aiInlineError.field === 'definition'"
-              class="bg-red-50/80 dark:bg-red-900/20 border-b border-gray-200 dark:border-gray-700"
-              role="alert"
-            >
-              <td :colspan="editableColumns.length + 2" class="px-3 py-2 align-top">
-                <div class="flex items-center justify-between gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-800 p-2 text-sm">
-                  <span class="text-red-700 dark:text-red-300">{{ aiInlineError.message }}</span>
-                  <div class="flex gap-2 flex-shrink-0">
-                    <UButton size="xs" color="neutral" variant="ghost" @click="aiInlineError = null">
-                      關閉
-                    </UButton>
-                    <UButton size="xs" color="primary" @click="retryInlineAISuggestion(row.entry)">
-                      重試
-                    </UButton>
-                  </div>
-                </div>
-              </td>
-            </tr>
-            <!-- 釋義詳情展開區 -->
-            <tr
-              v-if="row.type === 'entry' && expandedEntryId === getEntryIdString(row.entry)"
-              class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
-            >
-              <td :colspan="editableColumns.length + 2" class="p-0 align-top">
-                <EntrySensesExpand
-                  :entry="row.entry"
-                  :ai-suggestion="definitionAISuggestions.get(getEntryIdString(row.entry))"
-                  :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition'"
-                  :ai-loading-examples="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'examples'"
-                  @close="toggleSensesExpand(row.entry)"
-                  @ai-definition="generateAIDefinition(row.entry)"
-                  @accept-definition-ai="acceptDefinitionAI(row.entry)"
-                  @dismiss-definition-ai="dismissDefinitionAI(row.entry)"
-                  @ai-examples="generateAIExamples(row.entry)"
-                  @add-sense="addSense(row.entry)"
-                  @remove-sense="(senseIdx: number) => removeSense(row.entry, senseIdx)"
-                  @add-example="(senseIdx: number) => addExample(row.entry, senseIdx)"
-                  @remove-example="(p: { senseIdx: number; exIdx: number }) => removeExample(row.entry, p.senseIdx, p.exIdx)"
-                  @add-sub-sense="(senseIdx: number) => addSubSense(row.entry, senseIdx)"
-                  @remove-sub-sense="(p: { senseIdx: number; subIdx: number }) => removeSubSense(row.entry, p.senseIdx, p.subIdx)"
-                  @add-sub-sense-example="(p: { senseIdx: number; subIdx: number }) => addSubSenseExample(row.entry, p.senseIdx, p.subIdx)"
-                  @remove-sub-sense-example="(p: { senseIdx: number; subIdx: number; exIdx: number }) => removeSubSenseExample(row.entry, p.senseIdx, p.subIdx, p.exIdx)"
-                />
-              </td>
-            </tr>
-            <!-- 詞素引用展開區 -->
-            <tr
-              v-if="row.type === 'entry' && expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
-              class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
-            >
-              <td :colspan="editableColumns.length + 2" class="p-0 align-top">
-                <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                  <div class="flex items-center justify-between mb-3">
-                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">詞素／單音節來源</h4>
-                    <UButton
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      icon="i-heroicons-chevron-up"
-                      @click="toggleMorphemeRefsExpand(row.entry)"
-                    >
-                      收起
-                    </UButton>
-                  </div>
-                  <div class="space-y-2">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <template v-for="(ref, refIdx) in (row.entry.morphemeRefs || [])" :key="refIdx">
-                        <div
-                          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
-                          :title="ref.note ? `備註：${ref.note}` : (ref.targetEntryId ? `ID: ${ref.targetEntryId}` : undefined)"
-                        >
-                          <span v-if="ref.char" class="font-medium text-gray-900 dark:text-white">{{ ref.char }}</span>
-                          <span v-if="ref.jyutping" class="text-gray-500 dark:text-gray-400">{{ ref.jyutping }}</span>
-                          <span v-if="ref.position !== undefined" class="text-xs text-gray-400 dark:text-gray-500">第{{ (ref.position ?? 0) + 1 }}字</span>
-                          <span v-if="!ref.targetEntryId" class="text-xs text-amber-600 dark:text-amber-400" title="數據庫暫無對應詞條">(未連結)</span>
-                          <UButton
-                            color="error"
-                            variant="ghost"
-                            size="xs"
-                            icon="i-heroicons-trash"
-                            title="刪除此引用"
-                            class="p-0.5 min-w-0"
-                            @click="removeMorphemeRef(row.entry, refIdx)"
-                          />
-                        </div>
-                      </template>
-                      <span v-if="!row.entry.morphemeRefs || row.entry.morphemeRefs.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
-                        暫無詞素引用
-                      </span>
-                    </div>
-                    <div class="pt-1 border-t border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
-                      <UButton
-                        color="primary"
-                        variant="soft"
-                        size="sm"
-                        icon="i-heroicons-plus"
-                        @click="openMorphemeSearch(row.entry)"
-                      >
-                        從數據庫選擇詞素
-                      </UButton>
-                      <UButton
-                        color="neutral"
-                        variant="soft"
-                        size="sm"
-                        icon="i-heroicons-pencil-square"
-                        @click="openUnlinkedMorphemeForm(row.entry)"
-                      >
-                        添加未連結詞素
-                      </UButton>
-                    </div>
-                    <!-- 未連結詞素：自動依詞頭與粵拼帶入，確認或改備註後添加 -->
-                    <div
-                      v-if="unlinkedMorphemeEntryId === getEntryIdString(row.entry)"
-                      class="mt-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 space-y-2"
-                    >
-                      <p class="text-xs text-amber-800 dark:text-amber-200">以下為詞頭各字自動帶入的未連結詞素，可補備註後確認添加。</p>
-                      <div v-if="unlinkedMorphemeCandidates.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
-                        詞頭各字均已有關聯或未連結詞素。
-                      </div>
-                      <template v-else>
-                        <div class="flex flex-wrap gap-2">
-                          <div
-                            v-for="(cand, idx) in unlinkedMorphemeCandidates"
-                            :key="idx"
-                            class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900"
-                          >
-                            <span class="text-sm text-gray-500 dark:text-gray-400">第{{ cand.position + 1 }}字</span>
-                            <span class="font-medium text-gray-900 dark:text-white">{{ cand.char }}</span>
-                            <span v-if="cand.jyutping" class="text-sm text-gray-500 dark:text-gray-400">{{ cand.jyutping }}</span>
-                            <input
-                              v-model="cand.note"
-                              type="text"
-                              placeholder="備註（可選）"
-                              class="w-20 px-1.5 py-0.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-                            />
-                          </div>
-                        </div>
-                        <div class="flex gap-2 pt-1">
-                          <UButton size="sm" color="primary" @click="confirmUnlinkedMorphemeRefs(row.entry)">
-                            確認添加
-                          </UButton>
-                          <UButton size="sm" color="neutral" variant="ghost" @click="closeUnlinkedMorphemeForm">
-                            取消
-                          </UButton>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-            <!-- 詞頭詳情展開區 -->
-            <!-- 詞頭詳情展開區（已由詞頭欄位直接展示「主詞形 [異形]」格式取代，暫不再使用） -->
-            <!-- 主題分類展開區 -->
-            <tr
-              v-if="row.type === 'entry' && expandedThemeEntryId === getEntryIdString(row.entry)"
-              class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700"
-            >
-              <td :colspan="editableColumns.length + 2" class="p-0 align-top">
-                <EntryThemeExpand
-                  :entry="row.entry"
-                  :ai-suggestion="themeAISuggestions.get(getEntryIdString(row.entry))"
-                  :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme'"
-                  @close="toggleThemeExpand(row.entry)"
-                  @update:theme="onThemeUpdate(row.entry, $event)"
-                  @dismiss-ai="dismissThemeAI(row.entry)"
-                  @accept-ai="(suggestion: any) => onThemeExpandAcceptAI(row.entry, suggestion)"
-                  @ai-categorize="generateAICategorization(row.entry)"
-                />
-              </td>
-            </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      <div v-if="!hasActiveAdvancedFilters" class="flex-shrink-0 px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4 bg-gray-50 dark:bg-gray-900/50">
-        <div class="text-sm text-gray-500 dark:text-gray-400">
-          {{ (pagination.page - 1) * pagination.perPage + 1 }}-{{ Math.min(pagination.page * pagination.perPage, pagination.total) }} / {{ pagination.total }}
-        </div>
-        <div class="flex items-center gap-3">
-          <UPagination
-            v-model:page="currentPage"
-            :total="pagination.total"
-            :items-per-page="pagination.perPage"
-            size="sm"
-          />
-          <div class="flex items-center gap-2 border-l border-gray-200 dark:border-gray-600 pl-3">
-            <span class="text-sm text-gray-500 dark:text-gray-400">跳至</span>
-            <UInput
-              v-model="jumpToPageInput"
-              type="number"
-              size="sm"
-              class="w-16"
-              :min="1"
-              :max="pagination.totalPages || 1"
-              @keyup.enter="handleJumpToPage"
-            />
-            <span class="text-sm text-gray-500 dark:text-gray-400">頁</span>
-            <UButton
-              size="sm"
-              color="neutral"
-              variant="soft"
-              @click="handleJumpToPage"
-            >
-              跳轉
-            </UButton>
-          </div>
-        </div>
-      </div>
+    <EntriesDesktopTable
+      v-if="!isMobile"
+      ref="desktopTableRef"
+      :table-rows="tableRows"
+      :editable-columns="editableColumns"
+      :column-widths="columnWidths"
+      :view-mode="viewMode"
+      :pagination="pagination"
+      :expanded-group-keys="expandedGroupKeys"
+      :editing-cell="editingCell"
+      :edit-value="editValue"
+      :focused-cell="focusedCell"
+      :expanded-entry-id="expandedEntryId"
+      :expanded-morpheme-refs-entry-id="expandedMorphemeRefsEntryId"
+      :expanded-theme-entry-id="expandedThemeEntryId"
+      :get-cell-display="getCellDisplay"
+      :get-cell-class="getCellClass"
+      :get-column-options="getColumnOptions"
+      :selected-count="selectedCount"
+      :selected-saved-entries="selectedSavedEntries"
+      :select-all-checked="selectAllChecked"
+      :is-entry-selected="isEntrySelected"
+      :batch-deleting="batchDeleting"
+      :get-cell-overlay-meta="(e: any, f: string) => ruleOverlays.getCellOverlayMeta(e, f)"
+      :is-advanced-filter-field-key="isAdvancedFilterFieldKey"
+      :has-active-advanced-filters="hasActiveAdvancedFilters"
+      :ai-suggestion="aiSuggestion"
+      :ai-suggestion-for-field="aiSuggestionForField"
+      :ai-loading-for="aiLoadingFor"
+      :ai-loading-inline-for="aiLoadingInlineFor"
+      :ai-inline-error="aiInlineError"
+      :theme-ai-suggestions="themeAISuggestions"
+      :definition-ai-suggestions="definitionAISuggestions"
+      :register-ai-suggestions="registerAISuggestions"
+      :format-theme-suggestion="formatThemeSuggestion"
+      :format-register-suggestion="formatRegisterSuggestion"
+      :get-jyutdict-data="getJyutdictData"
+      :get-jyutdict-loading="getJyutdictLoading"
+      :get-jyutdict-suggested="getJyutdictSuggested"
+      :get-jyutdict-visible="getJyutdictVisible"
+      :get-duplicate-check-loading="getDuplicateCheckLoading"
+      :get-duplicate-check-entries-formatted="getDuplicateCheckEntriesFormatted"
+      :get-other-dialects-formatted="getOtherDialectsFormatted"
+      :get-jyutjyu-row-visible="getJyutjyuRowVisible"
+      :get-jyutjyu-query="getJyutjyuQuery"
+      :get-jyutjyu-total="getJyutjyuTotal"
+      :get-jyutjyu-loading="getJyutjyuLoading"
+      :get-jyutjyu-error="getJyutjyuError"
+      :jyutjyu-ref-result="jyutjyuRefResult"
+      :format-jyutjyu-results="formatJyutjyuResults"
+      :get-reference-search-loading="getReferenceSearchLoading"
+      :get-reference-search-query="getReferenceSearchQuery"
+      :reference-headword-visible-entry-id="referenceHeadwordVisibleEntryId"
+      :column-indices="{ themeColIndex: themeColIndex, phoneticColIndex: phoneticColIndex, headwordColIndex: headwordColIndex, registerColIndex: registerColIndex }"
+      :is-entry-saving="isEntrySaving"
+      :can-edit-entry="canEditEntry"
+      :can-edit-external-etymons="canEditExternalEtymons"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
+      :unlinked-morpheme-entry-id="unlinkedMorphemeEntryId"
+      :unlinked-morpheme-candidates="unlinkedMorphemeCandidates"
+      v-model:edit-value="editValue"
+      @update:currentPage="(p: number) => { currentPage = p }"
+      @cell-click="(entry: any, field: string, event: any, rowIndex?: number, colIndex?: number, forceEdit?: boolean) => handleCellClick(entry, field, event, rowIndex, colIndex, forceEdit)"
+      @set-input-ref="(el: any, entryId: string, field: string) => setInputRef(el, entryId, field)"
+      @cell-keydown="(event: KeyboardEvent, entry: any, field: string) => handleKeydown(event, entry, field)"
+      @cell-blur="(entry: any, field: string) => handleBlur(entry, field)"
+      @expand-click="(entry: any) => toggleSensesExpand(entry)"
+      @theme-expand-click="(entry: any) => toggleThemeExpand(entry)"
+      @accept-theme-ai="(entry: any) => acceptThemeAI(entry)"
+      @dismiss-theme-ai="(entry: any) => dismissThemeAI(entry)"
+      @save-row="(entry: any) => (entry as any)._isNew ? saveNewEntry(entry) : saveEntryChanges(entry)"
+      @duplicate="(entry: any) => duplicateEntry(entry)"
+      @delete="(entry: any) => deleteEntry(entry)"
+      @cancel="(entry: any) => cancelEdit(entry)"
+      @make-new-lexeme="(entry: any) => makeEntryNewLexeme(entry)"
+      @join-lexeme="(entry: any) => openMergeModalForEntry(entry)"
+      @toggle-morpheme-refs="(entry: any) => toggleMorphemeRefsExpand(entry)"
+      @sort="(key: string) => handleSort(key)"
+      @start-resize="(event: MouseEvent, key: string, width: number) => startResize(event, key, width)"
+      @toggle-select-entry="(entry: any, event?: MouseEvent) => toggleSelectEntry(entry, event)"
+      @toggle-select-all="toggleSelectAll"
+      @clear-selection="clearSelection"
+      @batch-delete="batchDeleteSelected"
+      @jump-to-page="(page: number) => { currentPage = page }"
+      @table-keydown="(event: KeyboardEvent) => handleTableKeydown(event)"
+      @ai-definition="(entry: any) => generateAIDefinition(entry)"
+      @ai-theme="(entry: any) => generateAICategorization(entry)"
+      @ai-register="(entry: any, rowIndex: number, colIndex: number) => { focusedCell = { rowIndex, colIndex }; generateAIRegister(entry) }"
+      @accept-suggestion="acceptAISuggestion"
+      @dismiss-suggestion="dismissAISuggestion"
+      @accept-theme-ai-row="(entry: any) => acceptThemeAI(entry)"
+      @dismiss-theme-ai-row="(entry: any) => dismissThemeAI(entry)"
+      @select-theme-alternative="(entry: any, idx: number) => acceptThemeAI(entry, idx)"
+      @accept-register-ai="(entry: any) => acceptRegisterAI(entry)"
+      @dismiss-register-ai="(entry: any) => dismissRegisterAI(entry)"
+      @accept-jyutdict="(entry: any, pronunciation: string) => acceptJyutdict(entry, pronunciation)"
+      @dismiss-jyutdict="(entry: any) => dismissJyutdict(entry)"
+      @dismiss-duplicate-check="(entry: any) => dismissDuplicateCheck(entry)"
+      @open-reference="(entryId: string) => referenceHeadwordVisibleEntryId = entryId"
+      @update-reference-query="(entryId: string, q: string) => setReferenceSearchQuery(entryId, q)"
+      @run-reference-search="(entry: any, q: string) => runReferenceSearchForEntry(entry, q)"
+      @close-reference="referenceHeadwordVisibleEntryId = null"
+      @apply-other-dialect-template="(entry: any, sourceId: string) => applyOtherDialectTemplate(entry, sourceId)"
+      @dismiss-jyutjyu-ref="(entry: any) => dismissJyutjyuRef(entry)"
+      @apply-jyutjyu-template="(entry: any, sourceId: string) => applyJyutjyuTemplate(entry, sourceId)"
+      @retry-inline-ai="(entry: any) => retryInlineAISuggestion(entry)"
+      @clear-inline-error="aiInlineError = null"
+      @close-senses="(entry: any) => toggleSensesExpand(entry)"
+      @ai-definition-expand="(entry: any) => generateAIDefinition(entry)"
+      @accept-definition-ai="(entry: any) => acceptDefinitionAI(entry)"
+      @dismiss-definition-ai="(entry: any) => dismissDefinitionAI(entry)"
+      @ai-examples="(entry: any) => generateAIExamples(entry)"
+      @add-sense="(entry: any) => addSense(entry)"
+      @remove-sense="(entry: any, senseIdx: number) => removeSense(entry, senseIdx)"
+      @add-example="(entry: any, senseIdx: number) => addExample(entry, senseIdx)"
+      @remove-example="(entry: any, senseIdx: number, exIdx: number) => removeExample(entry, senseIdx, exIdx)"
+      @add-sub-sense="(entry: any, senseIdx: number) => addSubSense(entry, senseIdx)"
+      @remove-sub-sense="(entry: any, senseIdx: number, subIdx: number) => removeSubSense(entry, senseIdx, subIdx)"
+      @add-sub-sense-example="(entry: any, senseIdx: number, subIdx: number) => addSubSenseExample(entry, senseIdx, subIdx)"
+      @remove-sub-sense-example="(entry: any, senseIdx: number, subIdx: number, exIdx: number) => removeSubSenseExample(entry, senseIdx, subIdx, exIdx)"
+      @close-theme-expand="(entry: any) => toggleThemeExpand(entry)"
+      @update:theme="(entry: any, theme: any) => onThemeUpdate(entry, theme)"
+      @dismiss-theme-ai-expand="(entry: any) => dismissThemeAI(entry)"
+      @accept-theme-ai-expand="(entry: any, suggestion: any) => onThemeExpandAcceptAI(entry, suggestion)"
+      @ai-categorize="(entry: any) => generateAICategorization(entry)"
+      @open-morpheme-search="(entry: any) => openMorphemeSearch(entry)"
+      @open-unlinked-morpheme-form="(entry: any) => openUnlinkedMorphemeForm(entry)"
+      @remove-morpheme-ref="(entry: any, refIdx: number) => removeMorphemeRef(entry, refIdx)"
+      @confirm-unlinked-morpheme="(entry: any) => confirmUnlinkedMorphemeRefs(entry)"
+      @close-unlinked-morpheme-form="closeUnlinkedMorphemeForm"
+      @toggle-group-expanded="(key: string) => toggleGroupExpanded(key)"
+      @open-external-etymons="(groupKey: string, groupLabel: string, entries: any[]) => openExternalEtymonsForGroup(groupKey, groupLabel, entries)"
+      @open-merge-modal-for-group="(groupKey: string, groupLabel: string, entryIds: string[]) => openMergeModalForGroup(groupKey, groupLabel, entryIds)"
+    />
+    <!-- Mobile workbench -->
+    <EntriesMobileWorkbench
+      v-else
+      :filtered-entries="filteredEntries"
+      :table-rows="tableRows"
+      :view-mode="viewMode"
+      :pagination="pagination"
+      :current-page="currentPage"
+      :loading="loading"
+      :is-empty="isEmpty"
+      :search-query="searchQuery"
+      :has-unsaved-changes="hasUnsavedChanges"
+      :saving="savingAll"
+      :is-authenticated="isAuthenticated"
+      :get-cell-display="getCellDisplay"
+      :get-cell-class="getCellClass"
+      :dialect-options="userDialectOptions"
+      :filter-dialect-options="dialectOptions"
+      :status-options="statusOptionsForTable"
+      :can-change-status="isReviewerOrAdmin"
+      :is-entry-saving="isEntrySaving"
+      :filter-dialect="filters.dialect"
+      :filter-status="filters.status"
+      :filter-theme="filters.theme"
+      :theme-filter-options="themeFilterOptions"
+      :status-filter-options="statusOptions"
+      :saved-views="savedViews.views.value"
+      :selected-view-id="selectedViewId"
+      :expanded-group-keys="expandedGroupKeys"
+      @search="handleSearch"
+      @add-new="addNewRow"
+      @save-all="saveAllChanges"
+      @row-click="(entry: any) => {}"
+      @update:currentPage="(p: number) => { currentPage = p }"
+      @update:viewMode="(v: string) => setViewMode(v)"
+      @update:filterDialect="(v: string) => { filterDialect = v }"
+      @update:filterStatus="(v: string) => { filterStatus = v }"
+      @update:filterTheme="(v: string) => { filterTheme = v }"
+      @save-entry="(entry: any) => (entry as any)._isNew ? saveNewEntry(entry) : saveEntryChanges(entry)"
+      @cancel-entry="(entry: any) => cancelEdit(entry)"
+      @duplicate-entry="(entry: any) => duplicateEntry(entry)"
+      @delete-entry="(entry: any) => deleteEntry(entry)"
+      @apply-saved-view="(view: any) => applySavedView(view)"
+      @toggle-group-expanded="(key: string) => toggleGroupExpanded(key)"
+    />
     </div>
-  </div>
 
   <EntriesSaveViewModal
     v-model:open="saveViewModalOpen"
@@ -933,10 +550,12 @@
       </UCard>
     </template>
   </UModal>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { useAuth, useProfileUpdatedUser } from '~/composables/useAuth'
+import { useMobileBreakpoint } from '~/composables/useMobileBreakpoint'
 import { useSearchFilters } from '~/composables/useSearchFilters'
 import { getThemeById, getThemeNameById, getFlatThemeList } from '~/composables/useThemeData'
 import { dialectOptionsWithAll, DIALECT_OPTIONS_FOR_SELECT, getDialectLabel, getDialectLabelByRegionCode } from '~/utils/dialects'
@@ -961,18 +580,10 @@ import type { DialectId } from '~shared/dialects'
 import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
 import type { Entry, Register } from '~/types'
 import type { AdvancedFilterFieldKey } from '~/utils/entriesAdvancedFilter'
-import AISuggestionRow from '~/components/entries/AISuggestionRow.vue'
-import JyutdictSuggestionRow from '~/components/entries/JyutdictSuggestionRow.vue'
-import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
-import EntryThemeExpand from '~/components/entries/EntryThemeExpand.vue'
-import EntryRowActions from '~/components/entries/EntryRowActions.vue'
-import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
-import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
-import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
-import JyutjyuRefRow from '~/components/entries/JyutjyuRefRow.vue'
+import EntriesDesktopTable from '~/components/entries/EntriesDesktopTable.vue'
+import EntriesMobileWorkbench from '~/components/entries/mobile/EntriesMobileWorkbench.vue'
 import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymonsModal.vue'
 import LexemeMergeModal from '~/components/entries/LexemeMergeModal.vue'
-import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 import EntriesAdvancedFilterPanel from '~/components/entries/EntriesAdvancedFilterPanel.vue'
 import EntriesRuleOverlayPanel from '~/components/entries/EntriesRuleOverlayPanel.vue'
 import EntriesViewsDropdown from '~/components/entries/EntriesViewsDropdown.vue'
@@ -1179,9 +790,8 @@ function isAdvancedFilterFieldKey(field: string): field is AdvancedFilterFieldKe
 }
 
 // State
-// Mobile warning
-const isMobile = ref(false)
-const mobileWarningDismissed = ref(false)
+// Mobile detection via matchMedia (responsive, updates on orientation change)
+const { isMobile } = useMobileBreakpoint()
 
 /** 詞條 baseline（用於「取消編輯」回滾，避免刷新整個頁面誤傷其他未保存內容）。key: entry.id */
 const entryBaselineById = ref<Map<string, any>>(new Map())
@@ -2522,7 +2132,10 @@ function addNewRow() {
   entries.value.unshift(newEntry)
   autoExpandGroupForEntry(newEntry)
 
-  // 直接進入詞頭編輯（forceEdit: true），否則只會選中格、焦點仍在按鈕上，用戶按 Enter 會再次觸發「新建詞條」
+  // 手機端：不自動進入單元格編輯，由 EntriesMobileWorkbench 開啟單行編輯頁
+  if (isMobile.value) return
+
+  // 桌面端：直接進入詞頭編輯（forceEdit: true）
   nextTick(() => {
     handleCellClick(newEntry, 'headword', new MouseEvent('click'), 0, 0, true)
   })
@@ -3046,9 +2659,6 @@ onMounted(async () => {
   if (route.query.google_merged === '1') {
     toast.add({ title: '已連結 Google 帳號', description: '之後可以使用 Google 或密碼登錄', color: 'success', icon: 'i-heroicons-check-circle' })
   }
-
-  // Check if mobile device
-  isMobile.value = window.innerWidth < 768
 
   // Apply URL parameters (search, filter=mine)
   await applySharedViewQuery()
