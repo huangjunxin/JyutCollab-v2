@@ -100,7 +100,7 @@
               <!-- Notification Dropdown -->
               <div
                 v-show="notificationOpen"
-                class="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] max-h-96 overflow-y-auto border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] z-50"
+                class="fixed left-4 right-4 top-[3.75rem] max-h-[calc(100vh-5rem)] overflow-y-auto border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] z-50 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1 sm:w-80 sm:max-w-[calc(100vw-2rem)] sm:max-h-96"
               >
                 <div class="sticky top-0 flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
                   <span class="font-semibold text-gray-900 dark:text-white">通知</span>
