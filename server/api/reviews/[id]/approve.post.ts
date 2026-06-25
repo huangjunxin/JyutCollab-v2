@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { createApprovedNotification, getEntryNotificationRecipients } from '../../../utils/Notification'
 
 const ApproveSchema = z.object({
   notes: z.string().optional()
@@ -96,6 +97,19 @@ export default defineEventHandler(async (event) => {
       action: 'status_change',
       comment: '審核通過'
     })
+
+    // 發送審核通過通知給詞條相關用戶（createdBy/updatedBy 去重，排除審核者本人）
+    const recipients = getEntryNotificationRecipients(updatedEntry.toObject(), user.id)
+    await Promise.allSettled(
+      recipients.map(userId =>
+        createApprovedNotification(
+          userId,
+          updatedEntry.id,
+          updatedEntry.headword?.display || '',
+          updatedEntry.dialect?.name || ''
+        )
+      )
+    )
 
     return {
       success: true,

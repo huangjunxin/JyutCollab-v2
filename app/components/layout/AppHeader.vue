@@ -152,15 +152,6 @@
                     </div>
                   </NuxtLink>
                 </div>
-
-                <NuxtLink
-                  v-if="notifications.length > 0"
-                  to="/notifications"
-                  class="block p-2 text-center text-sm text-primary hover:bg-gray-50 dark:hover:bg-gray-800 border-t border-gray-100 dark:border-gray-800"
-                  @click="notificationOpen = false"
-                >
-                  查看全部通知
-                </NuxtLink>
               </div>
             </div>
           </template>
@@ -373,11 +364,27 @@ const {
   getNotificationColor: getColor
 } = useNotifications()
 
-// Fetch notifications on mount
+// 輪詢計時器與 visibilitychange 監聽器
+let pollInterval: ReturnType<typeof setInterval> | null = null
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && isAuthenticated.value) {
+    fetchNotifications()
+  }
+}
+
+// Fetch notifications on mount + start polling + visibility listener
 onMounted(() => {
   if (isAuthenticated.value) {
     fetchNotifications()
+    // 每 60 秒輪詢一次
+    pollInterval = setInterval(() => {
+      if (isAuthenticated.value) {
+        fetchNotifications()
+      }
+    }, 60_000)
   }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // Helper functions
@@ -425,6 +432,8 @@ function onNotificationClickOutside(event: MouseEvent) {
 
 watch(notificationOpen, (open) => {
   if (open) {
+    // 打開下拉時立即刷新通知
+    fetchNotifications(1, 20)
     nextTick(() => {
       document.addEventListener('click', onNotificationClickOutside)
     })
@@ -455,6 +464,12 @@ watch(userMenuOpen, (open) => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onClickOutside)
+  document.removeEventListener('click', onNotificationClickOutside)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
 })
 
 async function handleLogoutClick() {

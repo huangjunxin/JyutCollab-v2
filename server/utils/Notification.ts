@@ -96,7 +96,7 @@ export async function createApprovedNotification(
     type: 'review_approved',
     title: '詞條已通過審核',
     message: `您的詞條「${headword}」已通過審核並發佈`,
-    actionUrl: `/entries?id=${entryId}`,
+    actionUrl: `/entries?search=${entryId}`,
     isRead: false,
     metadata: { entryId, headword, dialect }
   })
@@ -118,7 +118,7 @@ export async function createRejectedNotification(
     type: 'review_rejected',
     title: '詞條被拒絕',
     message: `您的詞條「${headword}」被拒絕${reviewNotes ? `：${reviewNotes}` : ''}`,
-    actionUrl: `/entries?id=${entryId}`,
+    actionUrl: `/entries?search=${entryId}`,
     isRead: false,
     metadata: { entryId, headword, dialect, reviewNotes, reviewedBy }
   })
@@ -137,7 +137,7 @@ export async function createDraftReminderNotification(
     type: 'draft_reminder',
     title: '草稿提醒',
     message: `您有未完成的詞條草稿「${headword || '未命名'}」`,
-    actionUrl: `/entries?id=${entryId}`,
+    actionUrl: `/entries?search=${entryId}`,
     isRead: false,
     metadata: { entryId, headword }
   })
@@ -160,4 +160,43 @@ export async function createSystemNotification(
     actionUrl,
     isRead: false
   })
+}
+
+/**
+ * 安全建立通知：失敗時記錄錯誤但不拋出異常，避免影響審核主流程
+ */
+export async function createNotificationSafely(payload: {
+  userId: string
+  type: NotificationType
+  title: string
+  message: string
+  actionUrl?: string
+  metadata?: {
+    entryId?: string
+    headword?: string
+    dialect?: string
+    reviewNotes?: string
+    reviewedBy?: string
+  }
+}) {
+  try {
+    return await Notification.create({
+      ...payload,
+      isRead: false
+    })
+  } catch (error) {
+    console.error('[Notification] 建立通知失敗:', error)
+    return null
+  }
+}
+
+/**
+ * 取得詞條的通知接收者：createdBy 與 updatedBy 去重，並排除本次操作者
+ */
+export function getEntryNotificationRecipients(
+  entry: { createdBy?: string; updatedBy?: string },
+  actorUserId: string
+): string[] {
+  return [...new Set([entry.createdBy, entry.updatedBy].filter(Boolean))]
+    .filter((userId): userId is string => !!userId && userId !== actorUserId)
 }

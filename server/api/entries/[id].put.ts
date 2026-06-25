@@ -4,6 +4,7 @@ import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
 import { AISuggestion } from '../../utils/AISuggestion'
+import { createApprovedNotification, createRejectedNotification, getEntryNotificationRecipients } from '../../utils/Notification'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -373,6 +374,38 @@ export default defineEventHandler(async (event) => {
         changedFields,
         action: 'update'
       })
+    }
+
+    // 狀態旁路通知：審核員/管理員直接在 PUT 中改狀態時，也要發通知
+    if (changedFields.includes('status') && (data.status === 'approved' || data.status === 'rejected') && isReviewerOrAdmin) {
+      const entryObj = existingEntry.toObject()
+      const recipients = getEntryNotificationRecipients(entryObj, userId)
+      if (data.status === 'approved') {
+        await Promise.allSettled(
+          recipients.map(uid =>
+            createApprovedNotification(
+              uid,
+              existingEntry.id,
+              existingEntry.headword?.display || '',
+              existingEntry.dialect?.name || ''
+            )
+          )
+        )
+      } else {
+        // rejected
+        await Promise.allSettled(
+          recipients.map(uid =>
+            createRejectedNotification(
+              uid,
+              existingEntry.id,
+              existingEntry.headword?.display || '',
+              existingEntry.dialect?.name || '',
+              existingEntry.reviewNotes || '',
+              userId
+            )
+          )
+        )
+      }
     }
 
     // 詞素詞頭同步：當本詞條的 headword.display 變更時，同步更新所有引用本詞條的多音節詞的對應選字與詞頭
