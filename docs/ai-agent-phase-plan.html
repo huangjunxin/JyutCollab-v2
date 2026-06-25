@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JyutCollab-v2 AI Agent Phase Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f3eb;
+      --paper: #fffdf8;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #e5dccb;
+      --accent: #8a5a2b;
+      --accent-2: #0f766e;
+      --danger: #b42318;
+      --warn: #b54708;
+      --safe: #067647;
+      --code: #1e293b;
+      --code-bg: #f1efe7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #fff8e7 0, var(--bg) 36rem);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(1160px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 40px 0 80px;
+    }
+
+    header.hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #fffdf8, #f9eedb);
+      border-radius: 28px;
+      padding: 36px;
+      box-shadow: 0 20px 60px rgba(88, 64, 40, 0.08);
+    }
+
+    h1, h2, h3, h4 { line-height: 1.25; }
+    h1 { margin: 0 0 12px; font-size: clamp(2.1rem, 4vw, 4rem); letter-spacing: -0.04em; }
+    h2 { margin-top: 48px; padding-top: 12px; font-size: 2rem; letter-spacing: -0.025em; border-top: 2px solid var(--line); }
+    h3 { margin-top: 32px; font-size: 1.35rem; }
+    h4 { margin-bottom: 8px; color: var(--accent); }
+
+    .subtitle { max-width: 820px; color: var(--muted); font-size: 1.1rem; }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.65);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    section {
+      margin-top: 28px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--paper);
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(88, 64, 40, 0.05);
+    }
+
+    .grid { display: grid; gap: 18px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    @media (max-width: 860px) {
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      header.hero, section { padding: 22px; }
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fffaf0;
+      padding: 18px;
+    }
+
+    .card h3, .card h4 { margin-top: 0; }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      border-radius: 6px;
+      padding: 2px 5px;
+      background: var(--code-bg);
+      color: var(--code);
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      border: 1px solid #d8d0c1;
+      border-radius: 16px;
+      padding: 16px;
+      background: #172033;
+      color: #eef2ff;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #f4ead9; color: #4a321e; }
+    tr:last-child td { border-bottom: 0; }
+
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: 0.35rem; }
+
+    .risk-safe { color: var(--safe); font-weight: 700; }
+    .risk-warn { color: var(--warn); font-weight: 700; }
+    .risk-danger { color: var(--danger); font-weight: 700; }
+
+    .phase {
+      margin-top: 24px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .phase-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      padding: 22px 24px;
+      background: #efe1c8;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .phase-header h3 { margin: 0; }
+    .phase-body { padding: 22px 24px; }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 10px;
+      background: #fff7e8;
+      border: 1px solid var(--line);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent-2);
+      background: #ecfdf7;
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: #134e48;
+    }
+
+    .warning {
+      border-left-color: var(--warn);
+      background: #fff7ed;
+      color: #7c2d12;
+    }
+
+    .toc a { color: var(--accent); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <h1>JyutCollab-v2 AI Agent Phase Plan</h1>
+      <p class="subtitle">
+        A concrete implementation plan for making AI assistance a reusable JyutCollab capability across Web sidebar, Telegram, Feishu, QQ, and MCP adapters while keeping permissions, confirmations, chat history, and audit behavior centralized. Current Web implementation has shipped the first Agent Core MVP; the next priority is durable conversation management so users can open new chats, review their own historical chats, and support AI audit trails.
+      </p>
+      <div class="meta">
+        <span class="pill">Project: <strong>JyutCollab-v2</strong></span>
+        <span class="pill">Stack: <strong>Nuxt 4 · Vue 3 · Nuxt UI · Nitro · Zod</strong></span>
+        <span class="pill">Primary UI: <strong>Web Sidebar</strong></span>
+        <span class="pill">Future Channels: <strong>Telegram · Feishu · QQ · MCP</strong></span>
+      </div>
+    </header>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#progress-update">Current Progress and Next Priority</a></li>
+        <li><a href="#principles">Architecture Principles</a></li>
+        <li><a href="#target-architecture">Target Architecture</a></li>
+        <li><a href="#directories">Files and Directory Plan</a></li>
+        <li><a href="#contracts">Core Contracts</a></li>
+        <li><a href="#phases">Executable Phases</a></li>
+        <li><a href="#testing">Testing Strategy</a></li>
+        <li><a href="#acceptance">Global Acceptance Criteria</a></li>
+        <li><a href="#risks">Risks and Guardrails</a></li>
+      </ol>
+    </section>
+
+    <section id="progress-update">
+      <h2>0. Current Progress and Next Priority</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Implemented in JyutCollab-v2</h3>
+          <ul>
+            <li><code>server/utils/agent/core/runner.ts</code> runs an LLM-driven tool loop with registered Zod schemas.</li>
+            <li><code>server/utils/agent/tools/readOnlyJyutCollab.ts</code> supports dialect list, search, detail, and duplicate checks with redacted payloads.</li>
+            <li><code>server/utils/agent/tools/localUi.ts</code> supports safe Web navigation actions.</li>
+            <li><code>server/api/agent/chat.stream.post.ts</code> streams status, text deltas, tool-call deltas, and tool results over SSE.</li>
+            <li><code>app/composables/useAgentChat.ts</code> maintains sidebar state and renders streaming progress, tool cards, local actions, and confirmations.</li>
+            <li><code>server/api/agent/chat.post.ts</code> gates draft, submit, approve, and reject actions with actor-bound confirmation and exact echo.</li>
+            <li>Successful AI-assisted writes currently leave <code>EditHistory</code> records such as “via JyutCollab AI Agent”.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Next priority: conversation history and audit</h3>
+          <p>Current chat messages live in frontend state and are not durable. To support AI audit and user-visible history, the next slice should add persistent conversations, persisted messages, and structured audit events.</p>
+          <ul>
+            <li>User can create a new conversation from the sidebar.</li>
+            <li>User can list and reopen their own historical conversations.</li>
+            <li>Every assistant response, tool call, confirmation request, decision, blocked action, and model/tool error has a conversation-scoped audit event.</li>
+            <li>Audit payloads must use the existing redaction policy and never store tokens, cookies, raw headers, or unfiltered request bodies.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Updated recommendation:</strong> before adding Telegram, Feishu, QQ, or MCP adapters to v2, finish Web conversation persistence and AI audit foundations so every later channel inherits durable history and traceability.
+      </div>
+    </section>
+
+    <section id="principles">
+      <h2>1. Architecture Principles</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>One core, many channels</h3>
+          <p>Do not implement separate business tools for Web, Telegram, Feishu, QQ, and MCP. Build one Agent Core and expose it through channel adapters.</p>
+          <pre>Agent Core
+├── tools
+├── permissions
+├── confirmations
+├── audit
+└── LLM/tool loop
+
+Channels
+├── Web Sidebar
+├── Telegram
+├── Feishu
+├── QQ
+└── MCP</pre>
+        </div>
+        <div class="card">
+          <h3>Never let AI bypass product rules</h3>
+          <p>Agent tools must call existing domain logic or server utilities. They must not directly bypass validation, contribution permissions, review permissions, or confirmation gates.</p>
+          <ul>
+            <li>Safe operations may run immediately.</li>
+            <li>Draft writes require light confirmation.</li>
+            <li>Editorial, destructive, and admin operations require strong confirmation.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Recommended stance:</strong> Treat the AI Agent as a new product surface over existing JyutCollab workflows, not as a privileged backend automation script.
+      </div>
+    </section>
+
+    <section id="target-architecture">
+      <h2>2. Target Architecture</h2>
+      <pre>app/components/agent/*
+  Web-specific sidebar, message list, tool cards, confirmation cards.
+
+app/composables/useAgent*.ts
+  Web context, chat client, frontend UI actions.
+
+server/api/agent/*
+  Web-facing agent chat and confirmation endpoints.
+
+server/api/bots/*
+  Telegram, Feishu, QQ webhook endpoints.
+
+server/utils/agent/core/*
+  Channel-neutral agent runner, registry, policies, confirmation, audit.
+
+server/utils/agent/tools/*
+  Channel-neutral JyutCollab tools.
+
+server/utils/agent/channels/*
+  Platform adapters for rendering messages and confirmations.</pre>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Responsibility</th><th>Should not do</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Agent Core</td>
+            <td>Tool selection, permissions, confirmation policy, audit, LLM loop.</td>
+            <td>Render platform-specific UI.</td>
+          </tr>
+          <tr>
+            <td>Tools</td>
+            <td>Typed operations over entries, drafts, reviews, views, histories, users.</td>
+            <td>Trust user text as confirmation.</td>
+          </tr>
+          <tr>
+            <td>Web Adapter</td>
+            <td>Sidebar UI, page context, frontend actions, confirmation cards.</td>
+            <td>Duplicate backend validation or review policy.</td>
+          </tr>
+          <tr>
+            <td>Bot Adapters</td>
+            <td>Parse webhooks, resolve external identity, render messages/buttons/cards.</td>
+            <td>Own business logic or permissions.</td>
+          </tr>
+          <tr>
+            <td>MCP Adapter</td>
+            <td>Expose shared tools to external AI clients.</td>
+            <td>Become the primary Web runtime.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="directories">
+      <h2>3. Files and Directory Plan</h2>
+      <h3>New server files</h3>
+      <pre>server/utils/agent/core/runAgent.ts
+server/utils/agent/core/toolRegistry.ts
+server/utils/agent/core/toolTypes.ts
+server/utils/agent/core/toolResult.ts
+server/utils/agent/core/context.ts
+server/utils/agent/core/permissions.ts
+server/utils/agent/core/confirmations.ts
+server/utils/agent/core/audit.ts
+server/utils/agent/core/conversation.ts
+server/utils/agent/core/prompts.ts
+server/utils/agent/core/errors.ts
+
+server/utils/AgentConversation.ts
+server/utils/AgentMessage.ts
+server/utils/AgentAuditEvent.ts
+
+server/utils/agent/tools/entries.ts
+server/utils/agent/tools/dialects.ts
+server/utils/agent/tools/drafting.ts
+server/utils/agent/tools/review.ts
+server/utils/agent/tools/views.ts
+server/utils/agent/tools/histories.ts
+server/utils/agent/tools/stats.ts
+server/utils/agent/tools/users.ts
+server/utils/agent/tools/aiSuggestions.ts
+
+server/utils/agent/channels/web.ts
+server/utils/agent/channels/telegram.ts
+server/utils/agent/channels/feishu.ts
+server/utils/agent/channels/qq.ts
+server/utils/agent/channels/mcp.ts</pre>
+
+      <h3>New API routes</h3>
+      <pre>server/api/agent/chat.post.ts
+server/api/agent/chat.stream.post.ts
+server/api/agent/confirm.post.ts
+server/api/agent/conversations.get.ts
+server/api/agent/conversations.post.ts
+server/api/agent/conversations/[id].get.ts
+server/api/agent/conversations/[id]/messages.get.ts
+server/api/agent/conversations/[id]/archive.post.ts
+server/api/agent/audit-events.get.ts
+
+server/api/bots/telegram/webhook.post.ts
+server/api/bots/feishu/webhook.post.ts
+server/api/bots/qq/webhook.post.ts</pre>
+
+      <h3>New app files</h3>
+      <pre>app/components/agent/AgentLauncher.vue
+app/components/agent/AgentSidebar.vue
+app/components/agent/AgentMessageList.vue
+app/components/agent/AgentToolCard.vue
+app/components/agent/AgentConfirmationCard.vue
+app/components/agent/AgentConversationList.vue
+app/components/agent/AgentNewConversationButton.vue
+
+app/composables/useAgentChat.ts
+app/composables/useAgentContext.ts
+app/composables/useAgentActions.ts
+
+app/stores/agent.ts</pre>
+
+      <h3>Agent persistence collections</h3>
+      <table>
+        <thead><tr><th>Collection</th><th>Why it exists</th><th>Relationship to existing collections</th></tr></thead>
+        <tbody>
+          <tr><td><code>agent_conversations</code></td><td>Conversation header for user history, new-chat flow, archive state, and last activity sorting.</td><td>References <code>users</code> by <code>ownerId</code>; should not duplicate user profile data.</td></tr>
+          <tr><td><code>agent_messages</code></td><td>Durable user/assistant/tool-visible message records for restoring a chat after refresh.</td><td>References <code>agent_conversations</code>; stores redacted tool/confirmation UI payloads, not raw backend objects.</td></tr>
+          <tr><td><code>agent_audit_events</code></td><td>Append-only AI audit trail for request lifecycle, model output, tool calls, confirmations, blocked operations, and errors.</td><td>Can reference <code>entries</code> and <code>edit_histories</code> when a real data change happens; does not replace <code>edit_histories</code>.</td></tr>
+        </tbody>
+      </table>
+      <p>Existing <code>edit_histories</code> remains the source of truth for entry mutations. Agent collections explain how and why the AI interaction happened; edit history explains what changed in the dictionary data.</p>
+
+      <h3>Current implementation mapping</h3>
+      <table>
+        <thead><tr><th>Planned role</th><th>Current file</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Runner / LLM loop</td><td><code>server/utils/agent/core/runner.ts</code></td><td><span class="risk-safe">Implemented</span></td></tr>
+          <tr><td>Tool registry/contracts</td><td><code>server/utils/agent/core/registry.ts</code>, <code>contracts.ts</code></td><td><span class="risk-safe">Implemented</span></td></tr>
+          <tr><td>Read-only JyutCollab tools</td><td><code>server/utils/agent/tools/readOnlyJyutCollab.ts</code></td><td><span class="risk-safe">Implemented</span></td></tr>
+          <tr><td>Web chat API</td><td><code>server/api/agent/chat.post.ts</code>, <code>chat.stream.post.ts</code></td><td><span class="risk-safe">Implemented</span></td></tr>
+          <tr><td>Web UI</td><td><code>app/components/agent/Sidebar.vue</code>, <code>Message.vue</code>, <code>ConfirmationCard.vue</code>, <code>useAgentChat.ts</code></td><td><span class="risk-safe">Implemented foundation</span></td></tr>
+          <tr><td>Conversation persistence</td><td><code>AgentConversation</code>, <code>AgentMessage</code>, <code>/api/agent/conversations*</code></td><td><span class="risk-warn">Next priority</span></td></tr>
+          <tr><td>Full audit event stream</td><td><code>AgentAuditEvent</code>, <code>agent/core/audit.ts</code></td><td><span class="risk-warn">Next priority</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Likely existing files to touch</h3>
+      <ul>
+        <li><code>app/layouts/default.vue</code> — mount <code>AgentLauncher</code> and <code>AgentSidebar</code>.</li>
+        <li><code>nuxt.config.ts</code> — runtime config for model provider and bot secrets.</li>
+        <li><code>server/utils/ai.ts</code> — reuse or align existing AI provider utilities.</li>
+        <li><code>server/utils/Entry.ts</code>, <code>server/utils/User.ts</code>, <code>server/utils/EditHistory.ts</code> — reuse existing domain models.</li>
+        <li><code>server/api/entries/*</code>, <code>server/api/reviews/*</code>, <code>server/api/views/*</code> — use as behavior references; avoid copy/paste divergence.</li>
+      </ul>
+    </section>
+
+    <section id="contracts">
+      <h2>4. Core Contracts</h2>
+      <h3>Tool definition</h3>
+      <pre>import { z } from 'zod'
+
+export type AgentChannel = 'web' | 'telegram' | 'feishu' | 'qq' | 'mcp'
+
+export type ToolRisk =
+  | 'safe'
+  | 'local_ui'
+  | 'draft_write'
+  | 'editorial'
+  | 'destructive'
+  | 'admin'
+
+export interface AgentToolDefinition&lt;Input, Output&gt; {
+  name: string
+  description: string
+  risk: ToolRisk
+  inputSchema: z.ZodType&lt;Input&gt;
+  outputSchema?: z.ZodType&lt;Output&gt;
+  execute(input: Input, ctx: AgentToolContext): Promise&lt;AgentToolResult&lt;Output&gt;&gt;
+}</pre>
+
+      <h3>Tool result</h3>
+      <pre>export interface AgentToolResult&lt;T&gt; {
+  ok: boolean
+  data?: T
+  summary: string
+  warnings?: string[]
+  nextAction?: string
+  confirmationRequired?: ConfirmationRequest
+}</pre>
+
+      <h3>Confirmation request</h3>
+      <pre>export interface ConfirmationRequest {
+  id: string
+  action: string
+  risk: ToolRisk
+  actorId: string
+  channel: AgentChannel
+  target: {
+    entryId?: string
+    userId?: string
+    headword?: string
+    label: string
+  }
+  requiredEcho?: string
+  expiresAt: string
+  summary: string
+  consequences: string[]
+}</pre>
+
+      <h3>Channel capabilities</h3>
+      <pre>export interface ChannelCapabilities {
+  canPatchFrontendState: boolean
+  canRenderCards: boolean
+  canUseButtons: boolean
+  canSendPrivateReply: boolean
+  canAccessCurrentPageContext: boolean
+}</pre>
+    </section>
+
+    <section id="phases">
+      <h2>5. Executable Phases</h2>
+
+      <article class="phase" id="phase-0">
+        <div class="phase-header">
+          <h3>Phase 0 — Agent Contracts and Read-only Tool Registry</h3>
+          <span class="badge">Foundation · no UI</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Establish channel-neutral tool definitions, risk policy, result format, permissions helpers, and the first read-only tools.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>server/utils/agent/core/toolTypes.ts</code></li>
+            <li><code>server/utils/agent/core/toolResult.ts</code></li>
+            <li><code>server/utils/agent/core/toolRegistry.ts</code></li>
+            <li><code>server/utils/agent/core/context.ts</code></li>
+            <li><code>server/utils/agent/core/permissions.ts</code></li>
+            <li><code>server/utils/agent/tools/dialects.ts</code></li>
+            <li><code>server/utils/agent/tools/entries.ts</code></li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Define <code>AgentChannel</code>, <code>ToolRisk</code>, <code>AgentActor</code>, <code>AgentToolContext</code>, <code>AgentToolResult</code>.</li>
+            <li>Implement <code>defineAgentTool()</code> helper that stores name, risk, Zod schema, description, and execute function.</li>
+            <li>Implement <code>createToolRegistry()</code> and lookup by name.</li>
+            <li>Implement read-only tools: <code>listDialects</code>, <code>searchEntries</code>, <code>getEntry</code>, <code>checkDuplicate</code>.</li>
+            <li>Normalize duplicate results into <code>sameDialect</code> and <code>otherDialects</code>.</li>
+            <li>Ensure no tool returns auth headers, cookies, raw session data, or debug secrets.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li><code>server/utils/agent/tools/__tests__/entries.test.ts</code> — search/get/duplicate output shape.</li>
+            <li><code>server/utils/agent/tools/__tests__/dialects.test.ts</code> — dialect ids and labels.</li>
+            <li><code>server/utils/agent/core/__tests__/toolRegistry.test.ts</code> — registry rejects duplicate names and validates input.</li>
+            <li><code>server/utils/agent/core/__tests__/tokenSafety.test.ts</code> — tool outputs do not leak secrets.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Read-only tools can be called directly in tests without LLM or UI.</li>
+            <li>Invalid tool input is rejected by Zod before execution.</li>
+            <li><code>checkDuplicate</code> treats same-dialect matches as blocking risk and other-dialect matches as reference context.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-1">
+        <div class="phase-header">
+          <h3>Phase 1 — Web Read-only Sidebar</h3>
+          <span class="badge">Nuxt UI · AI SDK · safe tools</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Add a right-side AI sidebar that can answer questions and call safe tools, without writing data.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>server/api/agent/chat.post.ts</code></li>
+            <li><code>server/utils/agent/core/runAgent.ts</code></li>
+            <li><code>server/utils/agent/core/prompts.ts</code></li>
+            <li><code>app/components/agent/AgentLauncher.vue</code></li>
+            <li><code>app/components/agent/AgentSidebar.vue</code></li>
+            <li><code>app/components/agent/AgentMessageList.vue</code></li>
+            <li><code>app/components/agent/AgentToolCard.vue</code></li>
+            <li><code>app/components/agent/AgentPrompt.vue</code></li>
+            <li><code>app/composables/useAgentChat.ts</code></li>
+            <li><code>app/composables/useAgentContext.ts</code></li>
+            <li><code>app/stores/agent.ts</code></li>
+          </ul>
+          <h4>Files to modify</h4>
+          <ul>
+            <li><code>app/layouts/default.vue</code> — mount the launcher/sidebar.</li>
+            <li><code>nuxt.config.ts</code> — add model provider runtime config if needed.</li>
+            <li><code>package.json</code> — add <code>ai</code> and <code>@ai-sdk/vue</code> if not present.</li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Build <code>AgentSidebar</code> with <code>USlideover</code>, <code>UChatMessages</code>, <code>UChatPrompt</code>, and <code>UChatTool</code>.</li>
+            <li>Implement <code>useAgentContext()</code> to send route, page, user role, selected entries, filters, and active view id.</li>
+            <li>Implement <code>server/api/agent/chat.post.ts</code> using AI SDK <code>streamText()</code> and read-only tools.</li>
+            <li>Render tool calls/results as cards using <code>AgentToolCard</code>.</li>
+            <li>Keep all write tools out of the registry for this phase.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>Component test: sidebar opens/closes and sends message.</li>
+            <li>API test: chat endpoint rejects unauthenticated access if required by current app policy.</li>
+            <li>API test: chat endpoint exposes only safe tools.</li>
+            <li>Manual test: ask “幫我查食飯有冇香港詞條” from entries page and verify tool result is displayed.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Sidebar works on entries/review/docs pages without layout regressions.</li>
+            <li>User can query entries and duplicate status via conversation.</li>
+            <li>No server-side writes are possible through this phase.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-2">
+        <div class="phase-header">
+          <h3>Phase 2 — Web UI Actions</h3>
+          <span class="badge">local UI state · no database writes</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Let the agent perform the same UI state changes a user can do by clicking, without writing data.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>app/composables/useAgentActions.ts</code></li>
+            <li><code>app/components/agent/AgentActionPreview.vue</code></li>
+          </ul>
+          <h4>Files to modify</h4>
+          <ul>
+            <li><code>app/pages/entries/index.vue</code> — expose action bridge for filters/modals/selection.</li>
+            <li><code>app/composables/useEntriesAdvancedFilters.ts</code> — ensure filters can be applied programmatically.</li>
+            <li><code>app/composables/useEntriesSavedViews.ts</code> — expose saved-view activation.</li>
+            <li><code>app/composables/useEntriesSelection.ts</code> — expose row selection.</li>
+            <li><code>app/components/entries/EntryModal.vue</code> — allow draft field patching from agent action state.</li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Register frontend actions: <code>navigateToPage</code>, <code>applyEntryFilter</code>, <code>openCreateEntryModal</code>, <code>fillDraftField</code>, <code>applySavedView</code>, <code>selectEntry</code>, <code>openEntryDetail</code>.</li>
+            <li>Add page capability reporting to <code>useAgentContext()</code>.</li>
+            <li>Implement a server-to-client action proposal format; Web executes only actions supported by current page capabilities.</li>
+            <li>Render action previews before applying multi-step UI changes.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>Composable tests for applying filters and saved views through agent action inputs.</li>
+            <li>Component test: “open create modal” action opens modal.</li>
+            <li>Manual test: user says “篩選香港 pending review 最近更新”，table filters update.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Agent can change local UI state without direct DOM clicking.</li>
+            <li>Unsupported actions are rejected with a clear message.</li>
+            <li>No database write occurs in this phase.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-3">
+        <div class="phase-header">
+          <h3>Phase 3 — Draft Write Workflow</h3>
+          <span class="badge">light confirmation · audit</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Allow AI-assisted draft creation and draft updates with validation, duplicate checks, light confirmation, and audit logs.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>server/utils/agent/tools/drafting.ts</code></li>
+            <li><code>server/utils/agent/core/confirmations.ts</code></li>
+            <li><code>server/utils/agent/core/audit.ts</code></li>
+            <li><code>server/api/agent/confirm.post.ts</code></li>
+            <li><code>app/components/agent/AgentConfirmationCard.vue</code></li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Implement <code>prepareDraftEntryProposal</code> as a no-write tool.</li>
+            <li>Implement <code>createDraftEntry</code> and <code>updateDraftEntry</code> with <span class="risk-warn">draft_write</span> risk.</li>
+            <li>Require duplicate check before creation.</li>
+            <li>Require light confirmation before write.</li>
+            <li>Log successful and blocked write attempts in <code>AgentAuditLog</code>.</li>
+            <li>Ensure draft creation never submits for review automatically.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>Tool test: draft proposal validates required fields.</li>
+            <li>Tool test: same-dialect duplicate blocks creation.</li>
+            <li>Tool test: other-dialect duplicate does not block, but returns warning.</li>
+            <li>Confirmation test: create draft without confirmation returns confirmation request.</li>
+            <li>Audit test: confirmed create writes audit record.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>User can say “幫我建香港詞條 食飯，意思係吃飯”.</li>
+            <li>Agent checks duplicate, prepares preview, asks for confirmation, then creates draft.</li>
+            <li>Created entry status is <code>draft</code>.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-4">
+        <div class="phase-header">
+          <h3>Phase 4 — Review Workflow</h3>
+          <span class="badge">strong confirmation · reviewer permissions</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Add submit/approve/reject agent tools with strong confirmation and reviewer permission checks.</p>
+          <h4>Files to create or extend</h4>
+          <ul>
+            <li><code>server/utils/agent/tools/review.ts</code></li>
+            <li><code>server/utils/agent/core/permissions.ts</code></li>
+            <li><code>server/utils/agent/core/confirmations.ts</code></li>
+            <li><code>app/components/agent/AgentConfirmationCard.vue</code></li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Implement <code>checkSubmitReadiness</code> as no-write tool.</li>
+            <li>Implement <code>submitEntryForReview</code>, <code>approveReviewEntry</code>, <code>rejectReviewEntry</code> as <span class="risk-danger">editorial</span> tools.</li>
+            <li>Require strong confirmation with exact target echo.</li>
+            <li>Verify actor has required role and dialect permission server-side.</li>
+            <li>Require non-empty rejection reason.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>Unauthorized reviewer cannot approve/reject.</li>
+            <li>Missing/mismatched confirmation blocks mutation.</li>
+            <li>Reject without reason blocks mutation.</li>
+            <li>Confirmed approval changes status and records audit.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Reviewer can ask “批准當前詞條”.</li>
+            <li>Agent shows target, consequences, and required confirmation.</li>
+            <li>Mutation happens only after correct confirmation.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-5">
+        <div class="phase-header">
+          <h3>Phase 5 — Durable Conversation History and AI Audit</h3>
+          <span class="badge">next priority · history · audit</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Replace browser-only chat state with durable conversations and structured audit events before adding more channels.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>server/utils/AgentConversation.ts</code></li>
+            <li><code>server/utils/AgentMessage.ts</code></li>
+            <li><code>server/utils/AgentAuditEvent.ts</code></li>
+            <li><code>server/utils/agent/core/conversation.ts</code></li>
+            <li><code>server/utils/agent/core/audit.ts</code></li>
+            <li><code>server/api/agent/conversations.get.ts</code></li>
+            <li><code>server/api/agent/conversations.post.ts</code></li>
+            <li><code>server/api/agent/conversations/[id].get.ts</code></li>
+            <li><code>server/api/agent/conversations/[id]/messages.get.ts</code></li>
+            <li><code>app/components/agent/AgentConversationList.vue</code></li>
+            <li><code>app/components/agent/AgentNewConversationButton.vue</code></li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Add <code>AgentConversation</code> with owner id, channel, title, last message timestamp, message count, archived timestamp, and optional compact summary.</li>
+            <li>Add <code>AgentMessage</code> for user, assistant, and tool-visible messages with conversation id, request id, role, content, tool card payload, confirmation payload, and local action payload.</li>
+            <li>Add <code>AgentAuditEvent</code> for request lifecycle, model response, tool call/result, confirmation request/decision, blocked action, and error events.</li>
+            <li>Update <code>chat.stream.post.ts</code> and <code>chat.post.ts</code> to accept or create <code>conversationId</code> and persist user/assistant messages.</li>
+            <li>Update <code>useAgentChat()</code> so sidebar can load conversations, switch current conversation, create a new conversation, and recover messages after refresh.</li>
+            <li>Ensure conversation list and message reads are scoped to the authenticated user.</li>
+            <li>Apply redaction before writing audit payloads; never store auth headers, cookies, tokens, raw request objects, or password-like fields.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>API test: user can list only their own conversations.</li>
+            <li>API test: new conversation creates a durable id and first message can attach to it.</li>
+            <li>API test: chat stream persists user message, assistant response, and tool result.</li>
+            <li>Audit test: safe tool, blocked high-risk tool, confirmation request, and confirmation decision each create redacted events.</li>
+            <li>Redaction test: audit JSON does not contain tokens, cookies, raw headers, or password-like fields.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>User can click “新對話” and start a separate conversation.</li>
+            <li>User can reopen their own historical conversations after page refresh.</li>
+            <li>Each conversation has an inspectable AI audit trail tied by <code>conversationId</code> and <code>requestId</code>.</li>
+            <li>Existing confirmation gates still block unconfirmed draft/editorial actions.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-6">
+        <div class="phase-header">
+          <h3>Phase 6 — Telegram Private Chat Adapter</h3>
+          <span class="badge">first bot channel</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Reuse Agent Core in Telegram private chat for safe tools and draft creation.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>server/api/bots/telegram/webhook.post.ts</code></li>
+            <li><code>server/utils/agent/channels/telegram.ts</code></li>
+            <li><code>server/utils/agent/core/externalIdentity.ts</code></li>
+            <li><code>server/utils/ExternalIdentity.ts</code></li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Implement Telegram webhook verification.</li>
+            <li>Implement <code>/bind</code> flow using Web login confirmation link.</li>
+            <li>Resolve Telegram user id to JyutCollab user id.</li>
+            <li>Render Agent Core responses as Telegram Markdown messages.</li>
+            <li>Render confirmations as inline keyboard where possible.</li>
+            <li>Limit first version to safe tools and draft write tools.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>Webhook parse test for private message.</li>
+            <li>Identity resolution test.</li>
+            <li>Unbound user receives bind instructions.</li>
+            <li>Confirmed draft creation goes through Agent Core, not Telegram-specific business logic.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Bound Telegram user can search, check duplicate, and create draft after confirmation.</li>
+            <li>Unbound user cannot perform protected actions.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-7">
+        <div class="phase-header">
+          <h3>Phase 7 — Group Chat Safety Model</h3>
+          <span class="badge">actor-bound confirmations</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Support group chat safely across Telegram first, then Feishu/QQ.</p>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Model <code>AgentConversation</code> with <code>space: 'dm' | 'group'</code>, external chat id, thread id, and actor id.</li>
+            <li>Bind confirmations to actor id, not group id.</li>
+            <li>Block B from confirming A's operation.</li>
+            <li>Default sensitive results to private reply where platform supports it.</li>
+            <li>Disable destructive/admin tools in group contexts by default.</li>
+          </ol>
+          <h4>Tests</h4>
+          <ul>
+            <li>A starts confirmation; B attempts to confirm; server rejects.</li>
+            <li>Expired confirmation rejects.</li>
+            <li>Group context does not leak user private profile fields.</li>
+          </ul>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Group search and duplicate checks work.</li>
+            <li>Draft write can be confirmed only by the initiating bound user.</li>
+            <li>Editorial/destructive tools are disabled or require private confirmation.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-8">
+        <div class="phase-header">
+          <h3>Phase 8 — Feishu and QQ Adapters</h3>
+          <span class="badge">additional channels</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Add Feishu and QQ as thin channel adapters over the same Agent Core.</p>
+          <h4>Files to create</h4>
+          <ul>
+            <li><code>server/api/bots/feishu/webhook.post.ts</code></li>
+            <li><code>server/api/bots/qq/webhook.post.ts</code></li>
+            <li><code>server/utils/agent/channels/feishu.ts</code></li>
+            <li><code>server/utils/agent/channels/qq.ts</code></li>
+          </ul>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Implement Feishu event verification and interactive card rendering.</li>
+            <li>Implement QQ message parsing and text confirmation fallback.</li>
+            <li>Reuse external identity model with provider-specific ids.</li>
+            <li>Reuse group safety model from Phase 6.</li>
+          </ol>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Feishu and QQ adapters call <code>runAgent()</code>; they do not implement JyutCollab business logic.</li>
+            <li>Provider-specific signature verification and identity mapping are tested.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="phase" id="phase-9">
+        <div class="phase-header">
+          <h3>Phase 9 — CLI/MCP Contract Alignment</h3>
+          <span class="badge">reduce duplicate maintenance</span>
+        </div>
+        <div class="phase-body">
+          <p><strong>Goal:</strong> Align JyutCollab-CLI/MCP with the v2 Agent Core contracts so external AI clients and in-app agent behavior remain consistent.</p>
+          <h4>Tasks</h4>
+          <ol>
+            <li>Document canonical tool names, input schemas, output shapes, and risk levels in v2.</li>
+            <li>Compare against <code>JyutCollab-CLI</code> MCP tools.</li>
+            <li>Add contract tests that verify shared behavior for duplicate checks, draft creation policy, review confirmations, and token safety.</li>
+            <li>Consider generating JSON Schema from Zod and mirroring it in Python Pydantic models.</li>
+          </ol>
+          <h4>Acceptance criteria</h4>
+          <ul>
+            <li>Web sidebar and MCP use the same tool vocabulary for common operations.</li>
+            <li>Confirmation semantics are consistent across Web and MCP.</li>
+            <li>Changes to core tool contract have tests that make drift obvious.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section id="testing">
+      <h2>6. Testing Strategy</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Unit tests</h3>
+          <ul>
+            <li>Tool input schema validation.</li>
+            <li>Permission decisions by actor role and dialect permissions.</li>
+            <li>Confirmation generation and validation.</li>
+            <li>Token-safety redaction.</li>
+            <li>Channel capability degradation.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Integration tests</h3>
+          <ul>
+            <li>Agent chat endpoint streams response with tool parts.</li>
+            <li>Draft creation requires duplicate check and confirmation.</li>
+            <li>Review action requires reviewer permission and strong confirmation.</li>
+            <li>Bot webhook invokes Agent Core and renders expected response.</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Recommended commands</h3>
+      <pre>npm run build
+npx vitest run
+npm run dev -- --port 3100</pre>
+      <h3>Manual UAT scenarios</h3>
+      <table>
+        <thead><tr><th>Scenario</th><th>Expected result</th></tr></thead>
+        <tbody>
+          <tr><td>Ask sidebar to search “食飯” in Hong Kong dialect.</td><td>Agent calls read-only search/duplicate tools and displays structured result.</td></tr>
+          <tr><td>Start a conversation, send two messages, refresh the page, and reopen it from history.</td><td>The same conversation and messages are restored from persisted history.</td></tr>
+          <tr><td>Click “新對話” and send a new message.</td><td>A separate conversation id is created; old messages remain available in history but are not mixed into the new chat.</td></tr>
+          <tr><td>Inspect audit events for a search request.</td><td>Events show request, tool call, tool result, and assistant response tied to the same conversation/request id without secrets.</td></tr>
+          <tr><td>Ask sidebar to create a draft entry.</td><td>Agent prepares preview, checks duplicates, asks confirmation, creates draft only after confirmation.</td></tr>
+          <tr><td>Ask sidebar to approve a review entry as non-reviewer.</td><td>Server rejects with permission warning; no mutation.</td></tr>
+          <tr><td>Group chat: A starts a draft creation confirmation; B clicks confirm.</td><td>Server rejects because confirmation is actor-bound.</td></tr>
+          <tr><td>Ask bot for sensitive profile/session details.</td><td>Bot refuses or returns safe summary without secrets.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="acceptance">
+      <h2>7. Global Acceptance Criteria</h2>
+      <ul>
+        <li>Agent Core owns tool policy, confirmation, permissions, conversation persistence, and audit behavior.</li>
+        <li>Users can create new conversations and reopen their own historical conversations.</li>
+        <li>AI audit events connect user message, assistant response, tool call/result, confirmation request/decision, and blocked/error outcomes by conversation id and request id.</li>
+        <li>Web sidebar, Telegram, Feishu, QQ, and MCP adapters do not duplicate JyutCollab business rules.</li>
+        <li>No write operation can be triggered by model text alone.</li>
+        <li>All editorial/destructive/admin operations require strong confirmation and server-side target verification.</li>
+        <li>Group confirmations are bound to the initiating actor.</li>
+        <li>Tool outputs never include auth headers, cookies, session tokens, raw request objects, or debug secrets.</li>
+        <li>All initial tools have tests for success, validation failure, permission failure, and confirmation failure.</li>
+      </ul>
+    </section>
+
+    <section id="risks">
+      <h2>8. Risks and Guardrails</h2>
+      <table>
+        <thead><tr><th>Risk</th><th>Impact</th><th>Guardrail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Tool sprawl</td>
+            <td>Model calls wrong or overly broad tools.</td>
+            <td>Enable tools by page/channel capability; phase rollout; keep descriptions narrow.</td>
+          </tr>
+          <tr>
+            <td>Permission bypass</td>
+            <td>AI performs operation user cannot do manually.</td>
+            <td>Server-side permission checks in every write/editorial/admin tool.</td>
+          </tr>
+          <tr>
+            <td>Confirmation spoofing</td>
+            <td>User text or another group member triggers mutation.</td>
+            <td>Server-side confirmation id, actor id, target id, expiry, and echo validation.</td>
+          </tr>
+          <tr>
+            <td>Channel divergence</td>
+            <td>Web and bot behaviors drift.</td>
+            <td>One Agent Core; channel adapters only render/parse platform messages.</td>
+          </tr>
+          <tr>
+            <td>Missing audit continuity</td>
+            <td>AI actions cannot be reconstructed after incidents or user disputes.</td>
+            <td>Persist conversation messages and structured audit events for every tool call, confirmation, blocked action, and error.</td>
+          </tr>
+          <tr>
+            <td>History privacy leak</td>
+            <td>User can view another user's AI conversation or audit metadata.</td>
+            <td>Scope all conversation/message reads by owner id; keep admin audit access separate and explicitly permissioned.</td>
+          </tr>
+          <tr>
+            <td>Secret leakage</td>
+            <td>Tokens or raw headers enter model context or chat output.</td>
+            <td>Redaction helpers, token-safety tests, no raw payload returns.</td>
+          </tr>
+          <tr>
+            <td>Over-automation</td>
+            <td>Users lose visibility into changes.</td>
+            <td>Tool cards, previews, audit logs, and confirmation cards with consequences.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warning">
+        <strong>Non-goal for early phases:</strong> Do not implement admin/destructive automation before read-only, UI actions, draft writes, and review confirmations are stable and tested.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

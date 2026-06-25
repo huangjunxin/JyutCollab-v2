@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JyutCollab AI Assistant Production Agent Plan</title>
+  <style>
+    :root { color-scheme: light; --bg: #f7f3eb; --paper: #fffdf8; --ink: #1f2933; --muted: #667085; --line: #e5dccb; --accent: #8a5a2b; --safe: #067647; --warn: #b54708; --danger: #b42318; --code-bg: #f1efe7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(circle at top left, #fff8e7 0, var(--bg) 36rem); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif; line-height: 1.65; }
+    main { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 40px 0 80px; }
+    header, section { border: 1px solid var(--line); background: var(--paper); border-radius: 24px; padding: 28px; box-shadow: 0 16px 48px rgba(88, 64, 40, 0.06); }
+    header { background: linear-gradient(135deg, #fffdf8, #f9eedb); padding: 36px; }
+    section { margin-top: 24px; }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 { margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3.6rem); letter-spacing: -0.04em; }
+    h2 { margin: 0 0 16px; font-size: 1.6rem; }
+    h3 { margin: 24px 0 8px; color: var(--accent); }
+    p { margin: 0 0 12px; }
+    .subtitle { max-width: 860px; color: var(--muted); font-size: 1.08rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    .pill { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: rgba(255,255,255,0.72); color: var(--muted); font-size: 0.92rem; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { border: 1px solid var(--line); border-radius: 18px; padding: 18px; background: #fffaf1; }
+    .safe { color: var(--safe); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .danger { color: var(--danger); font-weight: 700; }
+    code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
+    pre { overflow: auto; border-radius: 16px; padding: 16px; background: var(--code-bg); border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; }
+    th { color: var(--accent); }
+    ul { padding-left: 1.25rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>JyutCollab AI 助手生產級 Agent 改造計劃</h1>
+      <p class="subtitle">本計劃取代早期正則路由式 workflow，把 Web AI 助手改造成 LLM 驅動的工具調用 Agent：LLM 負責理解意圖與規劃工具，代碼層負責工具白名單、Zod 校驗、權限、確認、安全審計與正式產品 UI。現況更新：Web Agent MVP 已具備 LLM runner、SSE 串流、只讀工具、本地導航工具、確認卡與基於 EditHistory 的寫入審計註記；下一個重點是把前端暫存聊天升級為可查詢、可審計、可開新對話的持久化聊天記錄系統。</p>
+      <div class="meta">
+        <span class="pill">Scope：Web AI Assistant</span>
+        <span class="pill">現況：Agent MVP 已落地</span>
+        <span class="pill">下一步：聊天歷史 / Conversation Store / AI Audit</span>
+        <span class="pill">不包含：Telegram / QQ / 飛書</span>
+        <span class="pill">安全原則：理解交給 LLM，安全交給代碼</span>
+        <span class="pill">目標：可上線且可審計</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>一、核心問題</h2>
+      <div class="grid">
+        <div class="card"><h3>正則路由不是 Agent</h3><p>原有 <code>includes('搜尋')</code> 分支把自然語言理解鎖死在硬編碼 workflow 裡，導致「找一下粵拼為 ang1 的詞」這類明確需求也可能失敗。</p></div>
+        <div class="card"><h3>工具 schema 不夠結構化</h3><p><code>jyutcollab.search_entries</code> 只有泛 <code>query</code>，缺少 <code>jyutping</code>、<code>headword</code>、<code>category</code>、<code>register</code> 等精確查詢欄位。</p></div>
+        <div class="card"><h3>UI 仍像調試介面</h3><p>Tool result 直接顯示 JSON，不符合上線產品體驗；應轉換為詞條列表、確認卡、導航卡等正式 UI。</p></div>
+        <div class="card"><h3>安全邊界要與規劃分離</h3><p>LLM 只規劃 tool call；工具白名單、schema validation、risk gate、actor-bound confirmation、審計由服務端代碼強制執行。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>二、目前實作進度（2026-05-27）</h2>
+      <div class="grid">
+        <div class="card"><h3>已完成：Agent Core MVP</h3><p><code>server/utils/agent/core/runner.ts</code> 已使用 OpenAI-compatible chat completion + tool schemas，由模型根據自然語言選擇工具；工具名稱、輸入與輸出通過 registry 和 Zod 管理。</p></div>
+        <div class="card"><h3>已完成：只讀與本地 UI 工具</h3><p><code>readOnlyJyutCollab.ts</code> 提供方言列表、詞條搜尋、詳情、查重；<code>localUi.ts</code> 提供本地導航，均不直接改寫資料庫。</p></div>
+        <div class="card"><h3>已完成：Web 串流體驗</h3><p><code>server/api/agent/chat.stream.post.ts</code> 以 SSE 回傳狀態、文字片段、tool call delta、tool result；<code>useAgentChat.ts</code> 在側欄即時更新訊息、進度和工具卡。</p></div>
+        <div class="card"><h3>已完成：確認與審計基礎</h3><p><code>chat.post.ts</code> 對草稿、送審、通過、拒絕使用 actor-bound confirmation + echo；成功寫入透過 <code>EditHistory</code> 記錄「via JyutCollab AI Agent」。</p></div>
+        <div class="card"><h3>待強化：聊天記錄</h3><p>目前訊息存放在前端 <code>useState('agent-chat-messages')</code>，刷新或換裝置後不可追溯；也沒有 <code>conversations.get</code> / <code>[id].get</code> 之類持久化 API。</p></div>
+        <div class="card"><h3>待強化：AI Audit</h3><p>現有 EditHistory 只覆蓋最終資料變更，尚未完整保存 conversation、tool call、模型回覆、確認請求、確認決策與失敗/阻擋事件。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>三、目標架構</h2>
+      <pre>User message
+  → Agent Runner (server/utils/agent/core/runner.ts)
+  → LLM tool planning with registered tool schemas
+  → Tool Registry + Zod validation
+  → Risk / confirmation gate
+  → Tool execution
+  → Tool result fed back to LLM
+  → Assistant response + productized UI payload</pre>
+      <p>Agent loop 採用單線程循環：模型返回 tool call 就執行工具並把結果回流；模型返回純文本就結束。循環設置最大步數，防止失控。</p>
+    </section>
+
+    <section>
+      <h2>四、分階段實施</h2>
+      <table>
+        <thead><tr><th>階段</th><th>文件</th><th>任務</th><th>驗收標準</th></tr></thead>
+        <tbody>
+          <tr><td>Phase A</td><td><code>server/utils/ai.ts</code><br><code>server/utils/agent/core/runner.ts</code></td><td>導出通用 OpenRouter client/model；新增 Agent Runner 和 tool schema 映射。</td><td><span class="safe">已完成：</span>LLM 可根據工具 schema 產生 tool call；無效 tool/input 被代碼拒絕。</td></tr>
+          <tr><td>Phase B</td><td><code>server/utils/agent/tools/readOnlyJyutCollab.ts</code></td><td>擴展 search tool：<code>jyutping</code>、<code>headword</code>、<code>dialectName</code>、<code>status</code>、<code>category</code>、<code>register</code>。</td><td><span class="safe">已完成：</span>「找粵拼為 ang1 的詞」可映射到 <code>{ jyutping: "ang1" }</code>。</td></tr>
+          <tr><td>Phase C</td><td><code>server/api/agent/chat.post.ts</code><br><code>server/api/agent/chat.stream.post.ts</code></td><td>移除正則主路由，改由 runner 處理 safe tools；保留 confirmation resolve 和高風險操作 gating；加入 SSE 串流。</td><td><span class="warn">部分完成：</span>safe tools 已由 runner 驅動；草稿/送審/審核仍有輕量文字解析入口，後續可收斂成 tool + confirmation workflow。</td></tr>
+          <tr><td>Phase D</td><td><code>app/components/agent/*.vue</code><br><code>app/types/agent.ts</code></td><td>去掉 MVP 文案，工具結果產品化展示，隱藏 raw JSON。</td><td><span class="safe">已完成基礎：</span>側欄、訊息、確認卡、tool card/streaming 狀態已存在；仍可繼續打磨結果卡片與空狀態。</td></tr>
+          <tr><td>Phase E</td><td><code>server/utils/agent/__tests__</code></td><td>補充 runner/search/UI payload 相關測試；跑 build。</td><td><span class="warn">部分完成：</span><code>phase0.test.ts</code> 覆蓋 registry、confirmation policy、redaction、read-only tools；仍需補 SSE、conversation storage、audit trail 測試。</td></tr>
+          <tr><td>Phase F</td><td><code>server/utils/AgentConversation.ts</code><br><code>server/utils/AgentMessage.ts</code><br><code>server/api/agent/conversations*.ts</code><br><code>app/composables/useAgentChat.ts</code></td><td>新增持久化 conversation/message models；支援列出歷史、讀取單個對話、新增新對話、切換對話、刪除/封存對話。</td><td><span class="warn">下一步：</span>登入用戶可查看自己的歷史聊天記錄；刷新後仍能恢復；新對話有獨立 conversation id。</td></tr>
+          <tr><td>Phase G</td><td><code>server/utils/AgentAuditEvent.ts</code><br><code>server/utils/agent/core/audit.ts</code><br><code>server/api/agent/chat*.ts</code></td><td>將 AI 審計從 EditHistory 擴展到完整 Agent 事件流：user message、assistant message、tool call、tool result、confirmation request/decision、blocked action、model error。</td><td><span class="warn">下一步：</span>每次 AI 互動可按 conversation/requestId 追溯，且不保存 token、cookie、raw headers 或未清洗 secret payload。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>五、聊天記錄與 AI 審計設計重點</h2>
+      <table>
+        <thead><tr><th>能力</th><th>建議資料</th><th>產品行為</th><th>審計要求</th></tr></thead>
+        <tbody>
+          <tr><td>歷史對話列表</td><td><code>AgentConversation</code>：ownerId、title、channel、lastMessageAt、archivedAt、messageCount、lastSummary。</td><td>側欄頂部提供「新對話」和歷史列表；只顯示當前登入用戶自己的對話。</td><td>查詢必須按 ownerId 過濾；管理員審計入口另設權限，不混入普通列表。</td></tr>
+          <tr><td>訊息持久化</td><td><code>AgentMessage</code>：conversationId、role、content、createdAt、requestId、toolCall、confirmation、localAction。</td><td>刷新後恢復當前 conversation；可切換舊對話繼續問。</td><td>保存前走 redaction，不保存 raw request、headers、cookie、token。</td></tr>
+          <tr><td>新對話</td><td><code>POST /api/agent/conversations</code> 建立空 conversation；首次 user message 可自動生成 title。</td><td>用戶點「新對話」後清空當前上下文，但不刪歷史。</td><td>新 conversation 繼承 actor/channel，不繼承未完成 confirmation。</td></tr>
+          <tr><td>工具調用審計</td><td><code>AgentAuditEvent</code>：requestId、conversationId、actorId、eventType、toolName、risk、inputRedacted、outputSummary、blockedReason。</td><td>普通用戶可看到工具卡；維護者可在審計頁查看事件鏈。</td><td>每次 safe/local_ui/draft/editorial 工具都記錄；失敗和被阻擋也要記錄。</td></tr>
+          <tr><td>確認審計</td><td>confirmationRequested / confirmationAccepted / confirmationRejected / confirmationExpired。</td><td>確認卡展示 action、target、echo、後果和過期時間。</td><td>必須記錄 actorId、target、risk、echo 是否匹配；不把用戶普通文字當確認。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>六、資料庫集合建議</h2>
+      <p>現有集合已包含 <code>users</code>、<code>entries</code>、<code>edit_histories</code>、<code>ai_suggestions</code>、<code>notifications</code> 等產品資料。聊天歷史和 AI 審計不應混入 <code>edit_histories</code>：<code>edit_histories</code> 繼續記錄詞條資料變更；Agent 互動本身用獨立集合保存，避免把「對話過程」和「詞條版本歷史」耦合。</p>
+      <table>
+        <thead><tr><th>集合</th><th>用途</th><th>核心欄位</th><th>索引 / 保留策略</th></tr></thead>
+        <tbody>
+          <tr><td><code>agent_conversations</code></td><td>每個用戶的一條聊天會話；支援歷史列表、新對話、封存。</td><td><code>ownerId</code>、<code>channel</code>、<code>title</code>、<code>lastMessageAt</code>、<code>messageCount</code>、<code>archivedAt</code>、<code>metadata.route</code>、<code>createdAt</code>、<code>updatedAt</code>。</td><td>索引：<code>{ ownerId: 1, lastMessageAt: -1 }</code>、<code>{ ownerId: 1, archivedAt: 1 }</code>。普通用戶查詢必須帶 <code>ownerId</code>。</td></tr>
+          <tr><td><code>agent_messages</code></td><td>持久化 user / assistant / tool-visible messages，刷新後可恢復聊天。</td><td><code>conversationId</code>、<code>ownerId</code>、<code>requestId</code>、<code>role</code>、<code>content</code>、<code>toolCall</code>、<code>confirmation</code>、<code>localAction</code>、<code>createdAt</code>。</td><td>索引：<code>{ conversationId: 1, createdAt: 1 }</code>、<code>{ ownerId: 1, createdAt: -1 }</code>。保存前 redaction；不存 raw headers/cookies/tokens。</td></tr>
+          <tr><td><code>agent_audit_events</code></td><td>完整 AI audit trail：模型請求、工具調用、工具結果、確認請求/決策、阻擋、錯誤。</td><td><code>conversationId</code>、<code>messageId</code>、<code>requestId</code>、<code>actorId</code>、<code>eventType</code>、<code>toolName</code>、<code>risk</code>、<code>inputRedacted</code>、<code>outputSummary</code>、<code>blockedReason</code>、<code>createdAt</code>。</td><td>索引：<code>{ conversationId: 1, createdAt: 1 }</code>、<code>{ actorId: 1, createdAt: -1 }</code>、<code>{ requestId: 1 }</code>。可按合規需求設 TTL；初期建議不自動刪除，先明確產品保留期。</td></tr>
+          <tr><td><code>edit_histories</code>（沿用）</td><td>只記錄詞條資料實際變更，例如 AI 建草稿、送審、通過、拒絕。</td><td>沿用現有 <code>entryId</code>、<code>userId</code>、<code>beforeSnapshot</code>、<code>afterSnapshot</code>、<code>changedFields</code>、<code>action</code>、<code>comment</code>。</td><td>在 <code>comment</code> 或新增 metadata 中關聯 <code>agentConversationId</code>/<code>agentRequestId</code>，但不要把完整聊天內容塞入 edit history。</td></tr>
+        </tbody>
+      </table>
+      <p>最小可行方案是先加三個新集合：<code>agent_conversations</code>、<code>agent_messages</code>、<code>agent_audit_events</code>。如果之後確認要跨請求持久化未完成確認，再單獨加 <code>agent_pending_confirmations</code>；目前 <code>chat.post.ts</code> 的 in-memory pending actions 可先保留到下一輪強化。</p>
+    </section>
+
+    <section>
+      <h2>七、安全與權限策略</h2>
+      <ul>
+        <li><span class="safe">safe</span>：搜索、詳情、方言、查重，可自動執行。</li>
+        <li><span class="warn">draft_write / editorial</span>：建立草稿、送審、通過、拒絕，必須生成 actor-bound confirmation，exact echo 通過後才執行。</li>
+        <li><span class="danger">destructive / admin</span>：本階段不提供工具；後續必須額外授權和可審計日誌。</li>
+        <li>LLM 不接收 raw token、headers、cookie 或未清洗 payload；工具輸出統一通過 serializer redaction。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>八、MVP 邊界</h2>
+      <p>Web AI 助手可上線 MVP 已覆蓋自然語言查詞、結構化查詢、查重、詳情、方言、串流回覆、工具卡展示，以及草稿/送審/審核確認流程的安全保留。下一輪 MVP 邊界應集中在聊天記錄持久化與 AI audit trail：歷史對話列表、讀取舊對話、新增新對話、conversation-scoped tool/audit events、用戶只可查看自己的歷史。暫不實現 Telegram、QQ、飛書、群聊安全模型、跨實例 durable confirmation 和長期記憶壓縮。</p>
+    </section>
+
+    <section>
+      <h2>九、驗證計劃</h2>
+      <pre>cd ~/Projects/JyutCollab-v2
+npm exec vitest run server/utils/agent/__tests__/phase0.test.ts
+npm run build
+npm run dev</pre>
+      <p>手動驗收：登入後打開 AI 助手，輸入「找一下粵拼為 ang1 的詞」、「查 食飯」、「列出方言」、「檢查重複 詞頭: 食飯 方言: hongkong」，確認不再出現 MVP 文案、不顯示 raw JSON，並且安全確認卡仍阻止未確認的寫入/審核操作。</p>
+      <p>下一輪聊天記錄驗收：發送多輪訊息後刷新頁面仍可恢復；點「新對話」會建立獨立 conversation；歷史列表只顯示本人對話；每條 assistant 回覆、tool call、tool result、confirmation request/decision 都能在審計事件中按 conversationId/requestId 串起來；審計 payload 不包含 token、cookie、raw headers 或密碼類欄位。</p>
+    </section>
+  </main>
+</body>
+</html>
