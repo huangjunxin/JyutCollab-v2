@@ -406,6 +406,7 @@
       :unlinked-morpheme-candidates="unlinkedMorphemeCandidates"
       :morpheme-search-results="morphemeSearchResults"
       :morpheme-search-loading="morphemeSearchLoading"
+      :rules="ruleOverlays.rules.value"
       @search="handleSearch"
       @add-new="addNewRow"
       @save-all="saveAllChanges"
@@ -441,6 +442,10 @@
       @search-morphemes="(q: string) => { morphemeSearchQuery = q }"
       @make-new-lexeme="(entry: any) => makeEntryNewLexeme(entry)"
       @join-lexeme="(entry: any) => openMergeModalForEntry(entry)"
+      @batch-delete="(ids: string[]) => mobileBatchDelete(ids)"
+      @batch-status-change="(ids: string[], status: string) => mobileBatchStatusChange(ids, status)"
+      @toggle-rule="(id: string) => ruleOverlays.toggleRule(id)"
+      @remove-rule="(id: string) => ruleOverlays.removeRule(id)"
     />
     </div>
 
@@ -2543,6 +2548,47 @@ async function deleteEntry(entry: Entry) {
   } catch (error: any) {
     console.error('Failed to delete entry:', error)
     alert(error?.data?.message || '刪除失敗')
+  }
+}
+
+/** 手機端批量刪除 */
+async function mobileBatchDelete(entryIds: string[]) {
+  if (!entryIds.length) return
+  const savedIds = entryIds.filter(id => !id.startsWith('new-') && !id.startsWith('dup-'))
+  if (!savedIds.length) return
+  if (!confirm(`確定要刪除 ${savedIds.length} 條詞條嗎？此操作不可撤銷。`)) return
+  try {
+    await Promise.all(savedIds.map(id => $fetch(`/api/entries/${id}`, { method: 'DELETE' })))
+    savedIds.forEach(id => removeEntryFromLocalStorage(id))
+    await fetchEntries()
+  } catch (error: any) {
+    console.error('Batch delete failed:', error)
+    alert(error?.data?.message || '批量刪除失敗')
+  }
+}
+
+/** 手機端批量修改狀態 */
+async function mobileBatchStatusChange(entryIds: string[], status: string) {
+  if (!entryIds.length || !status) return
+  try {
+    const validEntries = entries.value.filter(e => {
+      const id = e.id || (e as any)._tempId || ''
+      return entryIds.includes(id)
+    })
+    await Promise.all(
+      validEntries.filter(e => !e._isNew).map(e => {
+        e.status = status as Entry['status']
+        e._isDirty = true
+        return saveEntryChanges(e)
+      })
+    )
+    validEntries.filter(e => e._isNew).forEach(e => {
+      e.status = status as Entry['status']
+      e._isDirty = true
+    })
+  } catch (error: any) {
+    console.error('Batch status change failed:', error)
+    alert(error?.data?.message || '批量修改狀態失敗')
   }
 }
 

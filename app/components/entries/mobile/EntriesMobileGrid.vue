@@ -95,11 +95,13 @@
             :class="{
               'bg-amber-50/50 dark:bg-amber-900/5 border-l-2 border-l-amber-400 dark:border-l-amber-600': row.entry._isDirty && !(row.entry as any)._isNew,
               'border-l-2 border-l-blue-400 dark:border-l-blue-600': (row.entry as any)._isNew,
+              'bg-primary-50/50 dark:bg-primary-900/20': selectMode && isSelected(row.entry),
             }"
             :style="{ minHeight: density === 'compact' ? '36px' : '48px' }"
             @click="handleEntryClick($event, row.entry)"
+            @touchstart="handleRowTouchStart($event, row.entry)"
           >
-            <!-- First column (headword) -->
+            <!-- First column (headword + optional checkbox) -->
             <td
               class="bg-white dark:bg-slate-800 font-medium text-gray-900 dark:text-white border-r-2 border-r-gray-200 dark:border-r-gray-700 px-2"
               :class="[
@@ -109,6 +111,13 @@
               :style="{ width: firstColumnWidth + 'px', minWidth: firstColumnWidth + 'px' }"
             >
               <div class="flex items-center gap-1.5 min-w-0">
+                <input
+                  v-if="selectMode"
+                  type="checkbox"
+                  class="rounded border-gray-300 shrink-0"
+                  :checked="isSelected(row.entry)"
+                  @click.stop="emit('toggle-select', row.entry)"
+                />
                 <span class="truncate text-sm">
                   {{ columns[0] ? getCellDisplay(row.entry, columns[0]) : '—' }}
                 </span>
@@ -179,31 +188,51 @@ const props = defineProps<{
   stickyFirstColumn: boolean
   getCellDisplay: (entry: Entry, col: MobileColumnDef) => string
   getCellClass: (entry: Entry, field: string) => string[]
+
+  // Multi-select mode
+  selectMode?: boolean
+  selectedEntryIds?: Set<string>
 }>()
 
 const emit = defineEmits<{
   'row-click': [entry: Entry]
   'toggle-group': [headwordNormalized: string]
+  'long-press': [entry: Entry]
+  'toggle-select': [entry: Entry]
 }>()
 
 const scrollContainer = ref<HTMLElement | null>(null)
 
 const firstColumnWidth = computed(() => parseColumnWidth(props.columns[0]?.width, 94))
 
-// Track touch start position to distinguish horizontal swipe from tap
+// Touch handling: distinguish tap, horizontal scroll, and long press
 let touchStartX = 0
 let touchStartY = 0
 let touchMoved = false
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+let longPressEntry: Entry | null = null
+const LONG_PRESS_MS = 500
 
 onMounted(() => {
   scrollContainer.value?.addEventListener('touchstart', onTouchStart, { passive: true })
   scrollContainer.value?.addEventListener('touchmove', onTouchMove, { passive: true })
+  scrollContainer.value?.addEventListener('touchend', onTouchEnd, { passive: true })
 })
 
 onUnmounted(() => {
   scrollContainer.value?.removeEventListener('touchstart', onTouchStart)
   scrollContainer.value?.removeEventListener('touchmove', onTouchMove)
+  scrollContainer.value?.removeEventListener('touchend', onTouchEnd)
+  clearLongPressTimer()
 })
+
+function clearLongPressTimer() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+  longPressEntry = null
+}
 
 function onTouchStart(e: TouchEvent) {
   touchStartX = e.touches[0].clientX
@@ -214,19 +243,46 @@ function onTouchStart(e: TouchEvent) {
 function onTouchMove(e: TouchEvent) {
   const dx = Math.abs(e.touches[0].clientX - touchStartX)
   const dy = Math.abs(e.touches[0].clientY - touchStartY)
-  // If horizontal movement > 10px, treat as scroll, not tap
   if (dx > 10 || dx > dy) {
     touchMoved = true
+    clearLongPressTimer()
   }
 }
 
+function onTouchEnd() {
+  clearLongPressTimer()
+}
+
+function handleRowTouchStart(event: TouchEvent, entry: Entry) {
+  longPressEntry = entry
+  longPressTimer = setTimeout(() => {
+    // Long press detected — enter select mode
+    if (longPressEntry && !touchMoved) {
+      emit('long-press', longPressEntry)
+      // Haptic feedback (if available)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(30)
+      }
+    }
+    longPressTimer = null
+  }, LONG_PRESS_MS)
+}
+
 function handleEntryClick(event: MouseEvent, entry: Entry) {
-  // On touch devices, suppress click if the user was scrolling horizontally
   if (touchMoved) {
     touchMoved = false
     return
   }
+  if (props.selectMode) {
+    emit('toggle-select', entry)
+    return
+  }
   emit('row-click', entry)
+}
+
+function isSelected(entry: Entry): boolean {
+  if (!props.selectedEntryIds) return false
+  return props.selectedEntryIds.has(entry.id || (entry as any)._tempId || '')
 }
 
 const tableMinWidth = computed(() => {

@@ -43,6 +43,15 @@
       @search-morphemes="(q) => $emit('search-morphemes', q)"
     />
 
+    <!-- Rules sub-page -->
+    <EntriesMobileRulesPage
+      v-else-if="showRulesPage"
+      :rules="rules"
+      @back="closeSubPage"
+      @toggle-rule="(id) => $emit('toggle-rule', id)"
+      @remove-rule="(id) => $emit('remove-rule', id)"
+    />
+
     <!-- Row editor view -->
     <EntriesMobileRowEditor
       v-else-if="activeEntry"
@@ -93,11 +102,13 @@
       :filter-dialect-options="filterDialectOptions"
       :theme-filter-options="themeFilterOptions"
       :status-filter-options="statusFilterOptions"
+      :rule-count="rules.length"
       @back="closeViewPage"
       @select-view="(v) => { $emit('update:viewMode', v); closeViewPage() }"
       @apply-saved-view="(view) => { $emit('apply-saved-view', view); closeViewPage() }"
       @save-current-view="$emit('save-current-view')"
       @manage-views="$emit('manage-views')"
+      @open-rules-page="openSubPage('rules')"
       @update:density="(v) => density = v"
       @update:sticky-first-column="(v) => stickyFirstColumn = v"
       @toggle-column="toggleOptionalColumn"
@@ -230,20 +241,38 @@
         </p>
       </div>
 
-      <!-- Grid (supports both flat and grouped rows) -->
-      <EntriesMobileGrid
-        v-else
-        class="flex-1 min-h-0"
-        :rows="displayRows"
-        :columns="mobileColumns"
-        :expanded-groups="expandedGroupKeys"
-        :density="density"
-        :sticky-first-column="stickyFirstColumn"
-        :get-cell-display="getCellDisplay"
-        :get-cell-class="getCellClass"
-        @row-click="handleRowClick"
-        @toggle-group="toggleGroup"
-      />
+      <!-- Batch action bar + Grid -->
+      <template v-else>
+        <div
+          v-if="selectMode"
+          class="flex-shrink-0 px-3 py-2 bg-primary-50 dark:bg-primary-900/20 border-b border-primary-200 dark:border-primary-800 flex items-center justify-between gap-2"
+        >
+          <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
+            已選 {{ selectedEntryIds.size }} 項
+          </span>
+          <div class="flex items-center gap-1.5">
+            <UButton size="xs" variant="soft" color="primary" @click="showBatchStatusPicker = true">修改狀態</UButton>
+            <UButton size="xs" variant="soft" color="error" icon="i-heroicons-trash" @click="$emit('batch-delete', [...selectedEntryIds])">刪除</UButton>
+            <UButton size="xs" variant="ghost" color="neutral" @click="exitSelectMode">取消</UButton>
+          </div>
+        </div>
+        <EntriesMobileGrid
+          class="flex-1 min-h-0"
+          :rows="displayRows"
+          :columns="mobileColumns"
+          :expanded-groups="expandedGroupKeys"
+          :density="density"
+          :sticky-first-column="stickyFirstColumn"
+          :select-mode="selectMode"
+          :selected-entry-ids="selectedEntryIds"
+          :get-cell-display="getCellDisplay"
+          :get-cell-class="getCellClass"
+          @row-click="handleRowClick"
+          @toggle-group="toggleGroup"
+          @long-press="enterSelectMode"
+          @toggle-select="toggleEntrySelection"
+        />
+      </template>
 
       <!-- Pagination -->
       <div v-if="!loading && !isEmpty && pagination.totalPages > 1" class="flex-shrink-0 px-4 py-2 border-t border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] bg-gray-50 dark:bg-slate-900 flex items-center justify-between">
@@ -271,6 +300,33 @@
         </div>
       </div>
     </template>
+
+    <!-- Batch status change picker -->
+    <USlideover
+      :open="showBatchStatusPicker"
+      side="bottom"
+      :ui="{ wrapper: 'max-h-[50vh]', base: 'bg-white dark:bg-slate-800 rounded-t-none' }"
+      @update:open="(v: boolean) => { if (!v) showBatchStatusPicker = false }"
+    >
+      <template #header>
+        <div class="flex items-center justify-between w-full">
+          <span class="text-sm font-semibold text-gray-900 dark:text-white">批量修改狀態</span>
+          <UButton label="完成" variant="ghost" color="primary" size="sm" @click="showBatchStatusPicker = false" />
+        </div>
+      </template>
+      <template #body>
+        <div class="space-y-1 py-2">
+          <button
+            v-for="opt in batchStatusOptions"
+            :key="opt.value"
+            class="w-full flex items-center px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            @click="handleBatchStatusChange(opt.value)"
+          >
+            <span class="text-sm text-gray-900 dark:text-white">{{ opt.label }}</span>
+          </button>
+        </div>
+      </template>
+    </USlideover>
   </div>
 </template>
 
@@ -286,6 +342,7 @@ import EntriesMobileViewPage from './EntriesMobileViewPage.vue'
 import EntriesMobileSensesPage from './EntriesMobileSensesPage.vue'
 import EntriesMobileThemePage from './EntriesMobileThemePage.vue'
 import EntriesMobileMorphemePage from './EntriesMobileMorphemePage.vue'
+import EntriesMobileRulesPage from './EntriesMobileRulesPage.vue'
 
 type MobileGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type MobileRow =
@@ -350,6 +407,9 @@ const props = defineProps<{
   unlinkedMorphemeCandidates: Array<{ position: number; char: string; jyutping: string; note: string }>
   morphemeSearchResults: Array<{ id: string; headword: string; jyutping: string; definition: string; dialect: string; entryType: string }>
   morphemeSearchLoading: boolean
+
+  // Phase 5: Rules
+  rules: Array<{ id: string; name: string; kind: string; enabled: boolean; targetFields: string[]; condition: { kind: string }; stylePreset: string; colorHex?: string }>
 }>()
 
 const emit = defineEmits<{
@@ -398,6 +458,12 @@ const emit = defineEmits<{
   // Phase 4: Row editor extra actions
   'make-new-lexeme': [entry: Entry]
   'join-lexeme': [entry: Entry]
+
+  // Phase 5: Batch operations
+  'batch-delete': [entryIds: string[]]
+  'batch-status-change': [entryIds: string[], status: string]
+  'toggle-rule': [ruleId: string]
+  'remove-rule': [ruleId: string]
 }>()
 
 const localSearchQuery = ref(props.searchQuery)
@@ -407,9 +473,50 @@ watch(() => props.searchQuery, (val) => {
   localSearchQuery.value = val
 })
 
+// --- Multi-select mode ---
+const selectMode = ref(false)
+const selectedEntryIds = ref<Set<string>>(new Set())
+const showBatchStatusPicker = ref(false)
+
+function enterSelectMode(entry: Entry) {
+  selectMode.value = true
+  const id = entry.id || (entry as any)._tempId || ''
+  if (id) selectedEntryIds.value = new Set([id])
+}
+
+function exitSelectMode() {
+  selectMode.value = false
+  selectedEntryIds.value = new Set()
+}
+
+function handleBatchStatusChange(status: string) {
+  if (selectedEntryIds.value.size === 0) return
+  emit('batch-status-change', [...selectedEntryIds.value], status)
+  showBatchStatusPicker.value = false
+  exitSelectMode()
+}
+
+function toggleEntrySelection(entry: Entry) {
+  const id = entry.id || (entry as any)._tempId || ''
+  if (!id) return
+  const next = new Set(selectedEntryIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedEntryIds.value = next
+  // Exit select mode if all deselected
+  if (next.size === 0) exitSelectMode()
+}
+
+const batchStatusOptions = [
+  { value: 'draft', label: '草稿' },
+  { value: 'pending_review', label: '待審核' },
+  { value: 'approved', label: '已發佈' },
+  { value: 'rejected', label: '已拒絕' }
+]
+
 const activeEntry = ref<Entry | null>(null)
 const showViewPage = ref(false)
-const activeSubPage = ref<'senses' | 'theme' | 'morpheme' | null>(null)
+const activeSubPage = ref<'senses' | 'theme' | 'morpheme' | 'rules' | null>(null)
 
 // --- Computed AI / reference data for the active entry ---
 const activeEntryKey = computed(() => activeEntry.value ? getEntryIdString(activeEntry.value) : '')
@@ -434,6 +541,7 @@ const jyutjyuResultsForActive = computed(() =>
 const showSensesPage = computed(() => activeSubPage.value === 'senses')
 const showThemePage = computed(() => activeSubPage.value === 'theme')
 const showMorphemePage = computed(() => activeSubPage.value === 'morpheme')
+const showRulesPage = computed(() => activeSubPage.value === 'rules')
 
 // In-page back closes local state first, then consumes the pushed history entry.
 const skipNextPopState = ref(false)

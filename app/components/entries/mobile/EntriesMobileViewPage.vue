@@ -218,10 +218,17 @@
 
       <!-- ===== 規則 tab ===== -->
       <div v-if="activeTab === 'rules'" class="px-4 py-3">
-        <div class="text-center py-8">
-          <UIcon name="i-heroicons-paint-brush" class="w-10 h-10 text-gray-400 mb-3 mx-auto" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">條件着色規則將在後續階段支援。</p>
-        </div>
+        <button
+          class="w-full flex items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+          @click="$emit('open-rules-page')"
+        >
+          <div class="min-w-0">
+            <span class="text-sm text-gray-900 dark:text-white block">條件着色規則</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ ruleCount > 0 ? `${ruleCount} 條規則` : '暫無規則' }}</span>
+          </div>
+          <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-400 shrink-0" />
+        </button>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">可在手機端切換規則啟用 / 停用。建立與編輯規則請使用桌面端。</p>
       </div>
     </div>
 
@@ -307,6 +314,9 @@ const props = defineProps<{
   filterDialectOptions: Array<{ value: string; label: string }>
   themeFilterOptions: Array<{ value: string; label: string }>
   statusFilterOptions: Array<{ value: string; label: string }>
+
+  // Rules
+  ruleCount: number
 }>()
 
 const emit = defineEmits<{
@@ -329,6 +339,8 @@ const emit = defineEmits<{
   'update:filterDialect': [value: string]
   'update:filterStatus': [value: string]
   'update:filterTheme': [value: string]
+  'clear-filters': []
+  'open-rules-page': []
 }>()
 
 // --- Tabs ---
