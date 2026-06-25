@@ -2,7 +2,31 @@
 
 ## 結論
 
-右上角通知鈴鐺不是純裝飾，但目前只完成了「讀取已有通知」的外殼。在正常業務流程中，系統幾乎不會產生通知，所以用戶看到的效果大多是「暫無通知」。這是一個真實功能缺口，建議按審核回饋通知優先補齊。
+右上角通知鈴鐺不是純裝飾。2026-06-25 複查時，第一階段審核結果通知已大致接通：專用 approve / reject API、`entries/[id].put.ts` 狀態旁路、通知 action URL、Header 刷新與 `/notifications` 死鏈移除都已完成。
+
+目前仍有幾個需要跟進的質量點：通知建立失敗已不會阻斷主流程，但失敗結果未被記錄；`entries/[id].put.ts` 只要收到 `status` 就會當作狀態變更，可能產生重複通知；PUT 旁路拒絕沒有可靠拒絕原因；AI Agent 審核旁路尚未接通知；最小測試仍未補。
+
+## 實施狀態更新（2026-06-25）
+
+已完成：
+
+- [x] `Notification.ts` 的審核通知 action URL 已改為 `/entries?search=${entryId}`。
+- [x] 已新增 `getEntryNotificationRecipients()`，只取 `createdBy`、`updatedBy` 去重，並排除本次操作者。
+- [x] `server/api/reviews/[id]/approve.post.ts` 已在審核通過後建立 `review_approved` 通知。
+- [x] `server/api/reviews/[id]/reject.post.ts` 已在審核拒絕後建立 `review_rejected` 通知，並帶入拒絕原因與 `reviewedBy`。
+- [x] `server/api/entries/[id].put.ts` 已補上審核員/管理員直接改為 `approved` / `rejected` 時的通知旁路。
+- [x] Header 打開下拉時會刷新通知，已加入 60 秒輪詢、頁面恢復可見刷新，以及 unmount 清理。
+- [x] Header 下拉仍只顯示最新 5 條，不提供刪除入口。
+- [x] Header 下拉已不再顯示會跳到不存在 `/notifications` 的入口。
+- [x] 用 fnm Node/npm 執行 `zsh -ic 'npm run build'` 已通過；只看到既有 chunk size 與 Tailwind sourcemap warning。
+
+仍待修正或補強：
+
+- [ ] 通知建立失敗目前被 `Promise.allSettled()` 隔離，但 rejected result 沒有被記錄；`createNotificationSafely()` 已存在但未被 approve / reject / PUT 旁路使用。
+- [ ] `entries/[id].put.ts` 目前只要 body 帶 `status: 'approved' | 'rejected'` 就會建立通知，即使原狀態沒有真的改變。詞條列表保存 payload 會帶 `status`，所以審核員/管理員普通保存已通過或已拒絕詞條時有機會重複通知。
+- [ ] PUT 旁路拒絕沒有可靠原因來源：`UpdateEntrySchema` 不接受 `reviewNotes`，拒絕通知只能使用既有 `existingEntry.reviewNotes || ''`，可能是空字串或舊原因。
+- [ ] `server/api/agent/chat.post.ts` 的 `reviewEntry()` 也會把待審核詞條改為通過/拒絕，但尚未建立通知。
+- [ ] 尚未新增通知相關單元測試或整合測試。
 
 ## 產品決策紀錄
 
@@ -46,78 +70,88 @@
 
 - `server/utils/Notification.ts` 已有通知資料模型，支援 `review_approved`、`review_rejected`、`draft_reminder`、`system` 四種通知類型。
 - 同一檔案已定義 `createApprovedNotification()`、`createRejectedNotification()`、`createDraftReminderNotification()`、`createSystemNotification()` helper。
+- 同一檔案已新增 `createNotificationSafely()` 與 `getEntryNotificationRecipients()`；前者尚未被審核流程實際使用。
 - `server/api/notifications/index.get.ts` 可讀取當前用戶通知列表與未讀數。
 - `server/api/notifications/[id]/read.put.ts` 可標記單一通知為已讀。
 - `server/api/notifications/read-all.put.ts` 可標記當前用戶所有通知為已讀。
 - `app/composables/useNotifications.ts` 已封裝前端讀取、標記已讀、全部已讀、圖標與顏色邏輯。
 - `app/components/layout/AppHeader.vue` 已把通知鈴鐺接到 `useNotifications()`，並顯示最多 5 條通知。
+- `server/api/reviews/[id]/approve.post.ts`、`server/api/reviews/[id]/reject.post.ts` 與 `server/api/entries/[id].put.ts` 已接入審核結果通知。
 
-## 已確認的缺口
+## 原始缺口與目前狀態
 
-### 1. 通知沒有生產者
+### 1. 通知沒有生產者（第一階段已補）
 
-`Notification.ts` 裏的建立通知 helper 目前沒有被任何業務流程調用。審核通過、審核拒絕、提交審核、建立草稿、系統公告等流程都不會寫入 `notifications` collection。
+`Notification.ts` 裏的建立通知 helper 原本沒有被任何業務流程調用。現在第一階段核心生產者已補上：
 
-具體例子：
+- `server/api/reviews/[id]/approve.post.ts` 已在審核通過後通知詞條相關用戶。
+- `server/api/reviews/[id]/reject.post.ts` 已在審核拒絕後通知詞條相關用戶。
+- `server/api/entries/[id].put.ts` 已在審核員或管理員直接把狀態改為 `approved` / `rejected` 時建立通知。
 
-- `server/api/reviews/[id]/approve.post.ts` 只更新詞條狀態、寫入 `EditHistory`，沒有通知詞條建立者。
-- `server/api/reviews/[id]/reject.post.ts` 只更新詞條狀態、寫入拒絕原因與 `EditHistory`，沒有通知詞條建立者。
-- `server/api/entries/[id]/submit.post.ts` 只把詞條轉為 `pending_review` 並寫入 `EditHistory`，沒有通知有關審核員。
-- `server/api/entries/[id].put.ts` 可直接把狀態改為 `approved` 或 `rejected`，但這條旁路也沒有通知。
+仍保留的範圍外或待補項：
 
-所以除非資料庫被手動插入通知，否則 Header 鈴鐺正常情況下沒有可顯示內容。
+- `server/api/entries/[id]/submit.post.ts` 提交審核後通知審核員仍按產品決策暫緩。
+- 草稿提醒與系統公告仍不做。
+- `server/api/agent/chat.post.ts` 的 AI Agent 審核旁路尚未建立通知。
+- PUT 狀態旁路目前仍需補真實狀態變更判斷、失敗 log 與拒絕原因來源。
 
-### 2. 「查看全部通知」入口與本期範圍不匹配
+### 2. 「查看全部通知」入口與本期範圍不匹配（已修正）
 
-Header 下拉底部有 `to="/notifications"` 的入口，但目前沒有 `app/pages/notifications.vue` 或等價頁面。當通知真的存在時，用戶點「查看全部通知」會進入不存在的頁面。
+Header 下拉原本有 `to="/notifications"` 的入口，但目前沒有 `app/pages/notifications.vue` 或等價頁面。第一階段已移除/隱藏這個入口，避免提供死鏈。
 
-因為第一階段已確認不做完整通知頁，所以應在本期移除或隱藏這個入口，避免提供死鏈。
+完整通知頁仍屬未來方案。
 
-### 3. 通知 action URL 目前不可靠
+### 3. 通知 action URL 目前不可靠（已修正）
 
-現有 helper 生成的 `actionUrl` 是 `/entries?id=${entryId}`，但詞條列表頁目前主要處理 `search`、`filter`、共享視圖等 query，沒有消化 `id` query 來定位或打開指定詞條。
+原本 helper 生成的 `actionUrl` 是 `/entries?id=${entryId}`，但詞條列表頁主要處理 `search`、`filter`、共享視圖等 query，沒有消化 `id` query 來定位或打開指定詞條。
 
-第一階段直接把通知 action URL 改為 `/entries?search=${entryId}`，沿用現有搜尋機制即可。
+現在審核通知與草稿提醒 helper 均使用 `/entries?search=${entryId}`，可沿用現有搜尋機制。
 
-### 4. Header 只在掛載時拉取通知
+### 4. Header 只在掛載時拉取通知（已修正）
 
-`AppHeader.vue` 只在 `onMounted()` 時呼叫 `fetchNotifications()`。即使日後後端開始產生通知，已登入用戶在同一個 session 內不一定會即時看到未讀數更新。
+`AppHeader.vue` 原本只在 `onMounted()` 時呼叫 `fetchNotifications()`。現在已補：
 
-建議第一階段使用簡單輪詢：登入後每 60 秒刷新一次通知，打開鈴鐺時立即刷新一次，頁面重新變為可見時再刷新一次。這比 SSE 或 WebSocket 簡單，足夠支撐目前的通知量。
+- 打開鈴鐺時呼叫 `fetchNotifications(1, 20)`。
+- 已登入掛載後每 60 秒輪詢一次。
+- `visibilitychange` 回到可見時刷新一次。
+- `onBeforeUnmount()` 清理 interval、`visibilitychange` listener 與 dropdown 外部點擊 listener。
 
 ## 建議優先級
 
-### P0：補齊審核結果通知
+### P0：補齊審核結果通知（大部分已完成）
 
 這是最直接、最符合現有通知類型的價值點。
 
 觸發點：
 
-- 審核通過：在 `server/api/reviews/[id]/approve.post.ts` 成功更新後，通知詞條 loop 內的相關用戶。
-- 審核拒絕：在 `server/api/reviews/[id]/reject.post.ts` 成功更新後，通知詞條 loop 內的相關用戶，包含拒絕原因。
-- 狀態旁路：在 `server/api/entries/[id].put.ts` 由審核員或管理員把狀態改為 `approved` 或 `rejected` 時，也應建立同樣通知，避免繞過專用審核 API。
+- [x] 審核通過：在 `server/api/reviews/[id]/approve.post.ts` 成功更新後，通知詞條 loop 內的相關用戶。
+- [x] 審核拒絕：在 `server/api/reviews/[id]/reject.post.ts` 成功更新後，通知詞條 loop 內的相關用戶，包含拒絕原因。
+- [x] 狀態旁路：在 `server/api/entries/[id].put.ts` 由審核員或管理員把狀態改為 `approved` 或 `rejected` 時，也建立同樣通知，避免繞過專用審核 API。
+- [ ] AI Agent 審核旁路：`server/api/agent/chat.post.ts` 的 `reviewEntry()` 尚未建立通知。
 
 注意事項：
 
-- 第一階段的 loop 接收者明確為 `createdBy`、`updatedBy` 去重後的集合，不查 `EditHistory`；未來如果新增留言、訂閱、協作者或 watchlist，再擴展 recipient resolver。
-- 如果接收者等於本次審核者 `user.id`，跳過該接收者，避免自己審核自己還收到通知。
-- 建議通知失敗不要令審核操作失敗；可捕捉錯誤並記錄 `console.error`。
-- `reviewedBy` metadata 建議存 user id，顯示層如需名稱再額外查詢或冗餘保存 username。
+- [x] 第一階段的 loop 接收者明確為 `createdBy`、`updatedBy` 去重後的集合，不查 `EditHistory`；未來如果新增留言、訂閱、協作者或 watchlist，再擴展 recipient resolver。
+- [x] 如果接收者等於本次審核者 `user.id`，跳過該接收者，避免自己審核自己還收到通知。
+- [ ] 通知失敗不要令審核操作失敗這點已做到，但目前沒有記錄 rejected result，需要補 `console.error` 或改用 `createNotificationSafely()`。
+- [x] 拒絕通知的 `reviewedBy` metadata 已存 user id；通過通知目前未存 `reviewedBy`。
+- [ ] PUT 旁路應只在真實狀態變更時建立通知，避免普通保存造成重複通知。
+- [ ] PUT 旁路拒絕需要明確拒絕原因來源，避免空原因或舊原因。
 
-### P1：修正 Header 下拉與刷新
+### P1：修正 Header 下拉與刷新（已完成）
 
-- 打開鈴鐺時呼叫 `fetchNotifications(1, 20)`。
-- 登入後用 `setInterval` 每 60 秒刷新一次。
-- 監聽 `visibilitychange`，頁面從背景回到可見時刷新一次。
-- `onBeforeUnmount()` 清理 interval、`visibilitychange` listener、dropdown 外部點擊 listener。
-- 移除或隱藏「查看全部通知」入口，直到未來真的做 `/notifications` 頁。
-- 右上角下拉維持現有最多 5 條通知的呈現，不新增刪除入口。
+- [x] 打開鈴鐺時呼叫 `fetchNotifications(1, 20)`。
+- [x] 登入後用 `setInterval` 每 60 秒刷新一次。
+- [x] 監聽 `visibilitychange`，頁面從背景回到可見時刷新一次。
+- [x] `onBeforeUnmount()` 清理 interval、`visibilitychange` listener、dropdown 外部點擊 listener。
+- [x] 移除或隱藏「查看全部通知」入口，直到未來真的做 `/notifications` 頁。
+- [x] 右上角下拉維持現有最多 5 條通知的呈現，不新增刪除入口。
 
-### P1：修正通知跳轉
+### P1：修正通知跳轉（已完成）
 
 建議先把 helper 裏的 action URL 改成可立即工作的格式：
 
-- 審核結果通知：`/entries?search=${entryId}`
+- [x] 審核結果通知：`/entries?search=${entryId}`
 
 之後若要更精準，可新增 `entryId` query 並在詞條頁自動打開詳情或定位行。
 
@@ -146,7 +180,7 @@ Header 下拉底部有 `to="/notifications"` 的入口，但目前沒有 `app/pa
 
 ### 通知服務層
 
-保留現有 `server/utils/Notification.ts`，但建議新增通用 helper，避免不同流程重複處理錯誤與去重：
+保留現有 `server/utils/Notification.ts`。目前已新增通用 helper，但審核流程仍直接使用 `createApprovedNotification()` / `createRejectedNotification()` 配合 `Promise.allSettled()`；後續應統一到會記錄錯誤的 helper 或檢查 `allSettled` 結果：
 
 ```ts
 async function createNotificationSafely(payload) {
@@ -222,12 +256,12 @@ await Promise.allSettled(
 
 短期修正：
 
-- 打開通知下拉時呼叫 `fetchNotifications(1, 20)`，確保未讀數與列表刷新。
-- 用 `setInterval` 每 60 秒刷新一次；登出或組件卸載時清理。
-- 頁面從背景回到可見時刷新一次，減少用戶切回頁面時看到舊未讀數。
-- 移除或隱藏「查看全部通知」入口。
-- 右上角下拉維持最多 5 條通知的呈現，不新增刪除入口。
-- `onBeforeUnmount()` 應同時移除通知 dropdown 的 document click listener。
+- [x] 打開通知下拉時呼叫 `fetchNotifications(1, 20)`，確保未讀數與列表刷新。
+- [x] 用 `setInterval` 每 60 秒刷新一次；登出或組件卸載時清理。
+- [x] 頁面從背景回到可見時刷新一次，減少用戶切回頁面時看到舊未讀數。
+- [x] 移除或隱藏「查看全部通知」入口。
+- [x] 右上角下拉維持最多 5 條通知的呈現，不新增刪除入口。
+- [x] `onBeforeUnmount()` 應同時移除通知 dropdown 的 document click listener。
 
 ### 完整通知頁
 
@@ -244,23 +278,24 @@ await Promise.allSettled(
 
 ## 測試與驗收
 
-目前專案沒有固定測試框架要求，但已有 Vitest 設定與部分測試。建議新增以下驗收：
+目前專案沒有固定測試框架要求，但已有 Vitest 設定與部分測試。2026-06-25 已用 fnm Node/npm 執行 `zsh -ic 'npm run build'`，build 通過；尚未新增通知測試。
 
-- 後端：審核通過後建立 `review_approved` 通知給 `createdBy` 與 `updatedBy` 去重後且不包含審核者本人的接收者集合。
-- 後端：審核拒絕後建立 `review_rejected` 通知給同一接收者集合，metadata 包含 `entryId`、`headword`、`dialect`、`reviewNotes`、`reviewedBy`。
-- 後端：接收者解析不查 `EditHistory`；如果審核者等於其中一個接收者，只排除審核者本人，其他接收者照常收到。
-- 後端：每次詞條從待審核進入通過或拒絕狀態時都建立對應通知。
-- 後端：通知建立失敗不影響審核 API 成功返回。
-- 前端：Header 有未讀通知時顯示 badge，點擊通知會呼叫標記已讀。
-- 前端：Header 下拉最多顯示最新 5 條通知，不提供刪除通知功能。
-- 前端：Header 打開下拉時刷新，登入後 60 秒輪詢刷新，頁面恢復可見時刷新。
-- 前端：不再顯示會跳到不存在 `/notifications` 的入口。
-- 路由：通知 action URL 使用 `/entries?search=${entryId}`，能把用戶帶到可找到該詞條的搜尋結果。
+- [x] 後端：審核通過後建立 `review_approved` 通知給 `createdBy` 與 `updatedBy` 去重後且不包含審核者本人的接收者集合。
+- [x] 後端：審核拒絕後建立 `review_rejected` 通知給同一接收者集合，metadata 包含 `entryId`、`headword`、`dialect`、`reviewNotes`、`reviewedBy`。
+- [x] 後端：接收者解析不查 `EditHistory`；如果審核者等於其中一個接收者，只排除審核者本人，其他接收者照常收到。
+- [ ] 後端：每次詞條從待審核進入通過或拒絕狀態時都建立對應通知。部分完成：專用審核 API 與 PUT 旁路已覆蓋；AI Agent 審核旁路未覆蓋。
+- [ ] 後端：通知建立失敗不影響審核 API 成功返回。部分完成：主流程已隔離，但失敗沒有記錄。
+- [x] 前端：Header 有未讀通知時顯示 badge，點擊通知會呼叫標記已讀。
+- [x] 前端：Header 下拉最多顯示最新 5 條通知，不提供刪除通知功能。
+- [x] 前端：Header 打開下拉時刷新，登入後 60 秒輪詢刷新，頁面恢復可見時刷新。
+- [x] 前端：不再顯示會跳到不存在 `/notifications` 的入口。
+- [x] 路由：通知 action URL 使用 `/entries?search=${entryId}`，能把用戶帶到可找到該詞條的搜尋結果。
+- [ ] 測試：尚未新增通知接收者、通知失敗隔離、Header 刷新或重複通知防護測試。
 
 最少回歸命令：
 
 ```bash
-npm run build
+zsh -ic 'npm run build'
 ```
 
 如果新增測試，建議：
@@ -271,25 +306,27 @@ npx vitest run
 
 ## 建議實施順序
 
-1. 修正 `Notification.ts` action URL 為 `/entries?search=${entryId}`。
-2. 建立接收者解析函式：只取 `createdBy`、`updatedBy` 去重，並排除本次審核者。
-3. 在 approve / reject 專用 API 接入審核結果通知。
-4. 在 `entries/[id].put.ts` 補狀態旁路通知。
-5. Header 打開下拉時刷新，加入 60 秒輪詢與頁面可見性刷新，並清理 unmount listener。
-6. 移除或隱藏「查看全部通知」入口。
-7. 補後端與前端最小測試。
-8. 後續如有需要，再做完整通知頁、提交審核通知審核員、草稿提醒與系統公告。
+1. [x] 修正 `Notification.ts` action URL 為 `/entries?search=${entryId}`。
+2. [x] 建立接收者解析函式：只取 `createdBy`、`updatedBy` 去重，並排除本次審核者。
+3. [x] 在 approve / reject 專用 API 接入審核結果通知。
+4. [x] 在 `entries/[id].put.ts` 補狀態旁路通知。
+5. [x] Header 打開下拉時刷新，加入 60 秒輪詢與頁面可見性刷新，並清理 unmount listener。
+6. [x] 移除或隱藏「查看全部通知」入口。
+7. [ ] 補後端與前端最小測試。
+8. [ ] 補通知失敗 log、PUT 真實狀態變更判斷、PUT 拒絕原因來源與 AI Agent 審核旁路通知。
+9. [ ] 後續如有需要，再做完整通知頁、提交審核通知審核員、草稿提醒與系統公告。
 
 ## 最小可交付版本
 
 若只想先把右上角通知變成有用功能，建議最小版本包含：
 
-- 審核通過通知建立，接收者為詞條 loop 內相關用戶。
-- 審核拒絕通知建立，接收者為詞條 loop 內相關用戶，內容包含拒絕原因。
-- 詞條 loop 第一階段只包括 `createdBy` 與 `updatedBy`，不追溯歷史編輯者。
-- 通知 action URL 能跳到詞條列表搜尋結果。
-- Header 打開下拉時刷新，並每 60 秒刷新一次。
-- Header 下拉最多顯示最新 5 條，不做刪除。
-- 不顯示 `/notifications` 死鏈。
+- [x] 審核通過通知建立，接收者為詞條 loop 內相關用戶。
+- [x] 審核拒絕通知建立，接收者為詞條 loop 內相關用戶，內容包含拒絕原因。
+- [x] 詞條 loop 第一階段只包括 `createdBy` 與 `updatedBy`，不追溯歷史編輯者。
+- [x] 通知 action URL 能跳到詞條列表搜尋結果。
+- [x] Header 打開下拉時刷新，並每 60 秒刷新一次。
+- [x] Header 下拉最多顯示最新 5 條，不做刪除。
+- [x] 不顯示 `/notifications` 死鏈。
+- [ ] 補齊重複通知防護、通知失敗 log、PUT 拒絕原因與 AI Agent 審核旁路後，第一階段才算更穩。
 
 這樣就能覆蓋貢獻者最需要的閉環：提交詞條後，可以從右上角知道審核結果，並直接回到相關詞條。

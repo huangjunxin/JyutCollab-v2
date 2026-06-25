@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { formatZodErrorToMessage } from '../../../utils/validation'
-import { createRejectedNotification, getEntryNotificationRecipients } from '../../../utils/Notification'
+import { createNotificationSafely, getEntryNotificationRecipients } from '../../../utils/Notification'
 
 const RejectSchema = z.object({
   reason: z.string().trim().min(1, '請提供拒絕原因').max(500, '拒絕原因最多500個字符')
@@ -109,16 +109,18 @@ export default defineEventHandler(async (event) => {
 
     // 發送審核拒絕通知給詞條相關用戶（createdBy/updatedBy 去重，排除審核者本人）
     const recipients = getEntryNotificationRecipients(updatedEntry.toObject(), user.id)
+    const entryHeadword = updatedEntry.headword?.display || ''
+    const entryDialect = updatedEntry.dialect?.name || ''
     await Promise.allSettled(
       recipients.map(userId =>
-        createRejectedNotification(
+        createNotificationSafely({
           userId,
-          updatedEntry.id,
-          updatedEntry.headword?.display || '',
-          updatedEntry.dialect?.name || '',
-          validated.data.reason,
-          user.id
-        )
+          type: 'review_rejected',
+          title: '詞條被拒絕',
+          message: `您的詞條「${entryHeadword}」被拒絕：${validated.data.reason}`,
+          actionUrl: `/entries?search=${updatedEntry.id}`,
+          metadata: { entryId: updatedEntry.id, headword: entryHeadword, dialect: entryDialect, reviewNotes: validated.data.reason, reviewedBy: user.id }
+        })
       )
     )
 

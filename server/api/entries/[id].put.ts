@@ -4,7 +4,7 @@ import { canContributeToDialect } from '../../utils/auth'
 import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
 import { AISuggestion } from '../../utils/AISuggestion'
-import { createApprovedNotification, createRejectedNotification, getEntryNotificationRecipients } from '../../utils/Notification'
+import { createNotificationSafely, getEntryNotificationRecipients } from '../../utils/Notification'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -137,6 +137,8 @@ const UpdateEntrySchema = z.object({
     pos: z.string().optional()
   }).optional(),
   status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
+  // 拒絕原因：審核員/管理員直接在 PUT 中拒絕時需要提供
+  reviewNotes: z.string().trim().max(500, '拒絕原因最多500個字符').optional(),
   // 詞級關聯（可選）：用作範本時沿用來源詞條的 lexemeId，方便按詞語聚合
   lexemeId: z.string().optional(),
   // 詞素／單音節來源（僅屬於本方言點詞條，不跨方言共享）
@@ -337,6 +339,8 @@ export default defineEventHandler(async (event) => {
 
     // Update status (only reviewers/admins can approve/reject)
     if (data.status) {
+      // 只在狀態實際變更時才記錄為 changed，避免重複通知
+      const statusActuallyChanged = data.status !== existingEntry.status
       if (data.status === 'approved' || data.status === 'rejected') {
         if (!isReviewerOrAdmin) {
           throw createError({
@@ -344,8 +348,13 @@ export default defineEventHandler(async (event) => {
             message: '無權更改審核狀態'
           })
         }
-        existingEntry.reviewedBy = userId
-        existingEntry.reviewedAt = new Date()
+        if (statusActuallyChanged) {
+          existingEntry.reviewedBy = userId
+          existingEntry.reviewedAt = new Date()
+          if (data.status === 'rejected' && data.reviewNotes) {
+            existingEntry.reviewNotes = data.reviewNotes
+          }
+        }
       }
       // Block non-reviewers from moving pending_review back to draft (removes from review queue)
       if (data.status === 'draft' && existingEntry.status === 'pending_review' && !isReviewerOrAdmin) {
@@ -355,7 +364,9 @@ export default defineEventHandler(async (event) => {
         })
       }
       existingEntry.status = data.status
-      changedFields.push('status')
+      if (statusActuallyChanged) {
+        changedFields.push('status')
+      }
     }
 
     // Set updatedBy
@@ -380,29 +391,34 @@ export default defineEventHandler(async (event) => {
     if (changedFields.includes('status') && (data.status === 'approved' || data.status === 'rejected') && isReviewerOrAdmin) {
       const entryObj = existingEntry.toObject()
       const recipients = getEntryNotificationRecipients(entryObj, userId)
+      const entryHeadword = existingEntry.headword?.display || ''
+      const entryDialect = existingEntry.dialect?.name || ''
       if (data.status === 'approved') {
         await Promise.allSettled(
           recipients.map(uid =>
-            createApprovedNotification(
-              uid,
-              existingEntry.id,
-              existingEntry.headword?.display || '',
-              existingEntry.dialect?.name || ''
-            )
+            createNotificationSafely({
+              userId: uid,
+              type: 'review_approved',
+              title: '詞條已通過審核',
+              message: `您的詞條「${entryHeadword}」已通過審核並發佈`,
+              actionUrl: `/entries?search=${existingEntry.id}`,
+              metadata: { entryId: existingEntry.id, headword: entryHeadword, dialect: entryDialect }
+            })
           )
         )
       } else {
-        // rejected
+        // rejected — 優先使用 body 傳入的 reviewNotes，其次沿用詞條已有的
+        const rejectionReason = data.reviewNotes || existingEntry.reviewNotes || ''
         await Promise.allSettled(
           recipients.map(uid =>
-            createRejectedNotification(
-              uid,
-              existingEntry.id,
-              existingEntry.headword?.display || '',
-              existingEntry.dialect?.name || '',
-              existingEntry.reviewNotes || '',
-              userId
-            )
+            createNotificationSafely({
+              userId: uid,
+              type: 'review_rejected',
+              title: '詞條被拒絕',
+              message: `您的詞條「${entryHeadword}」被拒絕${rejectionReason ? `：${rejectionReason}` : ''}`,
+              actionUrl: `/entries?search=${existingEntry.id}`,
+              metadata: { entryId: existingEntry.id, headword: entryHeadword, dialect: entryDialect, reviewNotes: rejectionReason, reviewedBy: userId }
+            })
           )
         )
       }

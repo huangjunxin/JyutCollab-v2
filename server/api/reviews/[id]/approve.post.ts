@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createApprovedNotification, getEntryNotificationRecipients } from '../../../utils/Notification'
+import { createNotificationSafely, getEntryNotificationRecipients } from '../../../utils/Notification'
 
 const ApproveSchema = z.object({
   notes: z.string().optional()
@@ -100,14 +100,18 @@ export default defineEventHandler(async (event) => {
 
     // 發送審核通過通知給詞條相關用戶（createdBy/updatedBy 去重，排除審核者本人）
     const recipients = getEntryNotificationRecipients(updatedEntry.toObject(), user.id)
+    const entryHeadword = updatedEntry.headword?.display || ''
+    const entryDialect = updatedEntry.dialect?.name || ''
     await Promise.allSettled(
       recipients.map(userId =>
-        createApprovedNotification(
+        createNotificationSafely({
           userId,
-          updatedEntry.id,
-          updatedEntry.headword?.display || '',
-          updatedEntry.dialect?.name || ''
-        )
+          type: 'review_approved',
+          title: '詞條已通過審核',
+          message: `您的詞條「${entryHeadword}」已通過審核並發佈`,
+          actionUrl: `/entries?search=${updatedEntry.id}`,
+          metadata: { entryId: updatedEntry.id, headword: entryHeadword, dialect: entryDialect }
+        })
       )
     )
 

@@ -9,6 +9,7 @@ import { convertToHongKongTraditional } from '../../utils/textConversion'
 import { EditHistory } from '../../utils/EditHistory'
 import { Entry } from '../../utils/Entry'
 import { User } from '../../utils/User'
+import { createNotificationSafely, getEntryNotificationRecipients } from '../../utils/Notification'
 
 const ChatSchema = z.object({
   message: z.string().trim().max(2000).default(''),
@@ -258,6 +259,39 @@ async function reviewEntry(entryId: string, actor: any, approved: boolean, reaso
     action: 'status_change',
     comment: approved ? 'Approved via JyutCollab AI Agent' : `Rejected via JyutCollab AI Agent: ${reason || '未提供拒絕原因'}`
   })
+
+  // 發送審核結果通知給詞條相關用戶（排除審核者本人）
+  const recipients = getEntryNotificationRecipients(updatedEntry.toObject(), actor.id)
+  const entryHeadword = updatedEntry.headword?.display || ''
+  const entryDialect = updatedEntry.dialect?.name || ''
+  if (approved) {
+    await Promise.allSettled(
+      recipients.map(uid =>
+        createNotificationSafely({
+          userId: uid,
+          type: 'review_approved',
+          title: '詞條已通過審核',
+          message: `您的詞條「${entryHeadword}」已通過審核並發佈`,
+          actionUrl: `/entries?search=${updatedEntry.id}`,
+          metadata: { entryId: updatedEntry.id, headword: entryHeadword, dialect: entryDialect }
+        })
+      )
+    )
+  } else {
+    await Promise.allSettled(
+      recipients.map(uid =>
+        createNotificationSafely({
+          userId: uid,
+          type: 'review_rejected',
+          title: '詞條被拒絕',
+          message: `您的詞條「${entryHeadword}」被拒絕：${reason || '未提供拒絕原因'}`,
+          actionUrl: `/entries?search=${updatedEntry.id}`,
+          metadata: { entryId: updatedEntry.id, headword: entryHeadword, dialect: entryDialect, reviewNotes: reason || '未提供拒絕原因', reviewedBy: actor.id }
+        })
+      )
+    )
+  }
+
   return message(approved ? `已通過「${updatedEntry.headword?.display || entryId}」。` : `已拒絕「${updatedEntry.headword?.display || entryId}」。`)
 }
 
