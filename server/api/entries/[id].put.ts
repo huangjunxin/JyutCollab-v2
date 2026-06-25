@@ -149,10 +149,7 @@ const UpdateEntrySchema = z.object({
     jyutping: z.string().optional(),
     note: z.string().optional()
   })).optional()
-}).refine(
-  (data) => data.status !== 'rejected' || (data.reviewNotes && data.reviewNotes.trim().length > 0),
-  { message: '拒絕詞條時必須提供拒絕原因（reviewNotes）', path: ['reviewNotes'] }
-)
+})
 
 export default defineEventHandler(async (event) => {
   try {
@@ -352,9 +349,16 @@ export default defineEventHandler(async (event) => {
           })
         }
         if (statusActuallyChanged) {
+          // 真正轉為拒絕時必須提供原因，避免通知帶空原因或舊原因
+          if (data.status === 'rejected' && !data.reviewNotes?.trim()) {
+            throw createError({
+              statusCode: 400,
+              message: '拒絕詞條時必須提供拒絕原因（reviewNotes）'
+            })
+          }
           existingEntry.reviewedBy = userId
           existingEntry.reviewedAt = new Date()
-          if (data.status === 'rejected' && data.reviewNotes) {
+          if (data.status === 'rejected') {
             existingEntry.reviewNotes = data.reviewNotes
           }
         }
