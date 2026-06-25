@@ -80,10 +80,20 @@
                     </UBadge>
                   </div>
                 </div>
-                <UIcon
-                  :name="expandedGroups.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
-                  class="w-5 h-5 text-gray-400 shrink-0"
-                />
+                <div class="flex items-center gap-1 shrink-0">
+                  <UButton
+                    v-if="viewMode === 'lexeme' && canEditExternalEtymons"
+                    icon="i-heroicons-globe-asia-australia"
+                    variant="ghost"
+                    color="neutral"
+                    size="xs"
+                    @click.stop="$emit('open-group-external-etymons', row.group.headwordNormalized || '', row.group.headwordDisplay || '', row.group.entries)"
+                  />
+                  <UIcon
+                    :name="expandedGroups.has(row.group.headwordNormalized) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
+                    class="w-5 h-5 text-gray-400"
+                  />
+                </div>
               </div>
             </td>
           </tr>
@@ -198,6 +208,10 @@ const props = defineProps<{
   // Multi-select mode
   selectMode?: boolean
   selectedEntryIds?: Set<string>
+
+  // External etymons
+  viewMode?: 'flat' | 'aggregated' | 'lexeme'
+  canEditExternalEtymons?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -205,6 +219,7 @@ const emit = defineEmits<{
   'toggle-group': [headwordNormalized: string]
   'long-press': [entry: Entry]
   'toggle-select': [entry: Entry]
+  'open-group-external-etymons': [groupKey: string, groupLabel: string, entries: Entry[]]
 }>()
 
 const scrollContainer = ref<HTMLElement | null>(null)

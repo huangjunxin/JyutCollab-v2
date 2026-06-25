@@ -49,7 +49,7 @@
       </div>
       <EntriesMobileFieldRow label="類型" icon="i-heroicons-tag" :value="entryTypeLabel" type="select" :options="entryTypeOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('entryType')" />
       <EntriesMobileFieldRow label="語域" icon="i-heroicons-chat-bubble-left-right" :value="entry.meta?.register || ''" type="select" :options="registerOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('register')" />
-      <div v-if="registerAISuggestion" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+      <div v-if="registerAISuggestion && !readOnly" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
         <p class="text-xs text-blue-700 dark:text-blue-300 mb-1">AI 語域建議</p>
         <p class="text-sm text-gray-900 dark:text-white">
           {{ registerAISuggestion.register }}
@@ -106,7 +106,7 @@
         <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-400 shrink-0" />
       </button>
       <!-- AI theme suggestion -->
-      <div v-if="themeAISuggestion" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+      <div v-if="themeAISuggestion && !readOnly" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
         <p class="text-xs text-blue-700 dark:text-blue-300 mb-1">AI 建議：{{ themeAISuggestion.level3Name }}（{{ themeAISuggestion.level1Name }}）</p>
         <div class="flex gap-2">
           <UButton size="xs" color="primary" @click="$emit('accept-theme-ai')">採納</UButton>
@@ -132,7 +132,7 @@
         <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-400 shrink-0" />
       </button>
       <!-- AI definition suggestion -->
-      <div v-if="definitionAISuggestion" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+      <div v-if="definitionAISuggestion && !readOnly" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
         <p class="text-xs text-blue-700 dark:text-blue-300 mb-1">AI 釋義建議</p>
         <p class="text-sm text-gray-900 dark:text-white">{{ definitionAISuggestion.definition }}</p>
         <div class="flex gap-2 mt-1">
@@ -174,7 +174,7 @@
         <p class="text-xs font-medium text-green-700 dark:text-green-300 mb-1">其他方言點已有</p>
         <div v-for="od in otherDialectEntries.slice(0, 3)" :key="od.id" class="flex items-center justify-between gap-2 text-xs">
           <span class="text-gray-600 dark:text-gray-400">{{ od.headwordDisplay }}（{{ od.dialectLabel }}）</span>
-          <UButton size="xs" variant="ghost" color="primary" @click="$emit('apply-other-dialect', od.id)">套用</UButton>
+          <UButton v-if="!readOnly" size="xs" variant="ghost" color="primary" @click="$emit('apply-other-dialect', od.id)">套用</UButton>
         </div>
       </div>
 
@@ -183,7 +183,7 @@
         <p class="text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">Jyutjyu 參考</p>
         <div v-for="jy in jyutjyuResults.slice(0, 3)" :key="jy.id" class="flex items-center justify-between gap-2 text-xs">
           <span class="text-gray-600 dark:text-gray-400">{{ jy.headwordDisplay }}（{{ jy.jyutping }}）</span>
-          <UButton size="xs" variant="ghost" color="primary" @click="$emit('apply-jyutjyu', jy.id)">套用</UButton>
+          <UButton v-if="!readOnly" size="xs" variant="ghost" color="primary" @click="$emit('apply-jyutjyu', jy.id)">套用</UButton>
         </div>
       </div>
     </div>

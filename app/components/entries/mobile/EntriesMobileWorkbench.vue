@@ -80,7 +80,7 @@
       @back="closeRowEditor"
       @save="(entry) => $emit('save-entry', entry)"
       @cancel="(entry) => { $emit('cancel-entry', entry); closeRowEditor() }"
-      @duplicate="(entry) => $emit('duplicate-entry', entry)"
+      @duplicate="handleDuplicate"
       @delete="(entry) => $emit('delete-entry', entry)"
       @update:entry="(entry) => $emit('update:entry', entry)"
       @make-new-lexeme="(entry) => $emit('make-new-lexeme', entry)"
@@ -288,10 +288,12 @@
           :get-cell-display="getCellDisplay"
           :get-cell-class="getCellClass"
           :get-cell-overlay-meta="getCellOverlayMeta"
+          :view-mode="viewMode"
           @row-click="handleRowClick"
           @toggle-group="toggleGroup"
           @long-press="enterSelectMode"
           @toggle-select="toggleEntrySelection"
+          @open-group-external-etymons="handleGroupExternalEtymons"
         />
       </template>
 
@@ -515,6 +517,7 @@ const emit = defineEmits<{
   'make-new-lexeme': [entry: Entry]
   'join-lexeme': [entry: Entry]
   'open-external-etymons': [entry: Entry]
+  'open-group-external-etymons': [groupKey: string, groupLabel: string, entries: Entry[]]
   'accept-jyutdict': [entry: Entry]
 
   // Phase 5: Batch operations
@@ -820,6 +823,19 @@ function handleAddNew() {
       openRowEditor(firstRow.entry)
     }
   })
+}
+
+function handleDuplicate(entry: Entry) {
+  emit('duplicate-entry', entry)
+  // 父層 duplicateEntry() 會 unshift 新詞條到列表頂部，nextTick 後打開新副本
+  nextTick(() => {
+    const newRow = props.tableRows.find(r => r.type === 'entry' && (r as any).entry?._isNew)
+    if (newRow && newRow.type === 'entry') openRowEditor(newRow.entry)
+  })
+}
+
+function handleGroupExternalEtymons(groupKey: string, groupLabel: string, entries: Entry[]) {
+  emit('open-group-external-etymons', groupKey, groupLabel, entries)
 }
 </script>
 

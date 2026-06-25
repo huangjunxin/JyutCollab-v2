@@ -426,9 +426,11 @@ const emit = defineEmits<{
 
 const canGenerateAI = computed(() => !!props.entry.headword?.display?.trim())
 
-// Ensure senses structure on mount
+// Ensure senses structure on mount (skip in readOnly to avoid setting _isDirty on unmodified entries)
 onMounted(() => {
-  ensureSensesStructure(props.entry)
+  if (!props.readOnly) {
+    ensureSensesStructure(props.entry)
+  }
 })
 
 const senses = computed(() => props.entry.senses || [])

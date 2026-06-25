@@ -456,6 +456,7 @@
       @make-new-lexeme="(entry: any) => makeEntryNewLexeme(entry)"
       @join-lexeme="(entry: any) => openMergeModalForEntry(entry)"
       @open-external-etymons="(entry: any) => openExternalEtymonsForGroup(String(entry.lexemeId || ''), entry.headword?.display || entry.text || '')"
+      @open-group-external-etymons="(groupKey: string, groupLabel: string, entries: any[]) => openExternalEtymonsForGroup(groupKey, groupLabel, entries)"
       @accept-jyutdict="(entry: any) => { const s = getJyutdictSuggested(getEntryIdString(entry)); if (s) acceptJyutdict(entry, s) }"
       @batch-delete="(ids: string[]) => mobileBatchDelete(ids)"
       @batch-status-change="(ids: string[], status: string) => mobileBatchStatusChange(ids, status)"
