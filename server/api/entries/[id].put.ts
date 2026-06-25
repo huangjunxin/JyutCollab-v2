@@ -137,7 +137,7 @@ const UpdateEntrySchema = z.object({
     pos: z.string().optional()
   }).optional(),
   status: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
-  // 拒絕原因：審核員/管理員直接在 PUT 中拒絕時需要提供
+  // 拒絕原因：審核員/管理員直接在 PUT 中拒絕時必填
   reviewNotes: z.string().trim().max(500, '拒絕原因最多500個字符').optional(),
   // 詞級關聯（可選）：用作範本時沿用來源詞條的 lexemeId，方便按詞語聚合
   lexemeId: z.string().optional(),
@@ -149,7 +149,10 @@ const UpdateEntrySchema = z.object({
     jyutping: z.string().optional(),
     note: z.string().optional()
   })).optional()
-})
+}).refine(
+  (data) => data.status !== 'rejected' || (data.reviewNotes && data.reviewNotes.trim().length > 0),
+  { message: '拒絕詞條時必須提供拒絕原因（reviewNotes）', path: ['reviewNotes'] }
+)
 
 export default defineEventHandler(async (event) => {
   try {
@@ -407,17 +410,16 @@ export default defineEventHandler(async (event) => {
           )
         )
       } else {
-        // rejected — 優先使用 body 傳入的 reviewNotes，其次沿用詞條已有的
-        const rejectionReason = data.reviewNotes || existingEntry.reviewNotes || ''
+        // rejected — refinement 保證 data.reviewNotes 存在
         await Promise.allSettled(
           recipients.map(uid =>
             createNotificationSafely({
               userId: uid,
               type: 'review_rejected',
               title: '詞條被拒絕',
-              message: `您的詞條「${entryHeadword}」被拒絕${rejectionReason ? `：${rejectionReason}` : ''}`,
+              message: `您的詞條「${entryHeadword}」被拒絕：${data.reviewNotes}`,
               actionUrl: `/entries?search=${existingEntry.id}`,
-              metadata: { entryId: existingEntry.id, headword: entryHeadword, dialect: entryDialect, reviewNotes: rejectionReason, reviewedBy: userId }
+              metadata: { entryId: existingEntry.id, headword: entryHeadword, dialect: entryDialect, reviewNotes: data.reviewNotes, reviewedBy: userId }
             })
           )
         )
