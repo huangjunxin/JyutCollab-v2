@@ -2,20 +2,19 @@
   <header class="sticky top-0 z-50 border-b border-[var(--jc-border)] bg-white/80 backdrop-blur-md dark:border-[var(--jc-dark-border)] dark:bg-slate-900/80">
     <div class="w-full px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between items-center h-14 sm:h-16 gap-2">
-        <!-- Mobile hamburger -->
-        <UButton
-          v-if="isAuthenticated"
-          color="gray"
-          variant="ghost"
-          icon="i-heroicons-bars-3"
-          square
-          class="md:hidden shrink-0"
-          aria-label="開啟導航"
-          @click="mobileNavOpen = true"
-        />
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+          <UButton
+            v-if="isAuthenticated"
+            color="gray"
+            variant="ghost"
+            icon="i-heroicons-bars-3"
+            square
+            class="md:hidden shrink-0"
+            aria-label="開啟導航"
+            @click="mobileNavOpen = true"
+          />
 
-        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
-          <NuxtLink to="/" class="flex items-center gap-2 sm:gap-3 group">
+          <NuxtLink to="/" class="flex items-center gap-2 sm:gap-3 group shrink-0">
             <div class="w-8 h-8 sm:w-10 sm:h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent)] text-white shadow-[var(--jc-shadow-hard)] transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 shrink-0">
               <UIcon name="i-heroicons-book-open" class="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
@@ -27,7 +26,7 @@
         </div>
 
         <!-- Navigation (desktop) -->
-        <nav class="hidden md:flex items-center gap-1">
+        <nav class="hidden md:flex items-center gap-1 whitespace-nowrap">
           <UButton
             to="/"
             variant="ghost"

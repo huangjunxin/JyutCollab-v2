@@ -40,18 +40,6 @@
       <EntriesMobileFieldRow label="粵拼" icon="i-heroicons-speaker-wave" :value="entry.phonetic?.jyutping?.join('; ') || ''" type="text" :is-editing="editingField === 'phonetic'" :disabled="readOnly" @click="!readOnly && startEdit('phonetic')" @update:model-value="(v: string) => updateField('phonetic', v)" @finish="finishEdit" />
       <EntriesMobileFieldRow label="類型" icon="i-heroicons-tag" :value="entryTypeLabel" type="select" :options="entryTypeOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('entryType')" />
       <EntriesMobileFieldRow label="語域" icon="i-heroicons-chat-bubble-left-right" :value="entry.meta?.register || ''" type="select" :options="registerOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('register')" />
-      <div v-if="!readOnly && canGenerateRegister && !registerAISuggestion" class="px-3 py-2 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-        <UButton
-          size="xs"
-          color="neutral"
-          variant="soft"
-          icon="i-lucide-sparkles"
-          :loading="aiLoadingRegister"
-          @click="$emit('ai-register')"
-        >
-          AI 語域
-        </UButton>
-      </div>
       <div v-if="registerAISuggestion" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
         <p class="text-xs text-blue-700 dark:text-blue-300 mb-1">AI 語域建議</p>
         <p class="text-sm text-gray-900 dark:text-white">
@@ -69,6 +57,27 @@
         </div>
       </div>
       <EntriesMobileFieldRow label="狀態" icon="i-heroicons-check-circle" :value="statusLabel" type="select" :options="statusOptionsForSelect" :disabled="readOnly || !canChangeStatus" @click="(readOnly || !canChangeStatus) ? undefined : openSelectSheet('status')" />
+
+      <div v-if="!readOnly && canGenerateAI" class="px-3 py-3 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
+        <div class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
+          <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
+          <span>AI 輔助</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <UButton size="xs" color="neutral" variant="soft" icon="i-heroicons-folder" block :loading="aiLoadingTheme" @click="$emit('ai-categorize')">
+            AI 分類
+          </UButton>
+          <UButton size="xs" color="neutral" variant="soft" icon="i-heroicons-book-open" block :loading="aiLoadingDefinition" @click="$emit('ai-definition')">
+            AI 釋義
+          </UButton>
+          <UButton size="xs" color="neutral" variant="soft" icon="i-heroicons-chat-bubble-left-ellipsis" block :loading="aiLoadingExamples" @click="$emit('ai-examples')">
+            AI 例句
+          </UButton>
+          <UButton size="xs" color="neutral" variant="soft" icon="i-heroicons-chat-bubble-left-right" block :loading="aiLoadingRegister" @click="$emit('ai-register')">
+            AI 語域
+          </UButton>
+        </div>
+      </div>
 
       <!-- ===== 分類 ===== -->
       <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 mt-4">分類</h3>
@@ -224,6 +233,9 @@ const props = defineProps<{
   themeAISuggestion?: ThemeAISuggestion | null
   definitionAISuggestion?: DefinitionAISuggestion | null
   registerAISuggestion?: RegisterAISuggestion | null
+  aiLoadingTheme?: boolean
+  aiLoadingDefinition?: boolean
+  aiLoadingExamples?: boolean
   aiLoadingRegister?: boolean
 
   // Reference helpers
@@ -248,6 +260,9 @@ const emit = defineEmits<{
   'open-morpheme-page': []
 
   // AI
+  'ai-categorize': []
+  'ai-definition': []
+  'ai-examples': []
   'accept-theme-ai': []
   'dismiss-theme-ai': []
   'accept-definition-ai': []
@@ -290,7 +305,7 @@ const statusClass = computed(() => {
   const m: Record<string, string> = { draft: 'text-gray-500', pending_review: 'text-amber-600', approved: 'text-green-600', rejected: 'text-red-600' }
   return m[props.entry.status || 'draft'] || 'text-gray-500'
 })
-const canGenerateRegister = computed(() => !!props.entry.headword?.display?.trim())
+const canGenerateAI = computed(() => !!props.entry.headword?.display?.trim())
 
 const themeLabel = computed(() => {
   const id = props.entry.theme?.level3Id
