@@ -386,6 +386,7 @@
       :filter-dialect-options="dialectOptions"
       :status-options="statusOptionsForTable"
       :can-change-status="isReviewerOrAdmin"
+      :can-edit-entry="canEditEntry"
       :is-entry-saving="isEntrySaving"
       :filter-dialect="filters.dialect"
       :filter-status="filters.status"
@@ -397,6 +398,7 @@
       :expanded-group-keys="expandedGroupKeys"
       :sort-by="sortBy"
       :sort-order="sortOrder"
+      :reset-selection-trigger="mobileResetSelectionTrigger"
       :theme-ai-suggestions="themeAISuggestions"
       :definition-ai-suggestions="definitionAISuggestions"
       :ai-loading-for="aiLoadingFor"
@@ -404,13 +406,16 @@
       :other-dialect-entries="otherDialectEntriesMap"
       :jyutjyu-results="jyutjyuResultsMap"
       :unlinked-morpheme-candidates="unlinkedMorphemeCandidates"
+      :unlinked-morpheme-entry-id="unlinkedMorphemeEntryId"
       :morpheme-search-results="morphemeSearchResults"
       :morpheme-search-loading="morphemeSearchLoading"
       :rules="ruleOverlays.rules.value"
-      @search="handleSearch"
+      :get-cell-overlay-meta="(e: any, f: string) => ruleOverlays.getCellOverlayMeta(e, f)"
+      @search="(q: string) => { searchQuery = q; handleSearch() }"
       @add-new="addNewRow"
       @save-all="saveAllChanges"
       @row-click="(entry: any) => {}"
+      @update:entry="onMobileEntryUpdate"
       @update:currentPage="(p: number) => { currentPage = p }"
       @update:viewMode="(v: string) => setViewMode(v)"
       @update:filterDialect="(v: string) => { filterDialect = v }"
@@ -439,7 +444,8 @@
       @open-unlinked-form="(entry: any) => openUnlinkedMorphemeForm(entry)"
       @confirm-unlinked-morpheme="(entry: any) => confirmUnlinkedMorphemeRefs(entry)"
       @add-morpheme-ref="(id: string, item: any) => addMorphemeRef(id, item)"
-      @search-morphemes="(q: string) => { morphemeSearchQuery = q }"
+      @search-morphemes="(entry: any, q: string) => handleMobileMorphemeSearch(entry, q)"
+      @morpheme-page-mounted="(entry: any) => handleMobileMorphemePageMounted(entry)"
       @make-new-lexeme="(entry: any) => makeEntryNewLexeme(entry)"
       @join-lexeme="(entry: any) => openMergeModalForEntry(entry)"
       @batch-delete="(ids: string[]) => mobileBatchDelete(ids)"
@@ -586,6 +592,36 @@
       </UCard>
     </template>
   </UModal>
+
+  <!-- 手機端批量刪除確認彈出層 -->
+  <USlideover
+    v-if="isMobile"
+    :open="mobileBatchDeleteSheetOpen"
+    side="bottom"
+    :ui="{ wrapper: 'max-h-[40vh]', base: 'bg-white dark:bg-slate-800 rounded-t-none' }"
+    @update:open="(v: boolean) => { if (!v) { mobileBatchDeleteSheetOpen = false; mobileBatchDeletePendingIds = [] } }"
+  >
+    <template #header>
+      <div class="flex items-center gap-2">
+        <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5 text-red-500" />
+        <div class="min-w-0">
+          <DialogTitle class="text-sm font-semibold text-gray-900 dark:text-white">確認批量刪除</DialogTitle>
+          <DialogDescription class="sr-only">確認是否刪除已選詞條</DialogDescription>
+        </div>
+      </div>
+    </template>
+    <template #body>
+      <p class="text-sm text-gray-600 dark:text-gray-400 py-2">
+        確定要刪除所選的 <span class="font-semibold text-gray-900 dark:text-white">{{ mobileBatchDeletePendingIds.length }}</span> 條詞條嗎？此操作不可撤銷。
+      </p>
+    </template>
+    <template #footer>
+      <div class="flex gap-2 w-full">
+        <UButton color="neutral" variant="soft" size="sm" block @click="mobileBatchDeleteSheetOpen = false; mobileBatchDeletePendingIds = []">取消</UButton>
+        <UButton color="error" size="sm" block @click="confirmMobileBatchDelete">確認刪除</UButton>
+      </div>
+    </template>
+  </USlideover>
   </div>
 </template>
 
@@ -616,6 +652,7 @@ import type { DialectId } from '~shared/dialects'
 import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
 import type { Entry, Register } from '~/types'
 import type { AdvancedFilterFieldKey } from '~/utils/entriesAdvancedFilter'
+import { DialogDescription, DialogTitle } from 'reka-ui'
 import EntriesDesktopTable from '~/components/entries/EntriesDesktopTable.vue'
 import EntriesMobileWorkbench from '~/components/entries/mobile/EntriesMobileWorkbench.vue'
 import LexemeExternalEtymonsModal from '~/components/entries/LexemeExternalEtymonsModal.vue'
@@ -873,8 +910,10 @@ const inputRefs = ref<Map<string, HTMLInputElement | HTMLSelectElement | HTMLTex
 
 // 唯一焦點格：未編輯時表示「選中格」（方向鍵/Enter/Tab 目標），編輯時即正在編輯的格
 const focusedCell = ref<{ rowIndex: number; colIndex: number } | null>(null)
-const tableWrapperRef = ref<HTMLElement | null>(null)
-const tableRef = ref<HTMLTableElement | null>(null)
+const desktopTableRef = ref<InstanceType<typeof EntriesDesktopTable> | null>(null)
+// 從 EntriesDesktopTable 的 exposed refs 取得真實 DOM 參考
+const tableWrapperRef = computed(() => desktopTableRef.value?.tableWrapperRef ?? null)
+const tableRef = computed(() => desktopTableRef.value?.tableRef ?? null)
 
 // 方案 B：行展開編輯釋義詳情（多義項、例句、分義項）。值為當前展開的 entry id
 const expandedEntryId = ref<string | null>(null)
@@ -917,7 +956,8 @@ function setViewMode(v: string) {
   const mode = v === 'aggregated' ? 'aggregated' : (v === 'lexeme' ? 'lexeme' : 'flat')
   viewMode.value = mode
   currentPage.value = 1
-  fetchEntries()
+  if (hasActiveAdvancedFilters.value) fetchAllEntries()
+  else fetchEntries()
 }
 
 function setMobileSortBy(key: string) {
@@ -1734,11 +1774,23 @@ const {
   confirmUnlinkedMorphemeRefs,
   closeUnlinkedMorphemeForm,
   openMorphemeSearch,
+  searchMorphemes,
   addMorphemeRef,
   removeMorphemeRef
 } = useEntryMorphemeRefs(getEntryIdString, {
   onReferenceHelperEvent: logReferenceHelperEvent
 })
+
+function handleMobileMorphemeSearch(entry: Entry, query: string) {
+  morphemeSearchQuery.value = query
+  morphemeSearchTargetEntry.value = entry
+  searchMorphemes(entry, query)
+}
+
+function handleMobileMorphemePageMounted(entry: Entry) {
+  morphemeSearchTargetEntry.value = entry
+  searchMorphemes(entry)
+}
 
 function toggleThemeExpand(entry: Entry) {
   const key = getEntryIdString(entry)
@@ -2551,19 +2603,43 @@ async function deleteEntry(entry: Entry) {
   }
 }
 
-/** 手機端批量刪除 */
+/** 手機端詞條更新後觸發重複檢查與 Jyutjyu 參考（模擬桌面 handleBlur 行為） */
+function onMobileEntryUpdate(entry: Entry) {
+  if (entry.headword?.display?.trim() && entry.dialect?.name) {
+    runDuplicateCheck(entry)
+  }
+  if (entry._isNew && entry.headword?.display?.trim()) {
+    runJyutjyuRef(entry)
+  }
+}
+
+/** 手機端批量刪除（確認流程由 mobileBatchDeleteSheetOpen 控制） */
+const mobileBatchDeleteSheetOpen = ref(false)
+const mobileBatchDeletePendingIds = ref<string[]>([])
+const mobileResetSelectionTrigger = ref(0)
+
 async function mobileBatchDelete(entryIds: string[]) {
   if (!entryIds.length) return
   const savedIds = entryIds.filter(id => !id.startsWith('new-') && !id.startsWith('dup-'))
   if (!savedIds.length) return
-  if (!confirm(`確定要刪除 ${savedIds.length} 條詞條嗎？此操作不可撤銷。`)) return
+  mobileBatchDeletePendingIds.value = savedIds
+  mobileBatchDeleteSheetOpen.value = true
+}
+
+async function confirmMobileBatchDelete() {
+  const savedIds = mobileBatchDeletePendingIds.value
+  if (!savedIds.length) return
+  mobileBatchDeleteSheetOpen.value = false
   try {
     await Promise.all(savedIds.map(id => $fetch(`/api/entries/${id}`, { method: 'DELETE' })))
     savedIds.forEach(id => removeEntryFromLocalStorage(id))
+    mobileResetSelectionTrigger.value++
     await fetchEntries()
   } catch (error: any) {
     console.error('Batch delete failed:', error)
     alert(error?.data?.message || '批量刪除失敗')
+  } finally {
+    mobileBatchDeletePendingIds.value = []
   }
 }
 
@@ -2571,7 +2647,8 @@ async function mobileBatchDelete(entryIds: string[]) {
 async function mobileBatchStatusChange(entryIds: string[], status: string) {
   if (!entryIds.length || !status) return
   try {
-    const validEntries = entries.value.filter(e => {
+    // 使用 allLoadedPageEntries 而非 entries.value，因為在聚合/詞語視圖下 entries.value 可能為空
+    const validEntries = allLoadedPageEntries.value.filter(e => {
       const id = e.id || (e as any)._tempId || ''
       return entryIds.includes(id)
     })
@@ -2797,6 +2874,9 @@ onMounted(async () => {
 
   // 加載貢獻者列表（供提交者篩選下拉使用）
   await fetchContributors()
+
+  // 預載儲存視圖列表（桌面下拉與手機視圖頁都需要）
+  savedViews.fetchViews().catch(() => {})
 
   // 貢獻者若無方言權限 → 引導設定
   if (user.value?.role === 'contributor' && (!user.value.dialectPermissions || user.value.dialectPermissions.length === 0)) {

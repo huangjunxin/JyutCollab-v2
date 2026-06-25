@@ -7,6 +7,8 @@ const source = readFileSync(pagePath, 'utf8')
 
 const panelPath = resolve(process.cwd(), 'app/components/entries/EntriesRuleOverlayPanel.vue')
 const panelSource = readFileSync(panelPath, 'utf8')
+const desktopTablePath = resolve(process.cwd(), 'app/components/entries/EntriesDesktopTable.vue')
+const desktopTableSource = readFileSync(desktopTablePath, 'utf8')
 
 describe('entries page rule overlay wiring', () => {
   it('imports the rule overlay panel and composable', () => {
@@ -40,8 +42,9 @@ describe('entries page rule overlay wiring', () => {
   })
 
   it('passes per-cell overlay metadata without rule persistence or data mutation coupling', () => {
-    expect(source).toContain(':cell-meta="isAdvancedFilterFieldKey(col.key) ? ruleOverlays.getCellOverlayMeta')
-    expect(source).toContain('isAdvancedFilterFieldKey')
+    expect(source).toContain(':get-cell-overlay-meta="(e: any, f: string) => ruleOverlays.getCellOverlayMeta(e, f)"')
+    expect(source).toContain(':is-advanced-filter-field-key="isAdvancedFilterFieldKey"')
+    expect(desktopTableSource).toContain(':cell-meta="isAdvancedFilterFieldKey(col.key) ? getCellOverlayMeta(row.entry, col.key) : undefined"')
     expect(source).not.toMatch(/localStorage.*rule|\$fetch.*rule|save.*rule|delete.*rule|review.*rule|bulk.*rule/i)
   })
 

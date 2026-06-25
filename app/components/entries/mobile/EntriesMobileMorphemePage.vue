@@ -139,8 +139,13 @@ const emit = defineEmits<{
   'open-unlinked-form': []
   'confirm-unlinked-morpheme': []
   'add-morpheme-ref': [item: MorphemeSearchResult]
-  'search-morphemes': [query: string]
+  'search-morphemes': [entry: Entry, query: string]
+  'mounted': [entry: Entry]
 }>()
+
+onMounted(() => {
+  emit('mounted', props.entry)
+})
 
 const searchInput = ref('')
 const searchPerformed = ref(false)
@@ -148,6 +153,6 @@ const searchPerformed = ref(false)
 function doSearch() {
   if (!searchInput.value.trim()) return
   searchPerformed.value = true
-  emit('search-morphemes', searchInput.value.trim())
+  emit('search-morphemes', props.entry, searchInput.value.trim())
 }
 </script>

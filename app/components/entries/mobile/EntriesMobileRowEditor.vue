@@ -17,12 +17,12 @@
             </p>
           </div>
         </div>
-        <div class="flex items-center gap-1 shrink-0">
+        <div v-if="!readOnly" class="flex items-center gap-1 shrink-0">
           <UButton icon="i-heroicons-ellipsis-vertical" variant="ghost" color="neutral" size="sm" @click="showMoreMenu = !showMoreMenu" />
         </div>
       </div>
       <!-- More menu -->
-      <div v-if="showMoreMenu" class="mt-2 py-1 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
+      <div v-if="showMoreMenu && !readOnly" class="mt-2 py-1 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
         <UButton v-if="!entry._isNew" icon="i-heroicons-document-duplicate" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('duplicate', entry); showMoreMenu = false">複製詞條</UButton>
         <UButton v-if="!entry._isNew" icon="i-heroicons-folder-plus" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('make-new-lexeme', entry); showMoreMenu = false">拆出成新詞語</UButton>
         <UButton v-if="!entry._isNew" icon="i-heroicons-arrows-right-left" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('join-lexeme', entry); showMoreMenu = false">加入其他詞語組</UButton>
@@ -35,12 +35,12 @@
       <!-- ===== 基本 ===== -->
       <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 mt-1">基本</h3>
 
-      <EntriesMobileFieldRow label="詞頭" icon="i-heroicons-language" :value="entry.headword?.display || entry.text || ''" type="text" :is-editing="editingField === 'headword'" @click="startEdit('headword')" @update:model-value="(v: string) => updateField('headword', v)" @finish="finishEdit" />
-      <EntriesMobileFieldRow label="方言" icon="i-heroicons-map-pin" :value="getDialectLabel(entry.dialect?.name || '') || entry.dialect?.name || ''" type="select" :options="dialectOptions" @click="openSelectSheet('dialect')" />
-      <EntriesMobileFieldRow label="粵拼" icon="i-heroicons-speaker-wave" :value="entry.phonetic?.jyutping?.join('; ') || ''" type="text" :is-editing="editingField === 'phonetic'" @click="startEdit('phonetic')" @update:model-value="(v: string) => updateField('phonetic', v)" @finish="finishEdit" />
-      <EntriesMobileFieldRow label="類型" icon="i-heroicons-tag" :value="entryTypeLabel" type="select" :options="entryTypeOptions" @click="openSelectSheet('entryType')" />
-      <EntriesMobileFieldRow label="語域" icon="i-heroicons-chat-bubble-left-right" :value="entry.meta?.register || ''" type="select" :options="registerOptions" @click="openSelectSheet('register')" />
-      <EntriesMobileFieldRow label="狀態" icon="i-heroicons-check-circle" :value="statusLabel" type="select" :options="statusOptionsForSelect" :disabled="!canChangeStatus" @click="canChangeStatus ? openSelectSheet('status') : undefined" />
+      <EntriesMobileFieldRow label="詞頭" icon="i-heroicons-language" :value="entry.headword?.display || entry.text || ''" type="text" :is-editing="editingField === 'headword'" :disabled="readOnly" @click="!readOnly && startEdit('headword')" @update:model-value="(v: string) => updateField('headword', v)" @finish="finishEdit" />
+      <EntriesMobileFieldRow label="方言" icon="i-heroicons-map-pin" :value="getDialectLabel(entry.dialect?.name || '') || entry.dialect?.name || ''" type="select" :options="dialectOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('dialect')" />
+      <EntriesMobileFieldRow label="粵拼" icon="i-heroicons-speaker-wave" :value="entry.phonetic?.jyutping?.join('; ') || ''" type="text" :is-editing="editingField === 'phonetic'" :disabled="readOnly" @click="!readOnly && startEdit('phonetic')" @update:model-value="(v: string) => updateField('phonetic', v)" @finish="finishEdit" />
+      <EntriesMobileFieldRow label="類型" icon="i-heroicons-tag" :value="entryTypeLabel" type="select" :options="entryTypeOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('entryType')" />
+      <EntriesMobileFieldRow label="語域" icon="i-heroicons-chat-bubble-left-right" :value="entry.meta?.register || ''" type="select" :options="registerOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('register')" />
+      <EntriesMobileFieldRow label="狀態" icon="i-heroicons-check-circle" :value="statusLabel" type="select" :options="statusOptionsForSelect" :disabled="readOnly || !canChangeStatus" @click="(readOnly || !canChangeStatus) ? undefined : openSelectSheet('status')" />
 
       <!-- ===== 分類 ===== -->
       <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 mt-4">分類</h3>
@@ -48,9 +48,9 @@
         class="w-full flex items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
         @click="$emit('open-theme-page')"
       >
-        <div class="flex items-center gap-3 min-w-0">
+        <div class="flex flex-1 items-center gap-3 min-w-0 text-left">
           <UIcon name="i-heroicons-folder" class="w-4 h-4 text-gray-400 shrink-0" />
-          <div class="min-w-0">
+          <div class="flex-1 min-w-0">
             <span class="text-xs text-gray-500 dark:text-gray-400 block">主題分類</span>
             <span class="text-sm text-gray-900 dark:text-white truncate block" :class="{ 'text-gray-400': !themeLabel }">
               {{ themeLabel || '點擊選擇' }}
@@ -74,9 +74,9 @@
         class="w-full flex items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
         @click="$emit('open-senses-page')"
       >
-        <div class="flex items-center gap-3 min-w-0">
+        <div class="flex flex-1 items-center gap-3 min-w-0 text-left">
           <UIcon name="i-heroicons-book-open" class="w-4 h-4 text-gray-400 shrink-0" />
-          <div class="min-w-0">
+          <div class="flex-1 min-w-0">
             <span class="text-xs text-gray-500 dark:text-gray-400 block">義項詳情</span>
             <span class="text-sm text-gray-900 dark:text-white truncate block">
               {{ sensesSummary || '點擊編輯' }}
@@ -103,9 +103,9 @@
         class="w-full flex items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
         @click="$emit('open-morpheme-page')"
       >
-        <div class="flex items-center gap-3 min-w-0">
+        <div class="flex flex-1 items-center gap-3 min-w-0 text-left">
           <UIcon name="i-heroicons-link" class="w-4 h-4 text-gray-400 shrink-0" />
-          <div class="min-w-0">
+          <div class="flex-1 min-w-0">
             <span class="text-xs text-gray-500 dark:text-gray-400 block">詞素引用</span>
             <span class="text-sm text-gray-900 dark:text-white truncate block">
               {{ morphemeSummary || '無' }}
@@ -144,7 +144,10 @@
 
     <!-- Bottom action bar -->
     <div class="flex-shrink-0 px-4 py-3 bg-white dark:bg-slate-800 border-t border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
-      <div v-if="entry._isNew" class="flex gap-2">
+      <div v-if="readOnly" class="text-center">
+        <p class="text-sm text-gray-500 dark:text-gray-400">此詞條由其他用戶創建，僅供查看</p>
+      </div>
+      <div v-else-if="entry._isNew" class="flex gap-2">
         <UButton color="neutral" variant="soft" size="sm" block @click="$emit('cancel', entry)">取消</UButton>
         <UButton color="primary" size="sm" block :loading="isSaving" @click="$emit('save', entry)">儲存草稿</UButton>
       </div>
@@ -162,6 +165,7 @@
       :title="activeSelectLabel"
       :options="activeSelectOptions"
       :model-value="activeSelectValue"
+      :required="activeSelectField === 'dialect' || activeSelectField === 'entryType'"
       @update:open="(v: boolean) => { if (!v) activeSelectField = null }"
       @select="handleSelect"
     />
@@ -184,6 +188,7 @@ const props = defineProps<{
   dialectOptions: Array<{ value: string; label: string }>
   statusOptions: Array<{ value: string; label: string }>
   canChangeStatus: boolean
+  readOnly?: boolean
   isSaving: boolean
 
   // AI suggestions

@@ -59,9 +59,11 @@
           <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">釋義</label>
           <UTextarea
             :model-value="sense.definition"
-            :rows="2"
+            :rows="4"
             size="sm"
-            :ui="{ base: 'bg-white dark:bg-slate-800' }"
+            autoresize
+            class="w-full"
+            :ui="{ root: 'w-full', base: 'w-full min-h-28 bg-white dark:bg-slate-800' }"
             @update:model-value="(v: string) => updateSenseDefinition(senseIdx, v)"
           />
         </div>
@@ -123,7 +125,7 @@
               <input
                 :value="sub.definition"
                 placeholder="分義項釋義"
-                class="w-full text-sm px-2 py-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                class="w-full min-h-10 text-sm px-2 py-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                 @input="(e) => updateSubSenseDefinition(senseIdx, subIdx, (e.target as HTMLInputElement).value)"
               />
               <!-- Sub-sense examples -->

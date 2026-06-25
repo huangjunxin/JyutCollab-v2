@@ -39,7 +39,8 @@
         icon="i-heroicons-magnifying-glass"
         placeholder="搜尋主題分類..."
         size="sm"
-        :ui="{ base: 'bg-white dark:bg-slate-800' }"
+        class="w-full"
+        :ui="{ root: 'w-full', base: 'w-full bg-white dark:bg-slate-800' }"
       >
         <template #trailing>
           <UButton

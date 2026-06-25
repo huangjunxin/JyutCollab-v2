@@ -8,13 +8,22 @@
     <template #header>
       <div class="flex items-center justify-between w-full">
         <UButton
+          v-if="!required"
           label="清除"
           variant="ghost"
           color="neutral"
           size="sm"
           @click="$emit('select', ''); $emit('update:open', false)"
         />
-        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ title }}</span>
+        <span v-else />
+        <div class="min-w-0 text-center">
+          <DialogTitle class="text-sm font-semibold text-gray-900 dark:text-white">
+            {{ title }}
+          </DialogTitle>
+          <DialogDescription class="sr-only">
+            選擇{{ title }}
+          </DialogDescription>
+        </div>
         <UButton
           label="完成"
           variant="ghost"
@@ -45,11 +54,14 @@
 </template>
 
 <script setup lang="ts">
+import { DialogDescription, DialogTitle } from 'reka-ui'
+
 defineProps<{
   open: boolean
   title: string
   options: Array<{ value: string; label: string }>
   modelValue: string
+  required?: boolean
 }>()
 
 const emit = defineEmits<{

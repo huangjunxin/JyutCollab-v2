@@ -32,15 +32,16 @@
       v-else-if="activeEntry && showMorphemePage"
       :entry="activeEntry"
       :morpheme-refs="activeEntry.morphemeRefs || []"
-      :unlinked-candidates="unlinkedMorphemeCandidates"
+      :unlinked-candidates="unlinkedMorphemeEntryId === activeEntryKey ? unlinkedMorphemeCandidates : []"
       :search-results="morphemeSearchResults"
       :search-loading="morphemeSearchLoading"
       @back="closeMorphemePage"
       @remove-morpheme-ref="(idx) => $emit('remove-morpheme-ref', activeEntry, idx)"
       @open-unlinked-form="activeEntry && $emit('open-unlinked-form', activeEntry)"
-      @confirm-unlinked-morpheme="activeEntry && $emit('confirm-unlinked-morpheme')"
+      @confirm-unlinked-morpheme="activeEntry && $emit('confirm-unlinked-morpheme', activeEntry)"
       @add-morpheme-ref="(item) => $emit('add-morpheme-ref', item.id, item)"
-      @search-morphemes="(q) => $emit('search-morphemes', q)"
+      @search-morphemes="(entry, q) => $emit('search-morphemes', entry, q)"
+      @mounted="(entry) => $emit('morpheme-page-mounted', entry)"
     />
 
     <!-- Rules sub-page -->
@@ -59,6 +60,7 @@
       :dialect-options="dialectOptions"
       :status-options="statusOptions"
       :can-change-status="canChangeStatus"
+      :read-only="!canEditEntry(activeEntry)"
       :is-saving="isEntrySaving(activeEntry)"
       :theme-ai-suggestion="themeAISuggestionForActive"
       :definition-ai-suggestion="definitionAISuggestionForActive"
@@ -251,7 +253,7 @@
             已選 {{ selectedEntryIds.size }} 項
           </span>
           <div class="flex items-center gap-1.5">
-            <UButton size="xs" variant="soft" color="primary" @click="showBatchStatusPicker = true">修改狀態</UButton>
+            <UButton v-if="canChangeStatus" size="xs" variant="soft" color="primary" @click="showBatchStatusPicker = true">修改狀態</UButton>
             <UButton size="xs" variant="soft" color="error" icon="i-heroicons-trash" @click="$emit('batch-delete', [...selectedEntryIds])">刪除</UButton>
             <UButton size="xs" variant="ghost" color="neutral" @click="exitSelectMode">取消</UButton>
           </div>
@@ -267,6 +269,7 @@
           :selected-entry-ids="selectedEntryIds"
           :get-cell-display="getCellDisplay"
           :get-cell-class="getCellClass"
+          :get-cell-overlay-meta="getCellOverlayMeta"
           @row-click="handleRowClick"
           @toggle-group="toggleGroup"
           @long-press="enterSelectMode"
@@ -310,7 +313,10 @@
     >
       <template #header>
         <div class="flex items-center justify-between w-full">
-          <span class="text-sm font-semibold text-gray-900 dark:text-white">批量修改狀態</span>
+          <div class="min-w-0">
+            <DialogTitle class="text-sm font-semibold text-gray-900 dark:text-white">批量修改狀態</DialogTitle>
+            <DialogDescription class="sr-only">為已選詞條選擇新狀態</DialogDescription>
+          </div>
           <UButton label="完成" variant="ghost" color="primary" size="sm" @click="showBatchStatusPicker = false" />
         </div>
       </template>
@@ -333,6 +339,7 @@
 <script setup lang="ts">
 import type { Entry } from '~/types'
 import type { SavedViewRecord } from '~/composables/useEntriesSavedViews'
+import { DialogDescription, DialogTitle } from 'reka-ui'
 import { ALL_FILTER_VALUE } from '~/utils/entriesTableConstants'
 import { getEntryIdString } from '~/utils/entryKey'
 import EntriesMobileRowEditor from './EntriesMobileRowEditor.vue'
@@ -350,7 +357,7 @@ type MobileRow =
   | { type: 'entry'; entry: Entry; groupIndex: number; entryIndexInGroup?: number }
 type EditableColumnDef = { key: string; label: string; width: string; type: string; get: (e: Entry) => unknown; set: (e: Entry, v: any) => void }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   // Data
   filteredEntries: Entry[]
   tableRows: MobileRow[]
@@ -372,6 +379,7 @@ const props = defineProps<{
   dialectOptions: Array<{ value: string; label: string }>
   statusOptions: Array<{ value: string; label: string }>
   canChangeStatus: boolean
+  canEditEntry: (entry: Entry) => boolean
   isEntrySaving: (entry: Entry) => boolean
 
   // Filters
@@ -386,6 +394,9 @@ const props = defineProps<{
   sortBy: string
   sortOrder: 'asc' | 'desc'
 
+  // Selection reset trigger (increment to clear mobile selection)
+  resetSelectionTrigger?: number
+
   // Saved views
   savedViews: SavedViewRecord[]
   selectedViewId: string | null
@@ -394,23 +405,38 @@ const props = defineProps<{
   expandedGroupKeys: Set<string>
 
   // Phase 4: AI suggestions (per-entry maps from index.vue)
-  themeAISuggestions: Map<string, any>
-  definitionAISuggestions: Map<string, any>
-  aiLoadingFor: { entryKey: string; action: string } | null
+  themeAISuggestions?: Map<string, any>
+  definitionAISuggestions?: Map<string, any>
+  aiLoadingFor?: { entryKey: string; action: string } | null
 
   // Phase 4: Reference helpers (per-entry data)
-  duplicateEntries: Map<string, any[]>
-  otherDialectEntries: Map<string, any[]>
-  jyutjyuResults: Map<string, any[]>
+  duplicateEntries?: Map<string, any[]>
+  otherDialectEntries?: Map<string, any[]>
+  jyutjyuResults?: Map<string, any[]>
 
   // Phase 4: Morpheme refs
-  unlinkedMorphemeCandidates: Array<{ position: number; char: string; jyutping: string; note: string }>
-  morphemeSearchResults: Array<{ id: string; headword: string; jyutping: string; definition: string; dialect: string; entryType: string }>
-  morphemeSearchLoading: boolean
+  unlinkedMorphemeCandidates?: Array<{ position: number; char: string; jyutping: string; note: string }>
+  unlinkedMorphemeEntryId?: string | null
+  morphemeSearchResults?: Array<{ id: string; headword: string; jyutping: string; definition: string; dialect: string; entryType: string }>
+  morphemeSearchLoading?: boolean
 
   // Phase 5: Rules
   rules: Array<{ id: string; name: string; kind: string; enabled: boolean; targetFields: string[]; condition: { kind: string }; stylePreset: string; colorHex?: string }>
-}>()
+
+  // Rule overlays
+  getCellOverlayMeta?: (entry: Entry, field: string) => { classNames: string[]; style: Record<string, string>; tooltipText: string } | null
+}>(), {
+  themeAISuggestions: () => new Map(),
+  definitionAISuggestions: () => new Map(),
+  aiLoadingFor: null,
+  duplicateEntries: () => new Map(),
+  otherDialectEntries: () => new Map(),
+  jyutjyuResults: () => new Map(),
+  unlinkedMorphemeCandidates: () => [],
+  unlinkedMorphemeEntryId: null,
+  morphemeSearchResults: () => [],
+  morphemeSearchLoading: false
+})
 
 const emit = defineEmits<{
   'search': [query: string]
@@ -451,9 +477,10 @@ const emit = defineEmits<{
   // Phase 4: Morpheme refs
   'remove-morpheme-ref': [entry: Entry, idx: number]
   'open-unlinked-form': [entry: Entry]
-  'confirm-unlinked-morpheme': []
+  'confirm-unlinked-morpheme': [entry: Entry]
   'add-morpheme-ref': [targetEntryId: string, morphemeEntry: any]
-  'search-morphemes': [query: string]
+  'search-morphemes': [entry: Entry, query: string]
+  'morpheme-page-mounted': [entry: Entry]
 
   // Phase 4: Row editor extra actions
   'make-new-lexeme': [entry: Entry]
@@ -468,6 +495,10 @@ const emit = defineEmits<{
 
 const localSearchQuery = ref(props.searchQuery)
 const controlsExpanded = ref(false)
+
+watch(() => props.resetSelectionTrigger, (val, oldVal) => {
+  if (val !== undefined && val !== oldVal) exitSelectMode()
+})
 
 watch(() => props.searchQuery, (val) => {
   localSearchQuery.value = val

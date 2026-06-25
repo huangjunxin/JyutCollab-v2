@@ -106,9 +106,11 @@
               class="bg-white dark:bg-slate-800 font-medium text-gray-900 dark:text-white border-r-2 border-r-gray-200 dark:border-r-gray-700 px-2"
               :class="[
                 density === 'compact' ? 'py-1.5' : 'py-2.5',
-                stickyFirstColumn ? 'sticky left-0 z-10' : ''
+                stickyFirstColumn ? 'sticky left-0 z-10' : '',
+                ...(cellOverlayMeta(row.entry, columns[0]?.key || 'headword')?.classNames || [])
               ]"
-              :style="{ width: firstColumnWidth + 'px', minWidth: firstColumnWidth + 'px' }"
+              :style="firstCellStyle(row.entry)"
+              :title="cellOverlayMeta(row.entry, columns[0]?.key || 'headword')?.tooltipText || undefined"
             >
               <div class="flex items-center gap-1.5 min-w-0">
                 <input
@@ -130,8 +132,9 @@
               v-for="col in columns.slice(1)"
               :key="col.key"
               class="px-2 text-sm border-r border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
-              :class="density === 'compact' ? 'py-1.5' : 'py-2.5'"
-              :style="{ width: columnWidth(col) + 'px', minWidth: columnWidth(col) + 'px' }"
+              :class="[density === 'compact' ? 'py-1.5' : 'py-2.5', ...(cellOverlayMeta(row.entry, col.key)?.classNames || [])]"
+              :style="cellStyle(row.entry, col)"
+              :title="cellOverlayMeta(row.entry, col.key)?.tooltipText || undefined"
             >
               <!-- Status column with badge -->
               <template v-if="col.key === 'status'">
@@ -189,6 +192,9 @@ const props = defineProps<{
   getCellDisplay: (entry: Entry, col: MobileColumnDef) => string
   getCellClass: (entry: Entry, field: string) => string[]
 
+  // Rule overlays
+  getCellOverlayMeta?: (entry: Entry, field: string) => { classNames: string[]; style: Record<string, string>; tooltipText: string } | null
+
   // Multi-select mode
   selectMode?: boolean
   selectedEntryIds?: Set<string>
@@ -211,6 +217,7 @@ let touchStartY = 0
 let touchMoved = false
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let longPressEntry: Entry | null = null
+let longPressJustFired = false
 const LONG_PRESS_MS = 500
 
 onMounted(() => {
@@ -258,6 +265,7 @@ function handleRowTouchStart(event: TouchEvent, entry: Entry) {
   longPressTimer = setTimeout(() => {
     // Long press detected — enter select mode
     if (longPressEntry && !touchMoved) {
+      longPressJustFired = true
       emit('long-press', longPressEntry)
       // Haptic feedback (if available)
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -269,6 +277,10 @@ function handleRowTouchStart(event: TouchEvent, entry: Entry) {
 }
 
 function handleEntryClick(event: MouseEvent, entry: Entry) {
+  if (longPressJustFired) {
+    longPressJustFired = false
+    return
+  }
   if (touchMoved) {
     touchMoved = false
     return
@@ -317,6 +329,27 @@ function getStatusClass(status?: string): string {
 
 function getStatusLabel(status?: string): string {
   return (STATUS_LABELS as Record<string, string>)[status || 'draft'] || status || '草稿'
+}
+
+function cellOverlayMeta(entry: Entry, field: string) {
+  return props.getCellOverlayMeta?.(entry, field) ?? null
+}
+
+function cellStyle(entry: Entry, column: MobileColumnDef) {
+  return {
+    width: columnWidth(column) + 'px',
+    minWidth: columnWidth(column) + 'px',
+    ...(cellOverlayMeta(entry, column.key)?.style || {})
+  }
+}
+
+function firstCellStyle(entry: Entry) {
+  const field = props.columns[0]?.key || 'headword'
+  return {
+    width: firstColumnWidth.value + 'px',
+    minWidth: firstColumnWidth.value + 'px',
+    ...(cellOverlayMeta(entry, field)?.style || {})
+  }
 }
 </script>
 

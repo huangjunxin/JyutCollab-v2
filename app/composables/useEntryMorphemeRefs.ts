@@ -101,15 +101,23 @@ export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string,
     searchMorphemes(entry)
   }
 
-  async function searchMorphemes(entry: Entry) {
+  async function searchMorphemes(entry: Entry, searchText = '') {
     morphemeSearchLoading.value = true
     morphemeSearchResults.value = []
     try {
       const query: Record<string, string> = {}
-      if (entry.headword?.display) query.headword = entry.headword.display
+      const trimmedSearch = searchText.trim()
+      if (trimmedSearch) {
+        if (/[\u3400-\u9fff]/.test(trimmedSearch)) {
+          query.headword = trimmedSearch
+        } else {
+          query.jyutping = trimmedSearch
+          query.definition = trimmedSearch
+        }
+      } else if (entry.headword?.display) query.headword = entry.headword.display
       if (entry.dialect?.name) query.dialect = entry.dialect.name
-      if (entry.phonetic?.jyutping?.length) query.jyutping = entry.phonetic.jyutping.join(' ')
-      if (entry.senses?.[0]?.definition) query.definition = entry.senses[0].definition
+      if (!trimmedSearch && entry.phonetic?.jyutping?.length) query.jyutping = entry.phonetic.jyutping.join(' ')
+      if (!trimmedSearch && entry.senses?.[0]?.definition) query.definition = entry.senses[0].definition
       const response = await $fetch<{ success: boolean; data: Array<any> }>('/api/entries/search-morphemes', { query })
       if (response.success && Array.isArray(response.data)) {
         morphemeSearchResults.value = response.data
@@ -119,7 +127,7 @@ export function useEntryMorphemeRefs(getEntryIdString: (entry: Entry) => string,
           helperType: 'morpheme_search',
           sourceProvider: 'morpheme',
           field: 'morphemeRefs',
-          query: query.headword,
+          query: trimmedSearch || query.headword,
           resultCount: response.data.length,
           suggestedContent: response.data.slice(0, 5).map(item => ({
             id: item.id,
