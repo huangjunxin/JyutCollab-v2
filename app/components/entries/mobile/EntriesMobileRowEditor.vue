@@ -40,6 +40,34 @@
       <EntriesMobileFieldRow label="粵拼" icon="i-heroicons-speaker-wave" :value="entry.phonetic?.jyutping?.join('; ') || ''" type="text" :is-editing="editingField === 'phonetic'" :disabled="readOnly" @click="!readOnly && startEdit('phonetic')" @update:model-value="(v: string) => updateField('phonetic', v)" @finish="finishEdit" />
       <EntriesMobileFieldRow label="類型" icon="i-heroicons-tag" :value="entryTypeLabel" type="select" :options="entryTypeOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('entryType')" />
       <EntriesMobileFieldRow label="語域" icon="i-heroicons-chat-bubble-left-right" :value="entry.meta?.register || ''" type="select" :options="registerOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('register')" />
+      <div v-if="!readOnly && canGenerateRegister && !registerAISuggestion" class="px-3 py-2 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-sparkles"
+          :loading="aiLoadingRegister"
+          @click="$emit('ai-register')"
+        >
+          AI 語域
+        </UButton>
+      </div>
+      <div v-if="registerAISuggestion" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+        <p class="text-xs text-blue-700 dark:text-blue-300 mb-1">AI 語域建議</p>
+        <p class="text-sm text-gray-900 dark:text-white">
+          {{ registerAISuggestion.register }}
+          <span v-if="typeof registerAISuggestion.confidence === 'number'" class="text-xs text-gray-500 dark:text-gray-400">
+            · {{ Math.round(registerAISuggestion.confidence * 100) }}%
+          </span>
+        </p>
+        <p v-if="registerAISuggestion.explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {{ registerAISuggestion.explanation }}
+        </p>
+        <div class="flex gap-2 mt-1">
+          <UButton size="xs" color="primary" @click="$emit('accept-register-ai')">採納</UButton>
+          <UButton size="xs" color="neutral" variant="ghost" @click="$emit('dismiss-register-ai')">忽略</UButton>
+        </div>
+      </div>
       <EntriesMobileFieldRow label="狀態" icon="i-heroicons-check-circle" :value="statusLabel" type="select" :options="statusOptionsForSelect" :disabled="readOnly || !canChangeStatus" @click="(readOnly || !canChangeStatus) ? undefined : openSelectSheet('status')" />
 
       <!-- ===== 分類 ===== -->
@@ -180,6 +208,7 @@ import { getThemeNameById } from '~/composables/useThemeData'
 
 interface ThemeAISuggestion { level1Name: string; level2Name: string; level3Name: string; level1Id: number; level2Id: number; level3Id: number }
 interface DefinitionAISuggestion { definition: string; usageNotes?: string }
+interface RegisterAISuggestion { register: string; confidence?: number; explanation?: string }
 interface FormattedDuplicateEntry { id: string; headwordDisplay: string; dialectLabel: string; statusLabel: string }
 interface JyutjyuRefFormattedItem { id: string; headwordDisplay: string; jyutping: string }
 
@@ -194,6 +223,8 @@ const props = defineProps<{
   // AI suggestions
   themeAISuggestion?: ThemeAISuggestion | null
   definitionAISuggestion?: DefinitionAISuggestion | null
+  registerAISuggestion?: RegisterAISuggestion | null
+  aiLoadingRegister?: boolean
 
   // Reference helpers
   duplicateEntries?: FormattedDuplicateEntry[]
@@ -221,6 +252,9 @@ const emit = defineEmits<{
   'dismiss-theme-ai': []
   'accept-definition-ai': []
   'dismiss-definition-ai': []
+  'ai-register': []
+  'accept-register-ai': []
+  'dismiss-register-ai': []
 
   // Reference helpers
   'apply-other-dialect': [sourceId: string]
@@ -256,6 +290,7 @@ const statusClass = computed(() => {
   const m: Record<string, string> = { draft: 'text-gray-500', pending_review: 'text-amber-600', approved: 'text-green-600', rejected: 'text-red-600' }
   return m[props.entry.status || 'draft'] || 'text-gray-500'
 })
+const canGenerateRegister = computed(() => !!props.entry.headword?.display?.trim())
 
 const themeLabel = computed(() => {
   const id = props.entry.theme?.level3Id

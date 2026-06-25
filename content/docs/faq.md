@@ -28,7 +28,7 @@ updatedAt: 2026-05-21
 
 ### 如何更改密碼？
 
-登入後，前往個人資料頁面，在「更改密碼」區塊輸入目前密碼同新密碼即可。如果你忘記了目前密碼，請在登錄頁使用「忘記密碼」功能重設（詳見 [帳戶、角色同權限](./account-and-permissions)）。
+登入後，前往個人資料頁面，在「更改密碼」區塊輸入目前密碼同新密碼即可。如果你忘記了目前密碼，請在登錄頁使用「忘記密碼」功能重設（詳見 [帳戶、角色同權限](/docs/account-and-permissions)）。
 
 ### 如何刪除帳號？
 
@@ -133,7 +133,7 @@ JyutCollab 支援以下現代瀏覽器的最新版本：
 
 ## 相關指南
 
-- [快速開始](./quick-start) — 新手入門操作速查
-- [帳戶、角色同權限](./account-and-permissions) — 權限相關問題
-- [AI 輔助](./ai-assistance) — AI 建議使用同限制
-- [詞條欄位](./entry-fields) — 欄位填寫規範
+- [快速開始](/docs/quick-start) — 新手入門操作速查
+- [帳戶、角色同權限](/docs/account-and-permissions) — 權限相關問題
+- [AI 輔助](/docs/ai-assistance) — AI 建議使用同限制
+- [詞條欄位](/docs/entry-fields) — 欄位填寫規範

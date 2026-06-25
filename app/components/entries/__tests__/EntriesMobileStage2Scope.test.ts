@@ -9,6 +9,8 @@ describe('mobile entries stage 2 scope guard', () => {
   const viewPageSource = readSource('app/components/entries/mobile/EntriesMobileViewPage.vue')
   const gridSource = readSource('app/components/entries/mobile/EntriesMobileGrid.vue')
   const workbenchSource = readSource('app/components/entries/mobile/EntriesMobileWorkbench.vue')
+  const rowEditorSource = readSource('app/components/entries/mobile/EntriesMobileRowEditor.vue')
+  const entriesPageSource = readSource('app/pages/entries/index.vue')
 
   it('keeps density and optional-column controls in the mobile view subpage', () => {
     expect(viewPageSource).toContain('視圖與設定')
@@ -87,5 +89,21 @@ describe('mobile entries stage 2 scope guard', () => {
     expect(workbenchSource).toContain("{ key: 'dialect', label: '方言', width: '52'")
     expect(workbenchSource).toContain("{ key: 'phonetic', label: '粵拼', width: '92'")
     expect(workbenchSource).toContain("{ key: 'status', label: '狀態', width: '66'")
+  })
+
+  it('keeps mobile AI register suggestions wired through the row editor', () => {
+    expect(entriesPageSource).toContain(':register-ai-suggestions="registerAISuggestions"')
+    expect(entriesPageSource).toContain('@ai-register="(entry: any) => generateAIRegister(entry)"')
+    expect(entriesPageSource).toContain('@accept-register-ai="(entry: any) => acceptRegisterAI(entry)"')
+    expect(entriesPageSource).toContain('@dismiss-register-ai="(entry: any) => dismissRegisterAI(entry)"')
+    expect(workbenchSource).toContain('registerAISuggestionForActive')
+    expect(workbenchSource).toContain(':register-ai-suggestion="registerAISuggestionForActive"')
+    expect(workbenchSource).toContain(':ai-loading-register="isAILoadingForActive(\'register\')"')
+    expect(workbenchSource).toContain("props.aiLoadingFor?.entryKey === activeEntryKey.value")
+    expect(rowEditorSource).toContain('AI 語域')
+    expect(rowEditorSource).toContain('AI 語域建議')
+    expect(rowEditorSource).toContain("'ai-register': []")
+    expect(rowEditorSource).toContain("'accept-register-ai': []")
+    expect(rowEditorSource).toContain("'dismiss-register-ai': []")
   })
 })

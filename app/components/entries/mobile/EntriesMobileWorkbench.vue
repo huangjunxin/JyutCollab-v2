@@ -5,8 +5,8 @@
       v-if="activeEntry && showSensesPage"
       :entry="activeEntry"
       :ai-definition-suggestion="definitionAISuggestionForActive"
-      :ai-loading-definition="aiLoadingFor?.action === 'definition'"
-      :ai-loading-examples="aiLoadingFor?.action === 'examples'"
+      :ai-loading-definition="isAILoadingForActive('definition')"
+      :ai-loading-examples="isAILoadingForActive('examples')"
       @back="closeSensesPage"
       @ai-definition="activeEntry && $emit('ai-definition', activeEntry)"
       @ai-examples="activeEntry && $emit('ai-examples', activeEntry)"
@@ -19,7 +19,7 @@
       v-else-if="activeEntry && showThemePage"
       :entry="activeEntry"
       :ai-suggestion="themeAISuggestionForActive"
-      :ai-loading="aiLoadingFor?.action === 'theme'"
+      :ai-loading="isAILoadingForActive('theme')"
       @back="closeThemePage"
       @update:theme="(theme) => { if (activeEntry) { activeEntry.theme = { ...theme }; activeEntry._isDirty = true; $emit('update:entry', activeEntry) } }"
       @accept-ai="(s) => activeEntry && $emit('accept-theme-ai', activeEntry)"
@@ -64,6 +64,8 @@
       :is-saving="isEntrySaving(activeEntry)"
       :theme-ai-suggestion="themeAISuggestionForActive"
       :definition-ai-suggestion="definitionAISuggestionForActive"
+      :register-ai-suggestion="registerAISuggestionForActive"
+      :ai-loading-register="isAILoadingForActive('register')"
       :duplicate-entries="duplicateEntriesForActive"
       :other-dialect-entries="otherDialectEntriesForActive"
       :jyutjyu-results="jyutjyuResultsForActive"
@@ -82,6 +84,9 @@
       @dismiss-theme-ai="activeEntry && $emit('dismiss-theme-ai', activeEntry)"
       @accept-definition-ai="activeEntry && $emit('accept-definition-ai', activeEntry)"
       @dismiss-definition-ai="activeEntry && $emit('dismiss-definition-ai', activeEntry)"
+      @ai-register="activeEntry && $emit('ai-register', activeEntry)"
+      @accept-register-ai="activeEntry && $emit('accept-register-ai', activeEntry)"
+      @dismiss-register-ai="activeEntry && $emit('dismiss-register-ai', activeEntry)"
       @apply-other-dialect="(sourceId) => activeEntry && $emit('apply-other-dialect', activeEntry, sourceId)"
       @apply-jyutjyu="(sourceId) => activeEntry && $emit('apply-jyutjyu', activeEntry, sourceId)"
     />
@@ -407,6 +412,7 @@ const props = withDefaults(defineProps<{
   // Phase 4: AI suggestions (per-entry maps from index.vue)
   themeAISuggestions?: Map<string, any>
   definitionAISuggestions?: Map<string, any>
+  registerAISuggestions?: Map<string, any>
   aiLoadingFor?: { entryKey: string; action: string } | null
 
   // Phase 4: Reference helpers (per-entry data)
@@ -428,6 +434,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   themeAISuggestions: () => new Map(),
   definitionAISuggestions: () => new Map(),
+  registerAISuggestions: () => new Map(),
   aiLoadingFor: null,
   duplicateEntries: () => new Map(),
   otherDialectEntries: () => new Map(),
@@ -465,10 +472,13 @@ const emit = defineEmits<{
   'ai-definition': [entry: Entry]
   'ai-examples': [entry: Entry]
   'ai-categorize': [entry: Entry]
+  'ai-register': [entry: Entry]
   'accept-theme-ai': [entry: Entry]
   'dismiss-theme-ai': [entry: Entry]
   'accept-definition-ai': [entry: Entry]
   'dismiss-definition-ai': [entry: Entry]
+  'accept-register-ai': [entry: Entry]
+  'dismiss-register-ai': [entry: Entry]
 
   // Phase 4: Reference helpers
   'apply-other-dialect': [entry: Entry, sourceId: string]
@@ -558,6 +568,12 @@ const themeAISuggestionForActive = computed(() =>
 const definitionAISuggestionForActive = computed(() =>
   activeEntryKey.value ? props.definitionAISuggestions.get(activeEntryKey.value) ?? null : null
 )
+const registerAISuggestionForActive = computed(() =>
+  activeEntryKey.value ? props.registerAISuggestions.get(activeEntryKey.value) ?? null : null
+)
+function isAILoadingForActive(action: string) {
+  return Boolean(activeEntryKey.value && props.aiLoadingFor?.entryKey === activeEntryKey.value && props.aiLoadingFor.action === action)
+}
 const duplicateEntriesForActive = computed(() =>
   activeEntryKey.value ? props.duplicateEntries.get(activeEntryKey.value) ?? [] : []
 )

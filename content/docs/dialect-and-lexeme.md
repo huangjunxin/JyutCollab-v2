@@ -71,6 +71,6 @@ JyutCollab 面向跨方言詞語編纂，所以需要把「一個地方的一條
 
 ## 相關指南
 
-- [詞條欄位](./entry-fields) — 方言點欄位的填寫規則同權限影響
-- [詞條表格](./entries-table) — 聚合視圖同詞語組視圖的操作方式
-- [視圖、篩選同標示](./views-filters-and-labels) — 按方言點篩選詞條
+- [詞條欄位](/docs/entry-fields) — 方言點欄位的填寫規則同權限影響
+- [詞條表格](/docs/entries-table) — 聚合視圖同詞語組視圖的操作方式
+- [視圖、篩選同標示](/docs/views-filters-and-labels) — 按方言點篩選詞條

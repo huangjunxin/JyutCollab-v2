@@ -73,6 +73,6 @@ JyutCollab 的流程設計目標，是讓方言詞語資料可以被快速錄入
 
 ## 相關指南
 
-- [審核流程](./review-workflow) — 審核隊列操作、通過/拒絕標準同審核員責任
-- [詞條欄位](./entry-fields) — 提交前檢查各欄位的填寫規範
-- [AI 輔助](./ai-assistance) — AI 建議在編纂流程中的角色同限制
+- [審核流程](/docs/review-workflow) — 審核隊列操作、通過/拒絕標準同審核員責任
+- [詞條欄位](/docs/entry-fields) — 提交前檢查各欄位的填寫規範
+- [AI 輔助](/docs/ai-assistance) — AI 建議在編纂流程中的角色同限制

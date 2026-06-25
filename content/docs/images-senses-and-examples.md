@@ -107,6 +107,6 @@ updatedAt: 2026-06-01
 
 ## 相關指南
 
-- [詞條欄位](./entry-fields) — 義項、語域、主題分類等欄位的完整說明
-- [AI 輔助](./ai-assistance) — 使用 AI 生成例句同釋義建議
-- [詞條表格](./entries-table) — 在表格中編輯義項同例句
+- [詞條欄位](/docs/entry-fields) — 義項、語域、主題分類等欄位的完整說明
+- [AI 輔助](/docs/ai-assistance) — 使用 AI 生成例句同釋義建議
+- [詞條表格](/docs/entries-table) — 在表格中編輯義項同例句

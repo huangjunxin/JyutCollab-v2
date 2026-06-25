@@ -65,6 +65,6 @@ updatedAt: 2026-05-21
 
 ## 相關指南
 
-- [編纂工作流程](./workflows) — 詞條生命週期同狀態變化
-- [審核流程](./review-workflow) — 審核前後的修訂追蹤
-- [詞條表格](./entries-table) — 在表格中查看詞條目前狀態
+- [編纂工作流程](/docs/workflows) — 詞條生命週期同狀態變化
+- [審核流程](/docs/review-workflow) — 審核前後的修訂追蹤
+- [詞條表格](/docs/entries-table) — 在表格中查看詞條目前狀態

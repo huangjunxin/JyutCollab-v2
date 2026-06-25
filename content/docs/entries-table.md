@@ -82,6 +82,6 @@ updatedAt: 2026-05-21
 
 ## 相關指南
 
-- [詞條欄位](./entry-fields) — 了解表格中每個欄位的含義同填寫規則
-- [鍵盤快捷鍵](./keyboard-shortcuts) — 表格內的完整鍵盤操作列表
-- [視圖、篩選同標示](./views-filters-and-labels) — 進階篩選、正則條件同整理策略
+- [詞條欄位](/docs/entry-fields) — 了解表格中每個欄位的含義同填寫規則
+- [鍵盤快捷鍵](/docs/keyboard-shortcuts) — 表格內的完整鍵盤操作列表
+- [視圖、篩選同標示](/docs/views-filters-and-labels) — 進階篩選、正則條件同整理策略

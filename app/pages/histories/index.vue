@@ -29,6 +29,7 @@
       :theme-filter-options="themeFilterOptions"
       :status-options="statusOptions"
       :show-status-filter="false"
+      :all-filter-value="ALL_FILTER_VALUE"
       @search="handleSearch"
     >
       <template #extra-filters>

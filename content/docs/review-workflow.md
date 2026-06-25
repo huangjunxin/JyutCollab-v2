@@ -71,6 +71,6 @@ updatedAt: 2026-05-21
 
 ## 相關指南
 
-- [編纂工作流程](./workflows) — 完整的詞條生命週期同質素檢查清單
-- [帳戶、角色同權限](./account-and-permissions) — 審核員權限同方言點授權
-- [編輯歷史同還原](./history-and-revert) — 追蹤審核前後的修訂記錄
+- [編纂工作流程](/docs/workflows) — 完整的詞條生命週期同質素檢查清單
+- [帳戶、角色同權限](/docs/account-and-permissions) — 審核員權限同方言點授權
+- [編輯歷史同還原](/docs/history-and-revert) — 追蹤審核前後的修訂記錄

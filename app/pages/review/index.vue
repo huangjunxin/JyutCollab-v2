@@ -28,6 +28,7 @@
       :dialect-options="dialectOptions"
       :theme-filter-options="themeFilterOptions"
       :status-options="statusOptions"
+      :all-filter-value="ALL_FILTER_VALUE"
       @search="handleSearch"
     />
 

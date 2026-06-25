@@ -50,6 +50,6 @@ updatedAt: 2026-05-21
 
 ## 相關指南
 
-- [詞條表格](./entries-table) — 表格操作同內聯編輯詳情
-- [快速開始](./quick-start) — 新手常用的核心快捷鍵
-- [AI 輔助](./ai-assistance) — Tab 鍵接受 AI 建議的詳細說明
+- [詞條表格](/docs/entries-table) — 表格操作同內聯編輯詳情
+- [快速開始](/docs/quick-start) — 新手常用的核心快捷鍵
+- [AI 輔助](/docs/ai-assistance) — Tab 鍵接受 AI 建議的詳細說明

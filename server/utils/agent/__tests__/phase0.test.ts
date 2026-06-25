@@ -19,19 +19,40 @@ import {
 const risks: ToolRisk[] = ['safe', 'local_ui', 'draft_write', 'editorial', 'destructive', 'admin']
 
 describe('agent tool registry', () => {
-  it('registers and lists safe read-only JyutCollab tools', () => {
+  it('registers and lists current JyutCollab agent tools', () => {
     const registry = createDefaultAgentToolRegistry()
     const tools = registry.list()
 
     expect(tools.map(tool => tool.name)).toEqual([
+      'jyutcollab.apply_entry_filters',
       'jyutcollab.check_duplicate',
       'jyutcollab.get_entry_detail',
+      'jyutcollab.get_entry_history',
+      'jyutcollab.get_page_context',
       'jyutcollab.list_dialects',
       'jyutcollab.navigate',
-      'jyutcollab.search_entries'
+      'jyutcollab.open_entry',
+      'jyutcollab.open_history',
+      'jyutcollab.plan_advanced_filter',
+      'jyutcollab.prepare_entry_draft',
+      'jyutcollab.read_doc',
+      'jyutcollab.search_agent_audit',
+      'jyutcollab.search_docs',
+      'jyutcollab.search_entries',
+      'jyutcollab.search_histories',
+      'jyutcollab.submit_or_review_entry',
+      'jyutcollab.switch_view',
+      'jyutcollab.toggle_advanced_filter'
     ])
-    expect(tools.filter(tool => tool.name !== 'jyutcollab.navigate').every(tool => tool.risk === 'safe')).toBe(true)
-    expect(registry.get('jyutcollab.navigate').risk).toBe('local_ui')
+    expect(tools.filter(tool => tool.risk === 'local_ui').map(tool => tool.name)).toEqual([
+      'jyutcollab.apply_entry_filters',
+      'jyutcollab.navigate',
+      'jyutcollab.open_entry',
+      'jyutcollab.open_history',
+      'jyutcollab.switch_view',
+      'jyutcollab.toggle_advanced_filter'
+    ])
+    expect(tools.filter(tool => tool.risk !== 'local_ui').every(tool => tool.risk === 'safe')).toBe(true)
   })
 
   it('rejects unknown tools instead of executing arbitrary names', () => {

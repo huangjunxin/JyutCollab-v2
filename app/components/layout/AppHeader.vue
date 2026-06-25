@@ -261,10 +261,9 @@
       <div
         v-if="mobileNavOpen"
         class="fixed inset-0 z-[70] md:hidden"
-        @click.self="mobileNavOpen = false"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/40" />
+        <div class="absolute inset-0 bg-black/40" @click="mobileNavOpen = false" />
         <!-- Panel -->
         <Transition name="nav-slide">
           <div

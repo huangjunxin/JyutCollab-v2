@@ -231,14 +231,14 @@
           </p>
 
           <template #footer>
-            <div class="flex justify-end gap-2">
-              <UButton color="gray" variant="ghost" class="rounded-none [&>*]:rounded-none" @click="unlinkConfirmOpen = false">
+            <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <UButton color="gray" variant="ghost" class="w-full rounded-none sm:w-auto [&>*]:rounded-none" @click="unlinkConfirmOpen = false">
                 取消
               </UButton>
               <UButton
                 color="error"
                 :loading="unlinkingGoogle"
-                class="rounded-none [&>*]:rounded-none"
+                class="w-full rounded-none sm:w-auto [&>*]:rounded-none"
                 @click="confirmUnlinkGoogle"
               >
                 確認解除

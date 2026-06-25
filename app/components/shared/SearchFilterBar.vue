@@ -149,6 +149,8 @@ const props = defineProps<{
   statusOptions: Array<{ value: any; label: string }>
   showStatusFilter?: boolean
   searchPlaceholder?: string
+  /** Sentinel value meaning "no filter" (e.g. '__all__' from useSearchFilters). Excluded from active count. */
+  allFilterValue?: string
 }>()
 
 defineEmits<{
@@ -162,13 +164,19 @@ defineEmits<{
 
 const mobileFiltersOpen = ref(false)
 
+function isFilterActive(value: string | number | undefined): boolean {
+  if (!value) return false
+  if (props.allFilterValue && value === props.allFilterValue) return false
+  return true
+}
+
 // Count active filters to show badge
 const activeFilterCount = computed(() => {
   let count = 0
-  if (props.filterUser) count++
-  if (props.filterDialect) count++
-  if (props.filterTheme) count++
-  if (props.showStatusFilter && props.filterStatus) count++
+  if (isFilterActive(props.filterUser)) count++
+  if (isFilterActive(props.filterDialect)) count++
+  if (isFilterActive(props.filterTheme)) count++
+  if (props.showStatusFilter && isFilterActive(props.filterStatus)) count++
   return count
 })
 </script>
