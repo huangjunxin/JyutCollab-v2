@@ -1,5 +1,6 @@
 <template>
-  <div class="overflow-x-auto">
+  <!-- Desktop: table -->
+  <div class="hidden sm:block overflow-x-auto">
     <table class="w-full">
       <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <tr>
@@ -100,6 +101,85 @@
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Mobile: card list -->
+  <div class="sm:hidden divide-y divide-gray-200 dark:divide-gray-700">
+    <div v-if="loading" class="px-4 py-8 text-center text-gray-500">
+      <UIcon name="i-heroicons-arrow-path" class="w-5 h-5 animate-spin inline mr-2" />
+      載入中...
+    </div>
+    <div v-else-if="users.length === 0" class="px-4 py-8 text-center text-gray-500">
+      暫無數據
+    </div>
+    <div
+      v-for="user in users"
+      v-else
+      :key="user.id"
+      class="p-4 space-y-3"
+    >
+      <!-- User info row -->
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <UAvatar
+            :alt="user.username"
+            size="sm"
+            class="bg-primary text-white font-sans font-bold antialiased [&_span]:font-sans [&_span]:font-bold [&_span]:text-white shrink-0"
+          />
+          <div class="min-w-0">
+            <div class="text-sm font-medium truncate">{{ user.username }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <UBadge :color="getRoleColor(user.role)" size="sm">
+            {{ getRoleLabel(user.role) }}
+          </UBadge>
+          <UBadge :color="user.isActive ? 'success' : 'neutral'" size="sm">
+            {{ user.isActive ? '活躍' : '已停用' }}
+          </UBadge>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+        <span>貢獻 <strong class="text-gray-700 dark:text-gray-300">{{ user.contributionCount }}</strong></span>
+        <span>審核 <strong class="text-gray-700 dark:text-gray-300">{{ user.reviewCount }}</strong></span>
+        <span>方言 <strong class="text-gray-700 dark:text-gray-300">{{ user.dialectPermissions?.length || 0 }}</strong></span>
+        <span class="ml-auto">{{ formatDate(user.createdAt) }}</span>
+      </div>
+
+      <!-- Actions row -->
+      <div class="flex items-center gap-2">
+        <UButton
+          color="gray"
+          variant="outline"
+          size="xs"
+          icon="i-heroicons-user-circle"
+          @click="emit('edit-role', user)"
+        >
+          角色
+        </UButton>
+        <UButton
+          color="gray"
+          variant="outline"
+          size="xs"
+          icon="i-heroicons-map"
+          @click="emit('manage-dialects', user)"
+        >
+          方言
+        </UButton>
+        <UButton
+          :color="user.isActive ? 'error' : 'success'"
+          variant="outline"
+          size="xs"
+          :icon="user.isActive ? 'i-heroicons-no-symbol' : 'i-heroicons-check-circle'"
+          @click="emit('toggle-active', user)"
+        >
+          {{ user.isActive ? '停用' : '啟用' }}
+        </UButton>
+      </div>
+    </div>
   </div>
 </template>
 

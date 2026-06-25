@@ -166,7 +166,7 @@
       description="查看此筆編輯歷史的變更字段、修改前內容和修改後內容。"
     >
       <template #content>
-        <UCard class="jc-modal-card max-w-3xl max-h-[90vh] overflow-y-auto rounded-none [&>*]:rounded-none">
+        <UCard class="jc-modal-card w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-none [&>*]:rounded-none">
           <template #header>
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold">修改詳情</h3>
@@ -255,12 +255,12 @@
                 無變化
               </div>
               <div v-else class="max-h-96 overflow-auto border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                <table class="w-full text-xs">
+                <table class="w-full text-xs min-w-[20rem]">
                   <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0">
                     <tr>
-                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/3">字段</th>
-                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/3">原值</th>
-                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/3">新值</th>
+                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/4 sm:w-1/3">字段</th>
+                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-3/8 sm:w-1/3">原值</th>
+                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-3/8 sm:w-1/3">新值</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -340,13 +340,14 @@
           </div>
 
           <template #footer>
-            <div class="flex justify-between items-center">
+            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2">
               <div>
                 <UButton
                   v-if="selectedHistory && !selectedHistory.isReverted"
                   color="warning"
                   variant="soft"
                   icon="i-heroicons-arrow-uturn-left"
+                  size="sm"
                   :loading="reverting"
                   :disabled="reverting"
                   class="rounded-none [&>*]:rounded-none"
@@ -385,7 +386,7 @@
           </p>
 
           <template #footer>
-            <div class="flex justify-end gap-2">
+            <div class="flex flex-col sm:flex-row justify-end gap-2">
               <UButton color="gray" variant="ghost" class="rounded-none [&>*]:rounded-none" @click="revertConfirmOpen = false">
                 取消
               </UButton>

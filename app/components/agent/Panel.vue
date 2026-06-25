@@ -1,7 +1,7 @@
 <template>
-  <div class="flex h-screen flex-col border-l border-[var(--jc-border)] bg-white dark:bg-slate-900">
+  <div class="flex h-full flex-col border-l border-[var(--jc-border)] bg-white dark:bg-slate-900">
     <!-- Panel header -->
-    <div class="flex h-16 shrink-0 items-center gap-2 border-b border-[var(--jc-border)] px-4">
+    <div class="flex shrink-0 items-center gap-2 border-b border-[var(--jc-border)] px-3 py-2 sm:px-4 sm:h-16">
       <!-- Tab switcher -->
       <div class="flex rounded-md border border-[var(--jc-border)] text-xs">
         <button
@@ -48,6 +48,7 @@
           size="sm"
           icon="i-lucide-trash-2"
           aria-label="刪除目前對話"
+          class="hidden sm:inline-flex"
           @click="archiveConversation(currentConversationId)"
         />
       </template>
@@ -85,7 +86,7 @@
       </div>
 
       <!-- Input -->
-      <form class="border-t border-[var(--jc-border)] p-3" @submit.prevent="handleSubmit">
+      <form class="border-t border-[var(--jc-border)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" @submit.prevent="handleSubmit">
         <div class="flex gap-2">
           <UInput
             v-model="draft"

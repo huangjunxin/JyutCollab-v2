@@ -133,7 +133,7 @@
           </div>
 
           <template #footer>
-            <div class="flex justify-end gap-3">
+            <div class="flex flex-col sm:flex-row justify-end gap-2">
               <UButton color="neutral" variant="ghost" class="rounded-none [&>*]:rounded-none" @click="rejectModalOpen = false">
                 取消
               </UButton>

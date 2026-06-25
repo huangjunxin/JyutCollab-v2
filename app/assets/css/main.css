@@ -417,6 +417,8 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 0.95rem;
+    display: block;
+    overflow-x: auto;
   }
 
   .docs-prose th,

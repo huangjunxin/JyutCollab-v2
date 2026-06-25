@@ -33,22 +33,24 @@
               <div
                 v-for="(perm, index) in localPermissions"
                 :key="perm.dialectName"
-                class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                class="flex flex-col sm:flex-row sm:items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
               >
                 <span class="flex-1 text-sm">{{ getDialectLabel(perm.dialectName) }}</span>
-                <USelect
-                  v-model="perm.role"
-                  :items="dialectRoleOptions"
-                  size="xs"
-                  class="w-28"
-                />
-                <UButton
-                  icon="i-heroicons-x-mark"
-                  color="gray"
-                  variant="ghost"
-                  size="xs"
-                  @click="removePermission(index)"
-                />
+                <div class="flex items-center gap-2">
+                  <USelect
+                    v-model="perm.role"
+                    :items="dialectRoleOptions"
+                    size="xs"
+                    class="w-28"
+                  />
+                  <UButton
+                    icon="i-heroicons-x-mark"
+                    color="gray"
+                    variant="ghost"
+                    size="xs"
+                    @click="removePermission(index)"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -1,20 +1,32 @@
 <template>
   <header class="sticky top-0 z-50 border-b border-[var(--jc-border)] bg-white/80 backdrop-blur-md dark:border-[var(--jc-dark-border)] dark:bg-slate-900/80">
     <div class="w-full px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center h-16">
-        <div class="flex items-center gap-3">
-          <NuxtLink to="/" class="flex items-center gap-3 group">
-            <div class="w-10 h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent)] text-white shadow-[var(--jc-shadow-hard)] transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5">
-              <UIcon name="i-heroicons-book-open" class="w-6 h-6 text-white" />
+      <div class="flex justify-between items-center h-14 sm:h-16 gap-2">
+        <!-- Mobile hamburger -->
+        <UButton
+          v-if="isAuthenticated"
+          color="gray"
+          variant="ghost"
+          icon="i-heroicons-bars-3"
+          square
+          class="md:hidden shrink-0"
+          aria-label="開啟導航"
+          @click="mobileNavOpen = true"
+        />
+
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+          <NuxtLink to="/" class="flex items-center gap-2 sm:gap-3 group">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 aspect-square flex items-center justify-center bg-[var(--jc-accent)] text-white shadow-[var(--jc-shadow-hard)] transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 shrink-0">
+              <UIcon name="i-heroicons-book-open" class="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div class="flex flex-col">
+            <div class="hidden sm:flex flex-col">
               <span class="jc-serif text-xl font-bold text-[var(--jc-accent)]">JyutCollab</span>
               <span class="text-xs text-[var(--jc-muted)] dark:text-slate-400 -mt-1">粵語詞條協作平台</span>
             </div>
           </NuxtLink>
         </div>
 
-        <!-- Navigation -->
+        <!-- Navigation (desktop) -->
         <nav class="hidden md:flex items-center gap-1">
           <UButton
             to="/"
@@ -64,8 +76,8 @@
           </UButton>
         </nav>
 
-        <!-- Theme toggle and user menu -->
-        <div class="flex items-center gap-3">
+        <!-- Right side icons -->
+        <div class="flex items-center gap-1 sm:gap-3 shrink-0">
           <LayoutColorModeButton />
 
           <!-- Notification Bell -->
@@ -75,6 +87,7 @@
                 color="gray"
                 variant="ghost"
                 icon="i-heroicons-bell"
+                square
                 class="relative"
                 @click="notificationOpen = !notificationOpen"
               >
@@ -88,7 +101,7 @@
               <!-- Notification Dropdown -->
               <div
                 v-show="notificationOpen"
-                class="absolute right-0 top-full mt-1 w-80 max-h-96 overflow-y-auto border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] z-50"
+                class="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] max-h-96 overflow-y-auto border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] z-50"
               >
                 <div class="sticky top-0 flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
                   <span class="font-semibold text-gray-900 dark:text-white">通知</span>
@@ -172,7 +185,7 @@
               </UButton>
               <div
                 v-show="userMenuOpen"
-                class="absolute right-0 top-full mt-1 min-w-[10rem] border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] py-1 z-50"
+                class="absolute right-0 top-full mt-1 min-w-[10rem] max-w-[calc(100vw-2rem)] border border-[var(--jc-border)] bg-white dark:border-[var(--jc-dark-border)] dark:bg-slate-900 shadow-[var(--jc-shadow-hard)] py-1 z-50"
                 role="menu"
               >
                 <div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800" role="presentation">
@@ -241,6 +254,70 @@
       </div>
     </div>
   </header>
+
+  <!-- Mobile Navigation Drawer -->
+  <Teleport to="body">
+    <Transition name="nav-fade">
+      <div
+        v-if="mobileNavOpen"
+        class="fixed inset-0 z-[70] md:hidden"
+        @click.self="mobileNavOpen = false"
+      >
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/40" />
+        <!-- Panel -->
+        <Transition name="nav-slide">
+          <div
+            v-if="mobileNavOpen"
+            class="relative w-72 max-w-[80vw] h-full bg-white dark:bg-slate-900 border-r border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-xl flex flex-col overflow-y-auto"
+          >
+            <div class="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+              <span class="jc-serif text-lg font-bold text-[var(--jc-accent)]">JyutCollab</span>
+              <UButton
+                color="gray"
+                variant="ghost"
+                icon="i-heroicons-x-mark"
+                square
+                size="sm"
+                aria-label="關閉導航"
+                @click="mobileNavOpen = false"
+              />
+            </div>
+
+            <nav class="flex-1 p-3 space-y-1">
+              <NuxtLink
+                v-for="item in mobileNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg transition-colors"
+                :class="$route.path === item.to || ($route.path.startsWith(item.to) && item.to !== '/')
+                  ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'"
+                @click="mobileNavOpen = false"
+              >
+                <UIcon :name="item.icon" class="w-5 h-5 shrink-0" />
+                {{ item.label }}
+              </NuxtLink>
+            </nav>
+
+            <div v-if="user" class="p-4 border-t border-gray-100 dark:border-gray-800">
+              <div class="flex items-center gap-3">
+                <UAvatar
+                  :alt="user.username"
+                  size="sm"
+                  class="bg-primary text-white font-sans font-bold antialiased [&_span]:font-sans [&_span]:font-bold [&_span]:text-white"
+                />
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ user.displayName || user.username }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -257,8 +334,32 @@ function toggleAgent() {
   agentOpen.value = !agentOpen.value
 }
 
+const mobileNavOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
+
+// Mobile nav items
+const mobileNavItems = computed(() => {
+  const items = [
+    { to: '/', icon: 'i-heroicons-home', label: '首頁' },
+    { to: '/docs', icon: 'i-heroicons-book-open', label: '使用指南' },
+    { to: '/entries', icon: 'i-heroicons-document-text', label: '詞條列表' },
+    { to: '/histories', icon: 'i-heroicons-clock', label: '編輯歷史' },
+    { to: '/profile', icon: 'i-heroicons-user-circle', label: '個人資料' },
+  ]
+  if (canReview.value) {
+    items.splice(3, 0, { to: '/review', icon: 'i-heroicons-clipboard-document-check', label: '審核隊列' })
+  }
+  if (isAdmin.value) {
+    items.push({ to: '/admin/users', icon: 'i-heroicons-cog-6-tooth', label: '用戶管理' })
+  }
+  return items
+})
+
+// Close mobile nav on route change
+watch(() => $route.path, () => {
+  mobileNavOpen.value = false
+})
 
 // Notification state
 const notificationOpen = ref(false)
@@ -363,3 +464,22 @@ async function handleLogoutClick() {
   await logout()
 }
 </script>
+
+<style scoped>
+.nav-slide-enter-active,
+.nav-slide-leave-active {
+  transition: transform 0.2s ease;
+}
+.nav-slide-enter-from,
+.nav-slide-leave-to {
+  transform: translateX(-100%);
+}
+.nav-fade-enter-active,
+.nav-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.nav-fade-enter-from,
+.nav-fade-leave-to {
+  opacity: 0;
+}
+</style>

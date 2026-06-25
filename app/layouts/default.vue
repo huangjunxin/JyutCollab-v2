@@ -6,16 +6,31 @@
         <slot />
       </main>
     </div>
-    <Transition name="agent-slide">
+
+    <!-- Desktop: sidebar panel -->
+    <Transition v-if="!isMobile" name="agent-slide">
       <AgentPanel v-if="agentOpen" class="w-[420px] shrink-0" />
+    </Transition>
+
+    <!-- Mobile: full-screen overlay -->
+    <Transition v-else name="agent-fade">
+      <div
+        v-if="agentOpen"
+        class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-slate-900"
+        :style="{ height: '100dvh', minHeight: '100vh' }"
+      >
+        <AgentPanel class="flex-1 min-h-0" />
+      </div>
     </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useAgentChat } from '../composables/useAgentChat'
+import { useMobileBreakpoint } from '../composables/useMobileBreakpoint'
 
 const { open: agentOpen } = useAgentChat()
+const { isMobile } = useMobileBreakpoint()
 </script>
 
 <style scoped>
@@ -29,5 +44,14 @@ const { open: agentOpen } = useAgentChat()
   min-width: 0;
   opacity: 0;
   overflow: hidden;
+}
+
+.agent-fade-enter-active,
+.agent-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.agent-fade-enter-from,
+.agent-fade-leave-to {
+  opacity: 0;
 }
 </style>

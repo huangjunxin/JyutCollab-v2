@@ -7,10 +7,10 @@
     </div>
 
     <!-- 搜索和篩選 -->
-    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 mb-4">
-      <div class="flex flex-wrap gap-4">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-3 sm:p-4 mb-4">
+      <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <!-- 搜索框 -->
-        <div class="flex-1 min-w-[200px]">
+        <div class="flex-1 min-w-0">
           <UInput
             v-model="searchQuery"
             placeholder="搜索用戶名、郵箱..."
@@ -19,23 +19,25 @@
           />
         </div>
 
-        <!-- 角色篩選 -->
-        <USelect
-          v-model="roleFilter"
-          :items="roleFilterOptions"
-          placeholder="角色"
-          class="w-32"
-          @update:model-value="fetchUsers"
-        />
+        <div class="flex gap-3 sm:gap-4">
+          <!-- 角色篩選 -->
+          <USelect
+            v-model="roleFilter"
+            :items="roleFilterOptions"
+            placeholder="角色"
+            class="flex-1 sm:w-32"
+            @update:model-value="fetchUsers"
+          />
 
-        <!-- 狀態篩選 -->
-        <USelect
-          v-model="statusFilter"
-          :items="statusFilterOptions"
-          placeholder="狀態"
-          class="w-32"
-          @update:model-value="fetchUsers"
-        />
+          <!-- 狀態篩選 -->
+          <USelect
+            v-model="statusFilter"
+            :items="statusFilterOptions"
+            placeholder="狀態"
+            class="flex-1 sm:w-32"
+            @update:model-value="fetchUsers"
+          />
+        </div>
       </div>
     </div>
 

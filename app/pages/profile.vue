@@ -60,7 +60,7 @@
               color="error"
               size="sm"
               :loading="unlinkingGoogle"
-              @click="handleUnlinkGoogle"
+              @click="unlinkConfirmOpen = true"
             >
               解除連結
             </UButton>
@@ -214,6 +214,40 @@
       title="無法載入個人資料"
       :description="loadError"
     />
+
+    <!-- Unlink Google Confirmation Modal -->
+    <UModal v-model:open="unlinkConfirmOpen">
+      <template #content>
+        <UCard class="jc-modal-card w-full max-w-md rounded-none [&>*]:rounded-none">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5 text-error" />
+              <h3 class="text-lg font-semibold">解除 Google 連結</h3>
+            </div>
+          </template>
+
+          <p class="text-gray-600 dark:text-gray-400">
+            確定要解除 Google 帳號連結嗎？解除後將無法使用 Google 登錄。
+          </p>
+
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton color="gray" variant="ghost" class="rounded-none [&>*]:rounded-none" @click="unlinkConfirmOpen = false">
+                取消
+              </UButton>
+              <UButton
+                color="error"
+                :loading="unlinkingGoogle"
+                class="rounded-none [&>*]:rounded-none"
+                @click="confirmUnlinkGoogle"
+              >
+                確認解除
+              </UButton>
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -255,6 +289,7 @@ const loadError = ref('')
 const saving = ref(false)
 const linkingGoogle = ref(false)
 const unlinkingGoogle = ref(false)
+const unlinkConfirmOpen = ref(false)
 const error = ref('')
 const success = ref(false)
 
@@ -332,8 +367,8 @@ function handleLinkGoogle() {
   }
 }
 
-async function handleUnlinkGoogle() {
-  if (!confirm('確定要解除 Google 帳號連結嗎？')) return
+async function confirmUnlinkGoogle() {
+  unlinkConfirmOpen.value = false
   unlinkingGoogle.value = true
   try {
     const res = await $fetch<{ success: boolean; error?: string }>('/api/auth/me/unlink-google', {
