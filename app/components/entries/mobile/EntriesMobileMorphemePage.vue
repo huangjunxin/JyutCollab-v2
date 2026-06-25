@@ -27,6 +27,7 @@
             <span v-if="ref.position !== undefined" class="text-xs text-gray-400 dark:text-gray-500">第{{ (ref.position ?? 0) + 1 }}字</span>
             <span v-if="!ref.targetEntryId" class="text-xs text-amber-600 dark:text-amber-400">(未連結)</span>
             <UButton
+              v-if="!readOnly"
               icon="i-heroicons-x-mark"
               color="error"
               variant="ghost"
@@ -40,7 +41,7 @@
       </div>
 
       <!-- Unlinked morpheme candidates -->
-      <div>
+      <div v-if="!readOnly">
         <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">快速添加</h3>
         <div v-if="unlinkedCandidates.length > 0" class="space-y-2">
           <div class="flex flex-wrap gap-2">
@@ -75,7 +76,7 @@
       </div>
 
       <!-- Search database -->
-      <div>
+      <div v-if="!readOnly">
         <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">從數據庫選擇</h3>
         <div class="flex gap-2 mb-2">
           <UInput
@@ -127,6 +128,7 @@ interface UnlinkedMorphemeCandidate {
 
 const props = defineProps<{
   entry: Entry
+  readOnly?: boolean
   morphemeRefs: Entry['morphemeRefs']
   unlinkedCandidates: UnlinkedMorphemeCandidate[]
   searchResults: MorphemeSearchResult[]

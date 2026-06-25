@@ -412,6 +412,8 @@
       :morpheme-search-results="morphemeSearchResults"
       :morpheme-search-loading="morphemeSearchLoading"
       :rules="ruleOverlays.rules.value"
+      :jyutdict-suggested="jyutdictSuggested"
+      :jyutdict-visible="jyutdictVisible"
       :get-cell-overlay-meta="(e: any, f: string) => ruleOverlays.getCellOverlayMeta(e, f)"
       @search="(q: string) => { searchQuery = q; handleSearch() }"
       @add-new="addNewRow"
@@ -453,6 +455,8 @@
       @morpheme-page-mounted="(entry: any) => handleMobileMorphemePageMounted(entry)"
       @make-new-lexeme="(entry: any) => makeEntryNewLexeme(entry)"
       @join-lexeme="(entry: any) => openMergeModalForEntry(entry)"
+      @open-external-etymons="(entry: any) => openExternalEtymonsForGroup(String(entry.lexemeId || ''), entry.headword?.display || entry.text || '')"
+      @accept-jyutdict="(entry: any) => { const s = getJyutdictSuggested(getEntryIdString(entry)); if (s) acceptJyutdict(entry, s) }"
       @batch-delete="(ids: string[]) => mobileBatchDelete(ids)"
       @batch-status-change="(ids: string[], status: string) => mobileBatchStatusChange(ids, status)"
       @toggle-rule="(id: string) => ruleOverlays.toggleRule(id)"
@@ -2324,6 +2328,9 @@ function duplicateEntry(entry: Entry) {
   entries.value.unshift(newEntry)
   autoExpandGroupForEntry(newEntry)
 
+  // 手機端：不自動進入單元格編輯，由 EntriesMobileWorkbench 開啟單行編輯頁
+  if (isMobile.value) return
+
   nextTick(() => {
     handleCellClick(newEntry, 'headword', new MouseEvent('click'), 0, 0, true)
   })
@@ -2608,13 +2615,25 @@ async function deleteEntry(entry: Entry) {
   }
 }
 
-/** 手機端詞條更新後觸發重複檢查與 Jyutjyu 參考（模擬桌面 handleBlur 行為） */
+/** 手機端詞條更新後觸發重複檢查、Jyutjyu 參考與 Jyutdict 建議（模擬桌面 handleBlur 行為） */
 function onMobileEntryUpdate(entry: Entry) {
   if (entry.headword?.display?.trim() && entry.dialect?.name) {
     runDuplicateCheck(entry)
   }
   if (entry._isNew && entry.headword?.display?.trim()) {
     runJyutjyuRef(entry)
+  }
+  // 新建詞條：有詞頭和方言時觸發 Jyutdict 粵拼建議
+  if (entry._isNew && entry.headword?.display?.trim() && entry.dialect?.name) {
+    const entryIdStr = String(getEntryIdString(entry))
+    if (!jyutdictHandled.value.has(entryIdStr)) {
+      const existingData = rowHints.jyutdictData.value.get(entryIdStr)
+      if (!existingData || existingData.length === 0) {
+        queryJyutdictForEntry(entry)
+      } else if (!jyutdictVisible.value.get(entryIdStr)) {
+        jyutdictVisible.value.set(entryIdStr, true)
+      }
+    }
   }
 }
 

@@ -4,6 +4,7 @@
     <EntriesMobileSensesPage
       v-if="activeEntry && showSensesPage"
       :entry="activeEntry"
+      :read-only="activeReadOnly"
       :ai-definition-suggestion="definitionAISuggestionForActive"
       :ai-loading-definition="isAILoadingForActive('definition')"
       :ai-loading-examples="isAILoadingForActive('examples')"
@@ -18,6 +19,7 @@
     <EntriesMobileThemePage
       v-else-if="activeEntry && showThemePage"
       :entry="activeEntry"
+      :read-only="activeReadOnly"
       :ai-suggestion="themeAISuggestionForActive"
       :ai-loading="isAILoadingForActive('theme')"
       @back="closeThemePage"
@@ -31,6 +33,7 @@
     <EntriesMobileMorphemePage
       v-else-if="activeEntry && showMorphemePage"
       :entry="activeEntry"
+      :read-only="activeReadOnly"
       :morpheme-refs="activeEntry.morphemeRefs || []"
       :unlinked-candidates="unlinkedMorphemeEntryId === activeEntryKey ? unlinkedMorphemeCandidates : []"
       :search-results="morphemeSearchResults"
@@ -72,6 +75,8 @@
       :duplicate-entries="duplicateEntriesForActive"
       :other-dialect-entries="otherDialectEntriesForActive"
       :jyutjyu-results="jyutjyuResultsForActive"
+      :jyutdict-suggested="jyutdictSuggestedForActive"
+      :jyutdict-visible="jyutdictVisibleForActive"
       @back="closeRowEditor"
       @save="(entry) => $emit('save-entry', entry)"
       @cancel="(entry) => { $emit('cancel-entry', entry); closeRowEditor() }"
@@ -80,6 +85,7 @@
       @update:entry="(entry) => $emit('update:entry', entry)"
       @make-new-lexeme="(entry) => $emit('make-new-lexeme', entry)"
       @join-lexeme="(entry) => $emit('join-lexeme', entry)"
+      @open-external-etymons="(entry) => $emit('open-external-etymons', entry)"
       @open-theme-page="openSubPage('theme')"
       @open-senses-page="openSubPage('senses')"
       @open-morpheme-page="openSubPage('morpheme')"
@@ -95,6 +101,7 @@
       @dismiss-register-ai="activeEntry && $emit('dismiss-register-ai', activeEntry)"
       @apply-other-dialect="(sourceId) => activeEntry && $emit('apply-other-dialect', activeEntry, sourceId)"
       @apply-jyutjyu="(sourceId) => activeEntry && $emit('apply-jyutjyu', activeEntry, sourceId)"
+      @accept-jyutdict="activeEntry && $emit('accept-jyutdict', activeEntry)"
     />
 
     <!-- View page -->
@@ -435,6 +442,10 @@ const props = withDefaults(defineProps<{
   // Phase 5: Rules
   rules: Array<{ id: string; name: string; kind: string; enabled: boolean; targetFields: string[]; condition: { kind: string }; stylePreset: string; colorHex?: string }>
 
+  // Jyutdict suggestions (per-entry maps)
+  jyutdictSuggested?: Map<string, string>
+  jyutdictVisible?: Map<string, boolean>
+
   // Rule overlays
   getCellOverlayMeta?: (entry: Entry, field: string) => { classNames: string[]; style: Record<string, string>; tooltipText: string } | null
 }>(), {
@@ -448,7 +459,9 @@ const props = withDefaults(defineProps<{
   unlinkedMorphemeCandidates: () => [],
   unlinkedMorphemeEntryId: null,
   morphemeSearchResults: () => [],
-  morphemeSearchLoading: false
+  morphemeSearchLoading: false,
+  jyutdictSuggested: () => new Map(),
+  jyutdictVisible: () => new Map()
 })
 
 const emit = defineEmits<{
@@ -501,6 +514,8 @@ const emit = defineEmits<{
   // Phase 4: Row editor extra actions
   'make-new-lexeme': [entry: Entry]
   'join-lexeme': [entry: Entry]
+  'open-external-etymons': [entry: Entry]
+  'accept-jyutdict': [entry: Entry]
 
   // Phase 5: Batch operations
   'batch-delete': [entryIds: string[]]
@@ -567,6 +582,7 @@ const activeSubPage = ref<'senses' | 'theme' | 'morpheme' | 'rules' | null>(null
 
 // --- Computed AI / reference data for the active entry ---
 const activeEntryKey = computed(() => activeEntry.value ? getEntryIdString(activeEntry.value) : '')
+const activeReadOnly = computed(() => activeEntry.value ? !props.canEditEntry(activeEntry.value) : false)
 
 const themeAISuggestionForActive = computed(() =>
   activeEntryKey.value ? props.themeAISuggestions.get(activeEntryKey.value) ?? null : null
@@ -588,6 +604,12 @@ const otherDialectEntriesForActive = computed(() =>
 )
 const jyutjyuResultsForActive = computed(() =>
   activeEntryKey.value ? props.jyutjyuResults.get(activeEntryKey.value) ?? [] : []
+)
+const jyutdictSuggestedForActive = computed(() =>
+  activeEntryKey.value ? props.jyutdictSuggested.get(activeEntryKey.value) ?? '' : ''
+)
+const jyutdictVisibleForActive = computed(() =>
+  activeEntryKey.value ? (props.jyutdictVisible.get(activeEntryKey.value) ?? false) : false
 )
 
 // Sub-page flags

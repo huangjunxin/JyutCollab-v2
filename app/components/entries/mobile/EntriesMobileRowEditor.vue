@@ -26,6 +26,7 @@
         <UButton v-if="!entry._isNew" icon="i-heroicons-document-duplicate" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('duplicate', entry); showMoreMenu = false">複製詞條</UButton>
         <UButton v-if="!entry._isNew" icon="i-heroicons-folder-plus" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('make-new-lexeme', entry); showMoreMenu = false">拆出成新詞語</UButton>
         <UButton v-if="!entry._isNew" icon="i-heroicons-arrows-right-left" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('join-lexeme', entry); showMoreMenu = false">加入其他詞語組</UButton>
+        <UButton v-if="!entry._isNew && entry.lexemeId" icon="i-heroicons-globe-asia-australia" variant="ghost" color="neutral" size="sm" block class="justify-start" @click="$emit('open-external-etymons', entry); showMoreMenu = false">域外方音</UButton>
         <UButton v-if="!entry._isNew" icon="i-heroicons-trash" variant="ghost" color="error" size="sm" block class="justify-start" @click="$emit('delete', entry); showMoreMenu = false">刪除詞條</UButton>
       </div>
     </div>
@@ -38,6 +39,14 @@
       <EntriesMobileFieldRow label="詞頭" icon="i-heroicons-language" :value="entry.headword?.display || entry.text || ''" type="text" :is-editing="editingField === 'headword'" :disabled="readOnly" @click="!readOnly && startEdit('headword')" @update:model-value="(v: string) => updateField('headword', v)" @finish="finishEdit" />
       <EntriesMobileFieldRow label="方言" icon="i-heroicons-map-pin" :value="getDialectLabel(entry.dialect?.name || '') || entry.dialect?.name || ''" type="select" :options="dialectOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('dialect')" />
       <EntriesMobileFieldRow label="粵拼" icon="i-heroicons-speaker-wave" :value="entry.phonetic?.jyutping?.join('; ') || ''" type="text" :is-editing="editingField === 'phonetic'" :disabled="readOnly" @click="!readOnly && startEdit('phonetic')" @update:model-value="(v: string) => updateField('phonetic', v)" @finish="finishEdit" />
+      <!-- Jyutdict 粵拼建議 -->
+      <div v-if="jyutdictVisible && jyutdictSuggested && !readOnly" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+        <p class="text-xs text-blue-700 dark:text-blue-300 mb-1">泛粵典建議</p>
+        <p class="text-sm font-mono text-gray-900 dark:text-white">{{ jyutdictSuggested }}</p>
+        <div class="flex gap-2 mt-1">
+          <UButton size="xs" color="primary" @click="$emit('accept-jyutdict')">採納</UButton>
+        </div>
+      </div>
       <EntriesMobileFieldRow label="類型" icon="i-heroicons-tag" :value="entryTypeLabel" type="select" :options="entryTypeOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('entryType')" />
       <EntriesMobileFieldRow label="語域" icon="i-heroicons-chat-bubble-left-right" :value="entry.meta?.register || ''" type="select" :options="registerOptions" :disabled="readOnly" @click="!readOnly && openSelectSheet('register')" />
       <div v-if="registerAISuggestion" class="p-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
@@ -242,6 +251,10 @@ const props = defineProps<{
   duplicateEntries?: FormattedDuplicateEntry[]
   otherDialectEntries?: FormattedDuplicateEntry[]
   jyutjyuResults?: JyutjyuRefFormattedItem[]
+
+  // Jyutdict suggestion
+  jyutdictSuggested?: string
+  jyutdictVisible?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -253,6 +266,7 @@ const emit = defineEmits<{
   'update:entry': [entry: Entry]
   'make-new-lexeme': [entry: Entry]
   'join-lexeme': [entry: Entry]
+  'open-external-etymons': [entry: Entry]
 
   // Sub-page navigation
   'open-theme-page': []
@@ -274,6 +288,7 @@ const emit = defineEmits<{
   // Reference helpers
   'apply-other-dialect': [sourceId: string]
   'apply-jyutjyu': [sourceId: string]
+  'accept-jyutdict': []
 }>()
 
 const showMoreMenu = ref(false)
@@ -342,9 +357,25 @@ function updateField(field: string, value: string) {
   const entry = props.entry
   switch (field) {
     case 'headword':
-      if (!entry.headword) entry.headword = { display: '', search: '', normalized: '', isPlaceholder: false }
-      entry.headword.display = value
-      entry.text = value
+      if (!entry.headword) entry.headword = { display: '', search: '', normalized: '', isPlaceholder: false, variants: [] }
+      // 桌面端相同的 bracket parsing：「主詞頭 [異形1; 異形2]」
+      const raw = (value || '').trim()
+      let outside = raw
+      let inside = ''
+      const bracketMatch = raw.match(/^(.*?)(?:[\[［](.*)[\]］])\s*$/)
+      if (bracketMatch) {
+        outside = (bracketMatch[1] || '').trim()
+        inside = (bracketMatch[2] || '').trim()
+      }
+      const main = outside.trim()
+      const variants = inside
+        ? [...new Set(inside.split(/[;,，；]/).map(t => t.trim()).filter(t => t && t !== main))]
+        : []
+      entry.headword.display = main
+      entry.headword.normalized = main
+      entry.headword.isPlaceholder = main.includes('□')
+      entry.headword.variants = variants
+      entry.text = main
       break
     case 'phonetic':
       if (!entry.phonetic) entry.phonetic = { jyutping: [] }

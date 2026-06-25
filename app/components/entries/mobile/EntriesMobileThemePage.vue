@@ -26,7 +26,7 @@
       <p v-if="aiSuggestion.explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
         {{ aiSuggestion.explanation }}
       </p>
-      <div class="flex gap-2 mt-2">
+      <div v-if="!readOnly" class="flex gap-2 mt-2">
         <UButton size="xs" color="primary" @click="acceptAISuggestion">採納</UButton>
         <UButton size="xs" color="neutral" variant="ghost" @click="$emit('dismiss-ai')">忽略</UButton>
       </div>
@@ -64,8 +64,9 @@
           v-for="result in searchResults"
           :key="result.id"
           class="w-full flex items-center justify-between px-3 py-2 text-left bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
-          :class="{ 'ring-2 ring-primary/40': result.id === currentThemeId }"
-          @click="selectTheme(result)"
+          :class="{ 'ring-2 ring-primary/40': result.id === currentThemeId, 'cursor-default': readOnly }"
+          :disabled="readOnly"
+          @click="!readOnly && selectTheme(result)"
         >
           <div class="min-w-0">
             <span class="text-sm text-gray-900 dark:text-white block truncate">{{ result.level3Name }}</span>
@@ -86,7 +87,7 @@
           <p class="text-sm font-medium text-gray-900 dark:text-white">
             {{ currentThemeName }}
           </p>
-          <UButton size="xs" variant="ghost" color="error" class="mt-1" @click="clearTheme">清除分類</UButton>
+          <UButton v-if="!readOnly" size="xs" variant="ghost" color="error" class="mt-1" @click="clearTheme">清除分類</UButton>
         </div>
 
         <!-- Level 1 -->
@@ -95,8 +96,8 @@
             v-for="l1 in level1Themes"
             :key="l1.id"
             class="w-full flex items-center justify-between px-3 py-2.5 text-left bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
-            :class="{ 'border-primary': selectedL1 === l1.id }"
-            @click="selectL1(l1.id)"
+            :class="{ 'border-primary': selectedL1 === l1.id, 'cursor-default': readOnly }"
+            @click="!readOnly && selectL1(l1.id)"
           >
             <span class="text-sm text-gray-900 dark:text-white">{{ l1.name }}</span>
             <UIcon
@@ -113,8 +114,8 @@
             v-for="l2 in level2Themes"
             :key="l2.id"
             class="w-full flex items-center justify-between px-3 py-2 text-left bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
-            :class="{ 'border-primary': selectedL2 === l2.id }"
-            @click="selectL2(l2.id)"
+            :class="{ 'border-primary': selectedL2 === l2.id, 'cursor-default': readOnly }"
+            @click="!readOnly && selectL2(l2.id)"
           >
             <span class="text-sm text-gray-900 dark:text-white">{{ l2.name }}</span>
             <UIcon
@@ -131,8 +132,8 @@
             v-for="l3 in level3Themes"
             :key="l3.id"
             class="w-full flex items-center justify-between px-3 py-2 text-left bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
-            :class="{ 'ring-2 ring-primary/40 bg-primary-50 dark:bg-primary-900/20': l3.id === currentThemeId }"
-            @click="selectTheme(l3)"
+            :class="{ 'ring-2 ring-primary/40 bg-primary-50 dark:bg-primary-900/20': l3.id === currentThemeId, 'cursor-default': readOnly }"
+            @click="!readOnly && selectTheme(l3)"
           >
             <span class="text-sm text-gray-900 dark:text-white">{{ l3.level3Name }}</span>
             <UIcon v-if="l3.id === currentThemeId" name="i-heroicons-check" class="w-4 h-4 text-primary" />
@@ -142,7 +143,7 @@
     </div>
 
     <!-- Bottom: AI button -->
-    <div v-if="canGenerateAI" class="flex-shrink-0 px-4 py-3 bg-white dark:bg-slate-800 border-t border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
+    <div v-if="canGenerateAI && !readOnly" class="flex-shrink-0 px-4 py-3 bg-white dark:bg-slate-800 border-t border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]">
       <UButton
         size="sm"
         color="neutral"
@@ -179,6 +180,7 @@ interface ThemeAISuggestion {
 
 const props = defineProps<{
   entry: Entry
+  readOnly?: boolean
   aiSuggestion?: ThemeAISuggestion | null
   aiLoading?: boolean
 }>()
