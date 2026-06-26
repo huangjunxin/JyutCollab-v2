@@ -2,6 +2,8 @@
 
 粵方言詞語編纂協作平台
 
+**[English](./README_EN.md)**
+
 <!-- TODO: 加入 banner 圖片 -->
 <!-- ![JyutCollab v2 Banner](.github/assets/banner.svg) -->
 
