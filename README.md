@@ -12,8 +12,11 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **類 Notion 內聯編輯**——點擊儲存格即可直接編輯，文字區域自動調整高度
 - **鍵盤導航**——完整支援鍵盤操作（方向鍵、Enter、Tab、Escape）
 - **多視圖詞條顯示**——平面視圖、按詞頭聚合、按詞位分組
+- **已儲存與分享視圖**——保存搜尋、欄位、排序、進階篩選等詞條表格狀態，支援私人及公開視圖
+- **進階篩選與規則標示**——支援公式條件、正則條件及列級規則提示，方便大型資料清理
 - **欄寬調整**——拖曳調整欄寬，設定自動儲存至瀏覽器
 - **即時儲存指示器**——視覺化顯示儲存狀態與編輯狀態
+- **手機詞條工作台**——在流動裝置上提供分頁式編輯、欄位選擇、密度設定及批量操作
 
 ### AI 智能功能
 - **主題分類（3 候選）**——AI 提供 3 個候選分類結果，附排名（🥇🥈🥉）與信心度，由人選擇最合適者
@@ -35,6 +38,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **190 多個方言點**——涵蓋珠江三角洲、五邑、廣西及海外地區
 - **跨方言關聯**——透過詞位 ID 連結不同方言的詞條
 - **語素參照**——連結詞條至字元級別資料
+- **外部詞源參照**——為詞位記錄外部詞源或參考資料
 - **重複偵測**——建立詞條時即時檢查重複
 
 ### 審核流程
@@ -52,6 +56,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 ### 其他功能
 - **圖片上傳**——整合 Cloudinary，支援 HEIC 格式及自動優化
 - **稀有漢字顯示**——支援為詞頭、審核與歷史頁載入稀有字體子集
+- **站內使用指南**——以 Nuxt Content 管理 `/docs` 文件，並提供搜尋與分類側欄
 - **深色模式**——完整支援深色主題
 - **響應式設計**——支援流動裝置
 - **香港繁體中文**——所有文字自動轉換為香港繁體
@@ -63,19 +68,21 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 | 類別 | 技術 |
 |------|------|
 | 框架 | Nuxt 4、Vue 3（Composition API） |
-| UI | @nuxt/ui、Tailwind CSS、Radix Vue |
+| UI | @nuxt/ui、Tailwind CSS、Iconify 圖示 |
 | 數據庫 | MongoDB、Mongoose ODM |
 | 認證 | nuxt-auth-utils、HttpOnly Cookie、Google OAuth、Cloudflare Turnstile |
 | AI | OpenRouter API（deepseek-v4-flash，可透過 `OPENROUTER_MODEL` 調整） |
 | 狀態管理 | Pinia |
 | 驗證 | Zod |
 | 圖片儲存 | Cloudinary |
+| 內容文件 | @nuxt/content |
 | 文字處理 | opencc-js |
+| 測試 | Vitest |
 
 ## 快速開始
 
 ### 系統需求
-- Node.js 18 或以上版本
+- Node.js 20.19 或以上版本（或 22.12 或以上版本）
 - MongoDB（本機或 Atlas）
 - OpenRouter API 金鑰（AI 功能所需）
 - Cloudinary 帳戶（圖片上傳所需）
@@ -108,6 +115,9 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jyutcollab
 # Session 密鑰（至少 32 個字元）
 NUXT_SESSION_PASSWORD=your-session-password-at-least-32-chars-long
 
+# JWT 密鑰（生產環境必須設定，至少 32 個字元）
+JWT_SECRET=your-jwt-secret-at-least-32-chars-long
+
 # OpenRouter API 金鑰與模型
 OPENROUTER_API_KEY=sk-or-your-api-key
 OPENROUTER_MODEL=deepseek-v4-flash
@@ -122,8 +132,13 @@ NUXT_OAUTH_GOOGLE_CLIENT_ID=your-google-client-id
 NUXT_OAUTH_GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 # Cloudflare Turnstile（可選）
-NUXT_TURNSTILE_SITE_KEY=your-turnstile-site-key
+NUXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
 NUXT_TURNSTILE_SECRET_KEY=your-turnstile-secret-key
+
+# 網站設定
+NUXT_PORT=3100
+NUXT_PUBLIC_SITE_URL=http://localhost:3100
+NUXT_PUBLIC_SITE_NAME=JyutCollab v2
 ```
 
 5. 啟動開發伺服器：
@@ -151,15 +166,17 @@ npm run generate:headword-font
 JyutCollab-v2/
 ├── app/                          # 前端應用程式
 │   ├── components/               # Vue 元件
+│   │   ├── admin/               # 用戶及權限管理元件
+│   │   ├── agent/               # AI 助手元件
+│   │   ├── docs/                # 文件頁元件
 │   │   ├── entries/             # 詞條相關元件
+│   │   ├── entries/mobile/      # 手機詞條工作台元件
 │   │   ├── layout/              # 佈局元件
-│   │   ├── auth/                # 認證元件
-│   │   ├── review/              # 審核元件
-│   │   └── history/             # 歷史元件
+│   │   └── shared/              # 共用 UI 元件
+│   ├── assets/                  # CSS 等前端資源
 │   ├── composables/             # 可重用的組合式函數
 │   ├── middleware/              # 路由中介軟體
 │   ├── pages/                   # 檔案式路由
-│   ├── stores/                  # Pinia 狀態儲存
 │   ├── types/                   # TypeScript 型別定義
 │   └── utils/                   # 前端工具函數
 ├── server/                       # 後端伺服器
@@ -173,6 +190,11 @@ JyutCollab-v2/
 │   │   ├── stats/              # 統計數據
 │   │   ├── upload/             # 檔案上傳
 │   │   ├── lexemes/            # 詞位管理
+│   │   ├── external-etymons/    # 外部詞源參照
+│   │   ├── views/              # 已儲存視圖
+│   │   ├── notifications/      # 通知
+│   │   ├── users/              # 管理員用戶管理
+│   │   ├── reference-helpers/   # 參照填寫輔助事件
 │   │   ├── jyutdict/           # 粵典整合
 │   │   └── jyutjyu/            # 粵語整合
 │   ├── middleware/              # 伺服器中介軟體
@@ -194,6 +216,10 @@ JyutCollab-v2/
 │       ├── cloudinary.ts       # 圖片上傳工具
 │       ├── db.ts               # 數據庫連線
 │       └── textConversion.ts   # 中文文字轉換
+├── content/                       # Nuxt Content 使用指南
+│   └── docs/                     # 站內文件 Markdown
+├── scripts/                       # 維護腳本
+│   └── generate-headword-rare-font.mjs
 ├── shared/                       # 共用程式碼
 │   └── dialects.ts              # 方言定義
 └── public/                       # 靜態資源
@@ -223,6 +249,7 @@ JyutCollab-v2/
 | DELETE | /api/entries/:id | 刪除詞條 |
 | POST | /api/entries/:id/submit | 提交審核 |
 | GET | /api/entries/check-duplicate | 檢查重複 |
+| GET | /api/entries/contributors | 詞條貢獻者列表 |
 
 ### 審核
 | 方法 | 端點 | 說明 |
@@ -258,6 +285,7 @@ JyutCollab-v2/
 | GET | /api/stats/reviewer/enhanced | 審核進度與效率統計 |
 | GET | /api/stats/ai-suggestions | AI 建議成效統計 |
 | GET | /api/stats/dialects | 方言覆蓋統計 |
+| GET | /api/stats/reference-helpers | 參照填寫輔助統計 |
 
 ### 歷史、視圖與通知
 | 方法 | 端點 | 說明 |
@@ -274,6 +302,14 @@ JyutCollab-v2/
 | PUT | /api/notifications/:id/read | 標記單一通知為已讀 |
 | PUT | /api/notifications/read-all | 標記所有通知為已讀 |
 
+### 用戶管理
+| 方法 | 端點 | 說明 |
+|------|------|------|
+| GET | /api/users | 管理員查詢用戶列表 |
+| PATCH | /api/users/:id/role | 更新用戶角色 |
+| PATCH | /api/users/:id/dialect-permissions | 更新用戶方言權限 |
+| PATCH | /api/users/:id/toggle-active | 啟用或停用用戶 |
+
 ### 其他整合
 | 方法 | 端點 | 說明 |
 |------|------|------|
@@ -287,6 +323,8 @@ JyutCollab-v2/
 | GET | /api/jyutdict/general | 查詢粵典 general 資料 |
 | GET | /api/jyutdict/sheet | 查詢粵典 sheet 資料 |
 | GET | /api/jyutjyu/search | 搜尋粵語資料 |
+| POST | /api/reference-helpers/events | 記錄參照填寫輔助事件 |
+| POST | /api/reference-helpers/events/:id/action | 記錄參照填寫輔助後續操作 |
 
 ## 用戶角色
 
@@ -322,8 +360,14 @@ npm run dev
 # 生產環境建置
 npm run build
 
+# 靜態生成
+npm run generate
+
 # 預覽生產建置
 npm run preview
+
+# 執行 Vitest 測試（目前未設 npm script）
+npx vitest run
 
 # 生成詞頭稀有字體子集
 npm run generate:headword-font
