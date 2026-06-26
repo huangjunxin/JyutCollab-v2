@@ -2,9 +2,30 @@
 
 粵方言詞語編纂協作平台
 
+![Nuxt 4](https://img.shields.io/badge/Nuxt-4-00DC82?style=flat-square&logo=nuxt&logoColor=white)
+![Vue 3](https://img.shields.io/badge/Vue-3-42B883?style=flat-square&logo=vuedotjs&logoColor=white)
+![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Vitest](https://img.shields.io/badge/tests-Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+
 ## 簡介
 
 JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計，致力於收錄粵方言詞語。平台支援廣東、廣西、香港、澳門及海外華人社區共 190 多個方言點。
+
+## 目錄
+
+- [功能特點](#功能特點)
+- [技術棧](#技術棧)
+- [快速開始](#快速開始)
+- [常用入口](#常用入口)
+- [架構概覽](#架構概覽)
+- [專案結構](#專案結構)
+- [API 端點](#api-端點)
+- [開發注意事項](#開發注意事項)
+- [開發命令](#開發命令)
+
+## 專案狀態
+
+此專案仍在活躍開發中。`package.json` 未設定 ESLint／Prettier 指令或 npm test script；本地驗證以 `npm run build` 和 `npx vitest run` 為準。
 
 ## 功能特點
 
@@ -12,7 +33,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **類 Notion 內聯編輯**——點擊儲存格即可直接編輯，文字區域自動調整高度
 - **鍵盤導航**——完整支援鍵盤操作（方向鍵、Enter、Tab、Escape）
 - **多視圖詞條顯示**——平面視圖、按詞頭聚合、按詞位分組
-- **已儲存與分享視圖**——保存搜尋、欄位、排序、進階篩選等詞條表格狀態，支援私人及公開視圖
+- **已儲存與分享視圖**——儲存搜尋、欄位、排序、進階篩選等詞條表格狀態，支援私人及公開視圖
 - **進階篩選與規則標示**——支援公式條件、正則條件及列級規則提示，方便大型資料清理
 - **欄寬調整**——拖曳調整欄寬，設定自動儲存至瀏覽器
 - **即時儲存指示器**——視覺化顯示儲存狀態與編輯狀態
@@ -24,7 +45,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **例句生成**——生成附帶解釋的情境例句，支援自動生成例句粵拼（逐字查泛粵典）
 - **語域建議**——AI 自動判斷語域（口語、書面、粗俗、文雅、中性）
 - **全站 AI 助手**——右側常駐面板可回答使用指南問題、查詢詞條、套用詞條表格篩選及切換視圖
-- **對話歷史與審計**——保存 AI 對話、工具調用摘要、確認流程與審計事件，方便追蹤 AI 輔助操作
+- **對話歷史與審計**——儲存 AI 對話、工具調用摘要、確認流程與審計事件，方便追蹤 AI 輔助操作
 - **建議成效追蹤**——記錄 AI 建議的採納、拒絕、接受後修改、忽略與待處理狀態，計算參與率與接受率
 
 ### 儀表板與分析
@@ -148,6 +169,20 @@ npm run dev
 
 應用程式將在 `http://localhost:3100` 運行。
 
+## 常用入口
+
+開發伺服器啟動後，可由以下路徑進入主要工作區：
+
+| 路徑 | 用途 |
+|------|------|
+| `/` | 儀表板與個人工作概覽 |
+| `/entries` | 詞條列表、內聯編輯、進階篩選、已儲存視圖 |
+| `/review` | 審核佇列 |
+| `/histories` | 編輯歷史與還原 |
+| `/profile` | 個人資料、Google 帳號連結與方言設定 |
+| `/admin/users` | 管理員用戶與權限管理 |
+| `/docs` | 站內使用指南 |
+
 ## 稀有漢字字體子集
 
 詞頭、審核佇列及編輯歷史會載入 `public/fonts/` 內的稀有漢字字體子集，以支援部分系統字體缺字的粵方言用字。
@@ -159,6 +194,20 @@ npm run generate:headword-font
 ```
 
 此指令會掃描資料庫中實際出現的詞頭與異形詞，重新產生 `public/fonts/jyutcollab-headword-rare-*.woff2` 及對應 CSS。只會打包實際用到的字，避免載入完整 CJK 字體造成前端體積過大。
+
+## 架構概覽
+
+```mermaid
+flowchart LR
+  Browser[瀏覽器] --> NuxtApp[Nuxt 4 / Vue 3 前端]
+  NuxtApp --> Nitro[Nuxt Nitro API]
+  Nitro --> Mongo[(MongoDB / Mongoose)]
+  Nitro --> OpenRouter[OpenRouter AI]
+  Nitro --> Cloudinary[Cloudinary 圖片]
+  Nitro --> Google[Google OAuth]
+  Nitro --> Turnstile[Cloudflare Turnstile]
+  NuxtApp --> Content[Nuxt Content 文件]
+```
 
 ## 專案結構
 
@@ -346,6 +395,15 @@ JyutCollab-v2/
 - **香港**
 - **澳門**
 - **海外**——美洲、澳洲、英國、東南亞
+
+## 開發注意事項
+
+- 所有中文介面文字、錯誤訊息及文件內容均使用香港繁體中文；需要轉換文字時使用 `convertToHongKongTraditional()`。
+- TypeScript strict mode 已啟用；提交前至少執行 `npm run build`，涉及測試覆蓋範圍時執行 `npx vitest run`。
+- 詞條公開識別使用自訂 `id` 欄位，不使用 MongoDB `_id`；跨方言分組使用 `lexemeId`。
+- 主題 ID 只接受 60-498 的 Level 3 ID。
+- 修改詞條前必須檢查 `canContributeToDialect()`；CRUD 操作需要建立 `EditHistory` 記錄。
+- 專案沒有通用註解風格要求；除非能說明複雜邏輯，避免加入描述性註解。
 
 ## 開發文件
 
