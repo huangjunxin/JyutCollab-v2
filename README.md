@@ -2,30 +2,112 @@
 
 粵方言詞語編纂協作平台
 
+<!-- TODO: 加入 banner 圖片 -->
+<!-- ![JyutCollab v2 Banner](.github/assets/banner.svg) -->
+
 ![Nuxt 4](https://img.shields.io/badge/Nuxt-4-00DC82?style=flat-square&logo=nuxt&logoColor=white)
 ![Vue 3](https://img.shields.io/badge/Vue-3-42B883?style=flat-square&logo=vuedotjs&logoColor=white)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Vitest](https://img.shields.io/badge/tests-Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+
+> **[文件](https://github.com/huangjunxin/JyutCollab-v2/tree/main/content/docs)** · [Issues](https://github.com/huangjunxin/JyutCollab-v2/issues)
+
+<!-- TODO: 加入截圖 -->
+<!-- 建議截圖：儀表板、詞條內聯編輯、AI 建議功能 -->
+<!-- ![儀表板截圖](.github/assets/screenshot-dashboard.png) -->
+<!-- ![內聯編輯 GIF](.github/assets/demo-inline-edit.gif) -->
 
 ## 簡介
 
 JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計，致力於收錄粵方言詞語。平台支援廣東、廣西、香港、澳門及海外華人社區共 190 多個方言點。
 
+粵方言詞語的收集與整理長期面臨以下挑戰：方言點分散、缺乏統一的編纂工具、審核流程繁瑣。JyutCollab v2 旨在提供一個現代化的協作平台，讓貢獻者可以方便地記錄詞語，審核者可以高效地把關品質，同時借助 AI 輔助減輕重複勞動。
+
 ## 目錄
 
-- [功能特點](#功能特點)
-- [技術棧](#技術棧)
 - [快速開始](#快速開始)
 - [常用入口](#常用入口)
+- [功能特點](#功能特點)
+- [技術棧](#技術棧)
+- [系統需求](#系統需求)
+- [稀有漢字字體子集](#稀有漢字字體子集)
 - [架構概覽](#架構概覽)
 - [專案結構](#專案結構)
 - [API 端點](#api-端點)
+- [用戶角色](#用戶角色)
+- [方言覆蓋範圍](#方言覆蓋範圍)
 - [開發注意事項](#開發注意事項)
 - [開發命令](#開發命令)
+- [貢獻指南](#貢獻指南)
+- [聯繫與討論](#聯繫與討論)
+- [授權](#授權)
 
-## 專案狀態
+## 快速開始
 
-此專案仍在活躍開發中。`package.json` 未設定 ESLint／Prettier 指令或 npm test script；本地驗證以 `npm run build` 和 `npx vitest run` 為準。
+```bash
+git clone https://github.com/huangjunxin/JyutCollab-v2.git && cd JyutCollab-v2
+cp .env.example .env   # 編輯 .env，至少設定 MONGODB_URI 和 OPENROUTER_API_KEY
+npm install && npm run dev
+```
+
+應用程式將在 `http://localhost:3100` 運行。
+
+<details>
+<summary>詳細安裝步驟</summary>
+
+### 環境變數
+
+編輯 `.env` 檔案：
+
+```bash
+# MongoDB 連線
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jyutcollab
+
+# Session 密鑰（至少 32 個字元）
+NUXT_SESSION_PASSWORD=your-session-password-at-least-32-chars-long
+
+# JWT 密鑰（生產環境必須設定，至少 32 個字元）
+JWT_SECRET=your-jwt-secret-at-least-32-chars-long
+
+# OpenRouter API 金鑰與模型
+OPENROUTER_API_KEY=sk-or-your-api-key
+OPENROUTER_MODEL=deepseek-v4-flash
+
+# Cloudinary 設定
+NUXT_CLOUDINARY_CLOUD_NAME=your_cloud_name
+NUXT_CLOUDINARY_API_KEY=your_api_key
+NUXT_CLOUDINARY_API_SECRET=your_api_secret
+
+# Google OAuth（可選）
+NUXT_OAUTH_GOOGLE_CLIENT_ID=your-google-client-id
+NUXT_OAUTH_GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Cloudflare Turnstile（可選）
+NUXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
+NUXT_TURNSTILE_SECRET_KEY=your-turnstile-secret-key
+
+# 網站設定
+NUXT_PORT=3100
+NUXT_PUBLIC_SITE_URL=http://localhost:3100
+NUXT_PUBLIC_SITE_NAME=JyutCollab v2
+```
+
+</details>
+
+## 常用入口
+
+開發伺服器啟動後，可由以下路徑進入主要工作區：
+
+| 路徑 | 用途 |
+|------|------|
+| `/` | 儀表板與個人工作概覽 |
+| `/entries` | 詞條列表、內聯編輯、進階篩選、已儲存視圖 |
+| `/review` | 審核佇列 |
+| `/histories` | 編輯歷史與還原 |
+| `/profile` | 個人資料、Google 帳號連結與方言設定 |
+| `/admin/users` | 管理員用戶與權限管理 |
+| `/docs` | 站內使用指南 |
 
 ## 功能特點
 
@@ -40,7 +122,7 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 - **手機詞條工作台**——在流動裝置上提供分頁式編輯、欄位選擇、密度設定及批量操作
 
 ### AI 智能功能
-- **主題分類（3 候選）**——AI 提供 3 個候選分類結果，附排名（🥇🥈🥉）與信心度，由人選擇最合適者
+- **主題分類（3 候選）**——AI 提供 3 個候選分類結果，附排名與信心度，由人選擇最合適者
 - **釋義生成**——自動生成香港繁體中文釋義建議
 - **例句生成**——生成附帶解釋的情境例句，支援自動生成例句粵拼（逐字查泛粵典）
 - **語域建議**——AI 自動判斷語域（口語、書面、粗俗、文雅、中性）
@@ -100,88 +182,14 @@ JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計
 | 文字處理 | opencc-js |
 | 測試 | Vitest |
 
-## 快速開始
+## 系統需求
 
-### 系統需求
 - Node.js 20.19 或以上版本（或 22.12 或以上版本）
 - MongoDB（本機或 Atlas）
 - OpenRouter API 金鑰（AI 功能所需）
 - Cloudinary 帳戶（圖片上傳所需）
-- Google OAuth 憑證（Google 登錄所需，可選）
-- Cloudflare Turnstile 金鑰（人機驗證防護，可選）
 
-### 安裝步驟
-
-1. 複製儲存庫：
-```bash
-git clone https://github.com/huangjunxin/JyutCollab-v2.git
-cd JyutCollab-v2
-```
-
-2. 安裝依賴項目：
-```bash
-npm install
-```
-
-3. 設定環境變數：
-```bash
-cp .env.example .env
-```
-
-4. 編輯 `.env` 檔案：
-```bash
-# MongoDB 連線
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/jyutcollab
-
-# Session 密鑰（至少 32 個字元）
-NUXT_SESSION_PASSWORD=your-session-password-at-least-32-chars-long
-
-# JWT 密鑰（生產環境必須設定，至少 32 個字元）
-JWT_SECRET=your-jwt-secret-at-least-32-chars-long
-
-# OpenRouter API 金鑰與模型
-OPENROUTER_API_KEY=sk-or-your-api-key
-OPENROUTER_MODEL=deepseek-v4-flash
-
-# Cloudinary 設定
-NUXT_CLOUDINARY_CLOUD_NAME=your_cloud_name
-NUXT_CLOUDINARY_API_KEY=your_api_key
-NUXT_CLOUDINARY_API_SECRET=your_api_secret
-
-# Google OAuth（可選）
-NUXT_OAUTH_GOOGLE_CLIENT_ID=your-google-client-id
-NUXT_OAUTH_GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Cloudflare Turnstile（可選）
-NUXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
-NUXT_TURNSTILE_SECRET_KEY=your-turnstile-secret-key
-
-# 網站設定
-NUXT_PORT=3100
-NUXT_PUBLIC_SITE_URL=http://localhost:3100
-NUXT_PUBLIC_SITE_NAME=JyutCollab v2
-```
-
-5. 啟動開發伺服器：
-```bash
-npm run dev
-```
-
-應用程式將在 `http://localhost:3100` 運行。
-
-## 常用入口
-
-開發伺服器啟動後，可由以下路徑進入主要工作區：
-
-| 路徑 | 用途 |
-|------|------|
-| `/` | 儀表板與個人工作概覽 |
-| `/entries` | 詞條列表、內聯編輯、進階篩選、已儲存視圖 |
-| `/review` | 審核佇列 |
-| `/histories` | 編輯歷史與還原 |
-| `/profile` | 個人資料、Google 帳號連結與方言設定 |
-| `/admin/users` | 管理員用戶與權限管理 |
-| `/docs` | 站內使用指南 |
+可選：Google OAuth 憑證、Cloudflare Turnstile 金鑰。
 
 ## 稀有漢字字體子集
 
@@ -275,6 +283,19 @@ JyutCollab-v2/
 ```
 
 ## API 端點
+
+| 類別 | 核心端點 | 說明 |
+|------|----------|------|
+| 認證 | POST `/api/auth/login`、POST `/api/auth/register` | 登入、註冊 |
+| 詞條 | GET/POST `/api/entries`、PUT `/api/entries/:id` | CRUD 操作 |
+| 審核 | POST `/api/reviews/:id/approve`、POST `/api/reviews/:id/reject` | 通過、拒絕 |
+| AI | POST `/api/ai/categorize`、POST `/api/ai/definitions` | 分類、釋義 |
+| 統計 | GET `/api/stats`、GET `/api/stats/mine` | 全站及個人統計 |
+| 歷史 | GET `/api/histories`、POST `/api/histories/:id/revert` | 查看、還原 |
+| 視圖 | GET/POST `/api/views` | 已儲存視圖 |
+
+<details>
+<summary>完整 API 端點列表</summary>
 
 ### 認證
 | 方法 | 端點 | 說明 |
@@ -375,6 +396,8 @@ JyutCollab-v2/
 | POST | /api/reference-helpers/events | 記錄參照填寫輔助事件 |
 | POST | /api/reference-helpers/events/:id/action | 記錄參照填寫輔助後續操作 |
 
+</details>
+
 ## 用戶角色
 
 | 角色 | 權限 |
@@ -405,10 +428,6 @@ JyutCollab-v2/
 - 修改詞條前必須檢查 `canContributeToDialect()`；CRUD 操作需要建立 `EditHistory` 記錄。
 - 專案沒有通用註解風格要求；除非能說明複雜邏輯，避免加入描述性註解。
 
-## 開發文件
-
-詳細開發文件請參閱 [CLAUDE.md](./CLAUDE.md)。
-
 ## 開發命令
 
 ```bash
@@ -433,3 +452,30 @@ npm run generate:headword-font
 # 準備 Nuxt
 npm run postinstall
 ```
+
+## 貢獻指南
+
+歡迎對 JyutCollab v2 做出貢獻。
+
+### 報告問題
+- 使用 [GitHub Issues](https://github.com/huangjunxin/JyutCollab-v2/issues) 提交 Bug 報告或功能建議
+- 提供盡可能詳細的重現步驟和環境資訊
+
+### 提交 Pull Request
+1. Fork 本儲存庫並建立你的分支（`git checkout -b feature/your-feature`）
+2. 進行修改並確保 `npm run build` 通過
+3. 提交 Pull Request，說明修改內容與原因
+
+### 開發規範
+- 詳細的開發指引請參閱 [CLAUDE.md](./CLAUDE.md)
+- 所有中文文字使用香港繁體中文
+- TypeScript strict mode，提交前務必通過建置檢查
+
+## 聯繫與討論
+
+- [GitHub Issues](https://github.com/huangjunxin/JyutCollab-v2/issues) — Bug 報告與功能建議
+- [GitHub Discussions](https://github.com/huangjunxin/JyutCollab-v2/discussions) — 一般討論與問答
+
+## 授權
+
+本倉庫的程式碼與文件採用 [MIT License](./LICENSE)。本倉庫目前不包含詞典資料，因此不另行聲明資料授權。
