@@ -181,6 +181,20 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
     return String(value ?? '').trim()
   }
 
+  function isAbortError(error: any): boolean {
+    return (
+      error?.name === 'AbortError' ||
+      error?.cause?.name === 'AbortError' ||
+      (typeof error?.message === 'string' && error.message.toLowerCase().includes('abort'))
+    )
+  }
+
+  function handleAIRequestError(error: any, label: string) {
+    if (isAbortError(error)) throw error
+    console.error(label, error)
+    return null
+  }
+
   function getThemeActionContent(entry: Entry) {
     return {
       level1: entry.theme?.level1,
@@ -400,18 +414,14 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             },
             signal
           }).catch(e => {
-            if (e?.name === 'AbortError') throw e
-            console.error('AI definition error:', e)
-            return null
+            return handleAIRequestError(e, 'AI definition error:')
           })
           const registerRequest = $fetch<{ success: boolean; data?: { register?: Register; confidence?: number; explanation?: string; suggestionId?: string } }>('/api/ai/register', {
             method: 'POST',
             body: registerBody,
             signal
           }).catch(e => {
-            if (e?.name === 'AbortError') throw e
-            console.error('AI register error:', e)
-            return null
+            return handleAIRequestError(e, 'AI register error:')
           })
 
           let definitionResponse: { success: boolean; data?: { definition?: string; suggestionId?: string } } | null = null
@@ -426,9 +436,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
                 body: categorizeBody,
                 signal
               }).catch(e => {
-                if (e?.name === 'AbortError') throw e
-                console.error('AI categorization error:', e)
-                return null
+                return handleAIRequestError(e, 'AI categorization error:')
               }),
               registerRequest
             ])
@@ -446,9 +454,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
               body: categorizeBody,
               signal
             }).catch(e => {
-              if (e?.name === 'AbortError') throw e
-              console.error('AI categorization error:', e)
-              return null
+              return handleAIRequestError(e, 'AI categorization error:')
             })
           }
 
@@ -504,11 +510,7 @@ export function useEntriesAISuggestions(options: UseEntriesAISuggestionsOptions)
             registerAISuggestions.value = new Map(registerAISuggestions.value)
           }
         } catch (error: any) {
-          const isAborted =
-            error?.name === 'AbortError' ||
-            error?.cause?.name === 'AbortError' ||
-            (typeof error?.message === 'string' && error.message.toLowerCase().includes('abort'))
-          if (isAborted) return
+          if (isAbortError(error)) return
           console.error('AI suggestion error:', error)
           const message = error?.data?.message || error?.message || '釋義建議暫時無法生成'
           aiInlineError.value = { entryId, field: 'definition', message }

@@ -2,20 +2,23 @@
 
 ## 2026-06-27 更新結論
 
-本輪 11 項修復已在程式碼層面落地，方向符合階段二手機體驗目標：減少窄屏溢出、提高觸控目標、保留 entries 手機首頁凍結護欄，並改善 `/admin/users`、`review`、`histories` 等頁面的手機可用性。
+本輪修復重檢後，涉及桌面 `/entries` 詞條表格的 2 項改動已回退：`useMobileBreakpoint()` SSR 預設手機端、以及桌面 loading skeleton。原因是桌面詞條表格承載快捷鍵、欄寬、saved views、預設方言等既有工作流，不應為手機端優化改動桌面首屏分流或桌面 loading 界面。
+
+其餘手機 / 跨頁修復方向仍符合階段二手機體驗目標：減少窄屏溢出、提高觸控目標、保留 entries 手機首頁凍結護欄，並改善 `/admin/users`、`review`、`histories` 等頁面的手機可用性。
 
 已驗證證據：
 
 - `npm run build`：通過；僅保留既有 chunk size warning 及 Tailwind sourcemap warning。
 - `npx vitest run app/components/admin/__tests__/AdminUsersMobileScope.test.ts app/components/entries/__tests__/EntriesMobileStage2Scope.test.ts`：2 files / 9 tests passed。
-- source review 確認 11 項修復均有對應檔案改動，且未重新打開 entries 手機首頁 grid 的第二期凍結範圍。
+- source review 確認 9 項非桌面 entries 修復仍有對應檔案改動；2 項涉及桌面 entries 的改動已回退。
 
 目前結論：
 
 - ✅ 可判定為「程式層面修復基本完成」。
 - ✅ 未發現會破壞 entries 第二期手機首頁護欄的改動。
+- ✅ 桌面 `/entries` 表格界面回復原有分流與 loading，不再引入 mobile-first SSR 或 skeleton 改動。
 - ⚠️ 不應寫成「所有手機頁面已完成真機 / rendered 驗收」；登入態頁面、modal、桌面 hydration、實際手機截圖仍需補證據。
-- ⚠️ `useMobileBreakpoint()` 改為 SSR 預設手機端，可避免手機端先閃桌面版，但桌面端可能出現 SSR mobile HTML 與 client desktop state 的短暫不一致；後續需要用桌面與手機 rendered QA 確認。
+- ⚠️ 手機端首屏閃爍仍待另案處理，不能用改動桌面 `/entries` 初始分流的方式解決。
 - ⚠️ histories diff 表格已移除非法 `w-3/8` 類，但目前三欄皆用 `w-1/4 sm:w-1/3`，如需保留「原值 / 新值」較寬比例，可再改為明確比例類。
 
 ## 總體方案（已確認）
@@ -48,7 +51,7 @@
 
 - ✅ 頁面用 `useMobileBreakpoint()` 決定渲染 `EntriesDesktopTable` 或 `EntriesMobileWorkbench`
 - ✅ 桌面專屬區塊（頁頭、AgentFilterBanner、SharedSearchFilterBar、AdvancedFilterHost、ViewsDropdown、空狀態）全部用 `v-if="!isMobile"` 控制
-- 🔧 桌面 loading 已由 spinner 改為 `USkeleton` 表格骨架屏；手機分支仍由 `EntriesMobileWorkbench` 自身狀態處理，未改手機首頁 grid
+- ✅ 桌面 loading 維持原 spinner，不再改為 `USkeleton`；手機分支仍由 `EntriesMobileWorkbench` 自身狀態處理，未改手機首頁 grid
 
 #### entries 手機端完整元件清單（`app/components/entries/mobile/`，共 11 個）
 
@@ -153,9 +156,9 @@
 | 6 | 歷史頁 diff 表格最小寬度 | `histories/index.vue` 259 行 | `min-w-[20rem]` → `min-w-[16rem]` |
 | 7 | `w-3/8` 非標準 Tailwind 類 | `histories/index.vue` 263-264 行 | → `w-1/4` |
 | 8 | UserTable 截斷文字缺 `title` | `UserTable.vue` 130-131 行 | 加 `:title="user.username"` / `:title="user.email"` |
-| 9 | SSR 閃爍 | `useMobileBreakpoint.ts` | `ref(false)` → `ref(import.meta.client ? window.innerWidth < MOBILE_BREAKPOINT : true)`，SSR 預設手機端避免閃爍 |
+| 9 | SSR 閃爍 | `useMobileBreakpoint.ts` | 不採用 mobile-first SSR；保留 `ref(false)`，避免桌面 `/entries` 首屏先渲染手機分支並干擾表格初始化 |
 | 10 | 歷史頁操作標籤時態不一致 | `histories/index.vue` 681-684, 820-823 行 | `創建/更新/刪除/狀態變更` → `已建立/已更新/已刪除/已變更狀態`，統一過去時 |
-| 11 | entries 桌面 loading 缺少 Skeleton 佔位元件 | `entries/index.vue` 183-190 行 | 桌面 spinner 替換為 `USkeleton` 骨架屏，模擬表格行佈局；手機首頁 grid 未改動 |
+| 11 | entries 桌面 loading 缺少 Skeleton 佔位元件 | `entries/index.vue` 183-190 行 | 不採用桌面 skeleton；桌面 loading 維持原 spinner，避免改動詞條表格桌面界面；手機首頁 grid 未改動 |
 
 ### 六、剩餘已知問題
 
@@ -163,5 +166,5 @@
 
 - 待補登入態 rendered QA：`/entries`、`/review`、`/histories`、`/admin/users` 在 375px / 390px / 430px 視口的截圖或錄屏。
 - 待補 modal 實測：拒絕原因、diff、撤銷確認、管理方言權限等窄屏彈窗是否仍無溢出、遮擋或按鈕過小。
-- 待確認 `useMobileBreakpoint()` SSR 預設手機端在桌面首屏是否有 hydration warning 或可見閃爍。
+- 待另案處理手機端首屏閃爍；方案不得影響桌面 `/entries` 表格初始化、快捷鍵、欄寬、saved views 或預設方言邏輯。
 - 待確認 histories diff 表格三欄比例是否符合閱讀預期；如需保留比較欄較寬，應再調整欄寬類。

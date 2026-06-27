@@ -117,6 +117,29 @@
           {{ opt.label }}
         </option>
       </select>
+      <div
+        v-if="activeAISuggestionHint"
+        class="mt-1 flex items-start justify-between gap-2 px-2 py-1.5 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800"
+        @click.stop
+      >
+        <div class="min-w-0">
+          <div class="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-300">
+            <UIcon name="i-heroicons-sparkles" class="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{{ aiSuggestionHintTitle }}</span>
+          </div>
+          <p class="mt-0.5 text-xs text-gray-700 dark:text-gray-300 whitespace-normal break-words">
+            {{ activeAISuggestionHint }}
+          </p>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <UButton color="neutral" variant="ghost" size="xs" @click="$emit('dismiss-ai-suggestion')">
+            關閉
+          </UButton>
+          <UButton color="primary" size="xs" @click="$emit('accept-ai-suggestion')">
+            採納
+          </UButton>
+        </div>
+      </div>
     </template>
     <!-- 顯示態 -->
     <template v-else>
@@ -234,6 +257,31 @@
             />
           </div>
         </div>
+        <div
+          v-if="activeAISuggestionHint"
+          class="mx-1 px-2 py-1.5 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800"
+          @click.stop
+        >
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-300">
+                <UIcon name="i-heroicons-sparkles" class="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{{ aiSuggestionHintTitle }}</span>
+              </div>
+              <p class="mt-0.5 text-xs text-gray-700 dark:text-gray-300 whitespace-normal break-words">
+                {{ activeAISuggestionHint }}
+              </p>
+            </div>
+            <div class="flex items-center gap-1 flex-shrink-0">
+              <UButton color="neutral" variant="ghost" size="xs" @click="$emit('dismiss-ai-suggestion')">
+                關閉
+              </UButton>
+              <UButton color="primary" size="xs" @click="$emit('accept-ai-suggestion')">
+                採納
+              </UButton>
+            </div>
+          </div>
+        </div>
         <!-- 第二行：展開提示 -->
         <div
           v-if="showExpand && expandHint"
@@ -329,6 +377,8 @@ const props = withDefaults(
     isThemeExpanded?: boolean
     /** 主題 AI 建議提示文字 */
     themeExpandHint?: string
+    aiSuggestionHint?: string
+    aiSuggestionHintTitle?: string
     /** 只讀規則覆蓋 metadata，用於條件格式及驗證警告 */
     cellMeta?: EntryCellOverlayMeta
   }>(),
@@ -350,7 +400,9 @@ const props = withDefaults(
     headwordExpandHint: '',
     themeId: undefined,
     isThemeExpanded: false,
-    themeExpandHint: ''
+    themeExpandHint: '',
+    aiSuggestionHint: '',
+    aiSuggestionHintTitle: 'AI 建議'
   }
 )
 
@@ -377,6 +429,7 @@ const overlayClassNames = computed(() => props.cellMeta?.classNames ?? [])
 const overlayTitle = computed(() => props.cellMeta?.tooltipText || undefined)
 const validationOverlayTitle = computed(() => props.cellMeta?.validationTooltipText || props.cellMeta?.tooltipText || '驗證警告')
 const hasValidationMatches = computed(() => (props.cellMeta?.validationMatches.length ?? 0) > 0)
+const activeAISuggestionHint = computed(() => props.aiSuggestionHint || props.themeExpandHint)
 
 // 主題完整路徑（用於 tooltip）
 const themePath = computed(() => {
@@ -408,5 +461,7 @@ const emit = defineEmits<{
   'theme-expand-click': []
   'accept-theme-ai': []
   'dismiss-theme-ai': []
+  'accept-ai-suggestion': []
+  'dismiss-ai-suggestion': []
 }>()
 </script>

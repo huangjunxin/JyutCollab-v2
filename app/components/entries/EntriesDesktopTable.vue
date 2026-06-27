@@ -219,7 +219,7 @@
               @keydown="$emit('cell-keydown', $event, row.entry, col.key)"
               @blur="$emit('cell-blur', row.entry, col.key)"
               @ai-definition="$emit('ai-definition', row.entry)"
-              @ai-theme="$emit('ai-theme', row.entry)"
+              @ai-theme="$emit('ai-theme', row.entry, rowIndex, colIndex)"
               @ai-register="$emit('ai-register', row.entry, rowIndex, colIndex)"
               @expand-click="$emit('expand-click', row.entry)"
               @theme-expand-click="$emit('theme-expand-click', row.entry)"
@@ -243,6 +243,7 @@
           </tr>
           <!-- 行內 AI 釋義建議（Tab 落在釋義格且有待處理建議時顯示） -->
           <AISuggestionRow
+            :key="`ai-definition-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && aiSuggestion && aiSuggestionForField && editingCell && editingCell.field === aiSuggestionForField && getEntryIdString(row.entry) === String(editingCell.entryId)"
             :text="aiSuggestion"
             :title="aiSuggestionForField === 'theme' ? 'AI 分類建議' : 'AI 釋義建議'"
@@ -252,10 +253,11 @@
           />
           <!-- 行內 AI 分類建議 -->
           <AISuggestionRow
-            v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === columnIndices.themeColIndex && themeAISuggestions.get(getEntryIdString(row.entry))"
-            :text="formatThemeSuggestion(themeAISuggestions.get(getEntryIdString(row.entry)))"
+            :key="`ai-theme-${getEntryIdString(row.entry)}-${themeAISuggestions?.get(getEntryIdString(row.entry)) ? '1' : '0'}`"
+            v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === columnIndices.themeColIndex && themeAISuggestions?.get(getEntryIdString(row.entry))"
+            :text="formatThemeSuggestion(themeAISuggestions?.get(getEntryIdString(row.entry)))"
             :alternatives="getThemeAlternativesForRow(row.entry)"
-            :confidence="themeAISuggestions.get(getEntryIdString(row.entry))?.confidence"
+            :confidence="themeAISuggestions?.get(getEntryIdString(row.entry))?.confidence"
             title="AI 分類建議"
             :colspan="editableColumns.length + 2"
             @accept="$emit('accept-theme-ai-row', row.entry)"
@@ -264,8 +266,9 @@
           />
           <!-- 行內 AI 語域建議 -->
           <AISuggestionRow
-            v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === columnIndices.registerColIndex && registerAISuggestions.get(getEntryIdString(row.entry))"
-            :text="formatRegisterSuggestion(registerAISuggestions.get(getEntryIdString(row.entry)))"
+            :key="`ai-register-${getEntryIdString(row.entry)}-${registerAISuggestions?.get(getEntryIdString(row.entry)) ? '1' : '0'}`"
+            v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === columnIndices.registerColIndex && registerAISuggestions?.get(getEntryIdString(row.entry))"
+            :text="formatRegisterSuggestion(registerAISuggestions?.get(getEntryIdString(row.entry)))"
             title="AI 語域建議"
             :colspan="editableColumns.length + 2"
             @accept="$emit('accept-register-ai', row.entry)"
@@ -273,6 +276,7 @@
           />
           <!-- 泛粵典粵拼建議 -->
           <JyutdictSuggestionRow
+            :key="`jyutdict-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && focusedCell?.colIndex === columnIndices.phoneticColIndex && getJyutdictVisible(getEntryIdString(row.entry))"
             :colspan="editableColumns.length + 2"
             :char-data="getJyutdictData(getEntryIdString(row.entry))"
@@ -284,6 +288,7 @@
           />
           <!-- 詞頭重複檢測 -->
           <DuplicateCheckRow
+            :key="`duplicate-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && focusedCell?.rowIndex === rowIndex && (getDuplicateCheckLoading(getEntryIdString(row.entry)) || getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry)).length > 0)"
             :colspan="editableColumns.length + 2"
             :entries="getDuplicateCheckEntriesFormatted(getEntryIdString(row.entry))"
@@ -293,6 +298,7 @@
           />
           <!-- 手動輸入另一個參考詞條 -->
           <ReferenceHeadwordRow
+            :key="`reference-${getEntryIdString(row.entry)}`"
             v-if="
               row.type === 'entry' &&
               focusedCell?.rowIndex === rowIndex &&
@@ -307,6 +313,7 @@
           />
           <!-- 其他方言點已有該詞條 -->
           <OtherDialectsRefRow
+            :key="`other-dialects-${getEntryIdString(row.entry)}`"
             v-if="
               row.type === 'entry' &&
               focusedCell?.rowIndex === rowIndex &&
@@ -321,6 +328,7 @@
           />
           <!-- Jyutjyu 參考 -->
           <JyutjyuRefRow
+            :key="`jyutjyu-${getEntryIdString(row.entry)}`"
             v-if="
               row.type === 'entry' &&
               focusedCell?.rowIndex === rowIndex &&
@@ -328,8 +336,8 @@
             "
             :colspan="editableColumns.length + 2"
             :query="getJyutjyuQuery(getEntryIdString(row.entry))"
-            :results="formatJyutjyuResults(jyutjyuRefResult.get(getEntryIdString(row.entry))?.results || [])"
-            :raw-results="jyutjyuRefResult.get(getEntryIdString(row.entry))?.results || []"
+            :results="formatJyutjyuResults(getJyutjyuResult(row.entry)?.results || [])"
+            :raw-results="getJyutjyuResult(row.entry)?.results || []"
             :total="getJyutjyuTotal(getEntryIdString(row.entry))"
             :is-loading="getJyutjyuLoading(getEntryIdString(row.entry))"
             :error-message="getJyutjyuError(getEntryIdString(row.entry))"
@@ -339,6 +347,7 @@
           />
           <!-- 行內釋義建議錯誤 + 重試 -->
           <tr
+            :key="`inline-error-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && aiInlineError && getEntryIdString(row.entry) === aiInlineError.entryId && aiInlineError.field === 'definition'"
             class="bg-red-50/80 dark:bg-red-900/20 border-b border-gray-200 dark:border-gray-700"
             role="alert"
@@ -359,13 +368,14 @@
           </tr>
           <!-- 釋義詳情展開區 -->
           <tr
+            :key="`senses-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && expandedEntryId === getEntryIdString(row.entry)"
             class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
           >
             <td :colspan="editableColumns.length + 2" class="p-0 align-top">
               <EntrySensesExpand
                 :entry="row.entry"
-                :ai-suggestion="definitionAISuggestions.get(getEntryIdString(row.entry))"
+                :ai-suggestion="getDefinitionSuggestion(row.entry)"
                 :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition'"
                 :ai-loading-examples="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'examples'"
                 @close="$emit('close-senses', row.entry)"
@@ -386,6 +396,7 @@
           </tr>
           <!-- 詞素引用展開區 -->
           <tr
+            :key="`morpheme-refs-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
             class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700"
           >
@@ -492,13 +503,14 @@
           </tr>
           <!-- 主題分類展開區 -->
           <tr
+            :key="`theme-expand-${getEntryIdString(row.entry)}`"
             v-if="row.type === 'entry' && expandedThemeEntryId === getEntryIdString(row.entry)"
             class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700"
           >
             <td :colspan="editableColumns.length + 2" class="p-0 align-top">
               <EntryThemeExpand
                 :entry="row.entry"
-                :ai-suggestion="themeAISuggestions.get(getEntryIdString(row.entry))"
+                :ai-suggestion="getThemeSuggestion(row.entry)"
                 :ai-loading="aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme'"
                 @close="$emit('close-theme-expand', row.entry)"
                 @update:theme="(theme: any) => $emit('update:theme', row.entry, theme)"
@@ -570,6 +582,11 @@ import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
 import JyutjyuRefRow from '~/components/entries/JyutjyuRefRow.vue'
 import ReferenceHeadwordRow from '~/components/entries/ReferenceHeadwordRow.vue'
 
+// ---- Inject fallback reactive state from parent (bypasses prop reactivity chain) ----
+const injectedFocusedCell = inject<ComputedRef<{ rowIndex: number; colIndex: number } | null> | null>('entryTableFocusedCell', null)
+const injectedThemeAIMap = inject<ComputedRef<Map<string, any>> | null>('entryTableThemeAISuggestions', null)
+const injectedRegisterAIMap = inject<ComputedRef<Map<string, any>> | null>('entryTableRegisterAISuggestions', null)
+
 // ---- Types ----
 type TableRow = { type: 'group'; group: { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }; groupIndex: number } | { type: 'entry'; entry: Entry; groupIndex: number; entryIndexInGroup?: number }
 type EditableColumnDef = { key: string; label: string; width: string; type: string; get: (e: Entry) => unknown; set: (e: Entry, v: any) => void; options?: Array<{ value: string; label: string }>; getOptions?: () => Array<{ value: string; label: string }> }
@@ -577,7 +594,7 @@ type EntryCellOverlayMeta = { formattingMatches: any[]; validationMatches: any[]
 type ColumnIndices = { themeColIndex: number; phoneticColIndex: number; headwordColIndex: number; registerColIndex: number }
 
 // ---- Props ----
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   // Data
   tableRows: TableRow[]
   editableColumns: EditableColumnDef[]
@@ -617,9 +634,9 @@ const props = defineProps<{
   aiLoadingFor: { entryKey: string; action: string } | null
   aiLoadingInlineFor: { entryId: string; field: string } | null
   aiInlineError: { entryId: string; field: string; message: string } | null
-  themeAISuggestions: Map<string, any>
-  definitionAISuggestions: Map<string, any>
-  registerAISuggestions: Map<string, any>
+  themeAISuggestions?: Map<string, any>
+  definitionAISuggestions?: Map<string, any>
+  registerAISuggestions?: Map<string, any>
   formatThemeSuggestion: (s: any) => string
   formatRegisterSuggestion: (s: any) => string
 
@@ -636,7 +653,7 @@ const props = defineProps<{
   getJyutjyuTotal: (id: string) => number
   getJyutjyuLoading: (id: string) => boolean
   getJyutjyuError: (id: string) => string | undefined
-  jyutjyuRefResult: Map<string, any>
+  jyutjyuRefResult?: Map<string, any>
   formatJyutjyuResults: (results: any[]) => any[]
   getReferenceSearchLoading: (id: string) => boolean
   getReferenceSearchQuery: (id: string) => string
@@ -659,11 +676,22 @@ const props = defineProps<{
   // Morpheme refs (inline expand)
   unlinkedMorphemeEntryId: string | null
   unlinkedMorphemeCandidates: Array<{ position: number; char: string; jyutping: string; note: string }>
-}>()
+}>(), {
+  themeAISuggestions: () => new Map(),
+  definitionAISuggestions: () => new Map(),
+  registerAISuggestions: () => new Map(),
+  jyutjyuRefResult: () => new Map()
+})
+
+// ---- Shadow props with injected reactive computeds (bypass prop-chain reactivity issues) ----
+const focusedCell = computed(() => injectedFocusedCell?.value ?? props.focusedCell)
+const themeAISuggestions = computed(() => injectedThemeAIMap?.value ?? props.themeAISuggestions)
+const registerAISuggestions = computed(() => injectedRegisterAIMap?.value ?? props.registerAISuggestions)
 
 // ---- Emits ----
 const emit = defineEmits<{
   // Cell events
+  'update:editValue': [value: any]
   'cell-click': [entry: Entry, field: string, event: MouseEvent | KeyboardEvent, rowIndex?: number, colIndex?: number, forceEdit?: boolean]
   'set-input-ref': [el: any, entryId: string, field: string]
   'cell-keydown': [event: KeyboardEvent, entry: Entry, field: string]
@@ -695,7 +723,7 @@ const emit = defineEmits<{
 
   // Suggestion events
   'ai-definition': [entry: Entry]
-  'ai-theme': [entry: Entry]
+  'ai-theme': [entry: Entry, rowIndex: number, colIndex: number]
   'ai-register': [entry: Entry, rowIndex: number, colIndex: number]
   'accept-suggestion': []
   'dismiss-suggestion': []
@@ -755,7 +783,7 @@ const emit = defineEmits<{
 // ---- v-model proxies ----
 const editValueModel = computed({
   get: () => props.editValue,
-  set: (val) => emit('update:editValue' as any, val)
+  set: (val) => emit('update:editValue', val)
 })
 
 const currentPageModel = computed({
@@ -780,7 +808,7 @@ function isEditing(entryId: string | number, field: string) {
 }
 
 function isSelected(rowIndex: number, colIndex: number) {
-  const f = props.focusedCell
+  const f = focusedCell.value
   return f != null && f.rowIndex === rowIndex && f.colIndex === colIndex
 }
 
@@ -812,8 +840,67 @@ function getPhoneticHint(entry: Entry): string {
   return `${arr.length - 1} 其他讀音`
 }
 
+function getMapValue<T>(map: Map<string, T> | undefined | null, key: string): T | undefined {
+  return map instanceof Map ? map.get(key) : undefined
+}
+
+function getThemeSuggestion(entry: Entry) {
+  return getMapValue(themeAISuggestions.value, getEntryIdString(entry))
+}
+
+function getDefinitionSuggestion(entry: Entry) {
+  return getMapValue(props.definitionAISuggestions, getEntryIdString(entry))
+}
+
+function getRegisterSuggestion(entry: Entry) {
+  return getMapValue(registerAISuggestions.value, getEntryIdString(entry))
+}
+
+function getJyutjyuResult(entry: Entry) {
+  return getMapValue(props.jyutjyuRefResult, getEntryIdString(entry))
+}
+
+function isTargetCellActive(entry: Entry, rowIndex: number, colIndex: number, field: string) {
+  const entryId = getEntryIdString(entry)
+  const f = focusedCell.value
+  const focusMatches = f?.rowIndex === rowIndex && f?.colIndex === colIndex
+  const editMatches = props.editingCell != null && String(props.editingCell.entryId) === entryId && props.editingCell.field === field
+  return focusMatches || editMatches
+}
+
+function isThemeSuggestionVisible(entry: Entry, rowIndex: number) {
+  return !!getThemeSuggestion(entry) && isTargetCellActive(entry, rowIndex, props.columnIndices.themeColIndex, 'theme')
+}
+
+function isRegisterSuggestionVisible(entry: Entry, rowIndex: number) {
+  return !!getRegisterSuggestion(entry) && isTargetCellActive(entry, rowIndex, props.columnIndices.registerColIndex, 'register')
+}
+
+function getCellAISuggestionHint(entry: Entry, field: string, rowIndex: number, colIndex: number) {
+  if (!isTargetCellActive(entry, rowIndex, colIndex, field)) return ''
+  if (field === 'theme') return props.formatThemeSuggestion(getThemeSuggestion(entry))
+  if (field === 'register') return props.formatRegisterSuggestion(getRegisterSuggestion(entry))
+  return ''
+}
+
+function getCellAISuggestionHintTitle(field: string) {
+  if (field === 'theme') return 'AI 分類建議'
+  if (field === 'register') return 'AI 語域建議'
+  return 'AI 建議'
+}
+
+function acceptCellAISuggestion(entry: Entry, field: string) {
+  if (field === 'theme') emit('accept-theme-ai-row', entry)
+  if (field === 'register') emit('accept-register-ai', entry)
+}
+
+function dismissCellAISuggestion(entry: Entry, field: string) {
+  if (field === 'theme') emit('dismiss-theme-ai-row', entry)
+  if (field === 'register') emit('dismiss-register-ai', entry)
+}
+
 function getThemeAlternativesForRow(entry: Entry) {
-  const suggestion = props.themeAISuggestions.get(getEntryIdString(entry))
+  const suggestion = getThemeSuggestion(entry)
   if (!suggestion?.alternatives || suggestion.alternatives.length === 0) return undefined
   return suggestion.alternatives.map((alt: any) => ({
     text: props.formatThemeSuggestion(alt),

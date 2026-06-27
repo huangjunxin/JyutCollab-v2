@@ -303,10 +303,25 @@ const selectedLevel1 = ref<number | undefined>(props.entry.theme?.level1Id || un
 const selectedLevel2 = ref<number | undefined>(props.entry.theme?.level2Id || undefined)
 const selectedLevel3 = ref<number | undefined>(props.entry.theme?.level3Id || undefined)
 
+function toThemeId(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+    const id = Number(trimmed)
+    return Number.isFinite(id) ? id : undefined
+  }
+  if (value && typeof value === 'object' && 'value' in value) {
+    return toThemeId((value as { value?: unknown }).value)
+  }
+  return undefined
+}
+
 // 根據當前 level3Id 初始化
 watchEffect(() => {
-  if (props.entry.theme?.level3Id) {
-    const theme = getThemeById(props.entry.theme.level3Id)
+  const themeId = toThemeId(props.entry.theme?.level3Id)
+  if (themeId) {
+    const theme = getThemeById(themeId)
     if (theme) {
       selectedLevel1.value = theme.level1Id
       selectedLevel2.value = theme.level2Id
@@ -338,13 +353,15 @@ const level3Options = computed(() => {
 })
 
 // 當一級分類變化時，重置二級和三級
-function onLevel1Select(level1Id: number | undefined) {
+function onLevel1Select(level1Id: unknown) {
+  selectedLevel1.value = toThemeId(level1Id)
   selectedLevel2.value = undefined
   selectedLevel3.value = undefined
 }
 
 // 當二級分類變化時，重置三級
-function onLevel2Select(level2Id: number | undefined) {
+function onLevel2Select(level2Id: unknown) {
+  selectedLevel2.value = toThemeId(level2Id)
   selectedLevel3.value = undefined
 }
 
@@ -357,7 +374,8 @@ const selectedThemePreview = computed(() => {
 })
 
 // 選擇三級分類
-function onLevel3Select(themeId: number | undefined) {
+function onLevel3Select(value: unknown) {
+  const themeId = toThemeId(value)
   if (!themeId) return
 
   const theme = getThemeById(themeId)

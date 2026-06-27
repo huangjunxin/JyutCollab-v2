@@ -116,10 +116,11 @@ export function useEntriesTableColumns(
       options: [],
       getOptions: () => themeOptions,
       get: (entry: Entry) => entry.theme?.level3Id || undefined,
-      set: (entry: Entry, value: number | undefined) => {
+      set: (entry: Entry, value: number | string | undefined) => {
         if (!entry.theme) entry.theme = {}
-        if (value) {
-          const theme = getThemeById(value)
+        const themeId = typeof value === 'number' ? value : Number(value)
+        if (Number.isFinite(themeId) && themeId > 0) {
+          const theme = getThemeById(themeId)
           if (theme) {
             entry.theme.level1 = theme.level1Name
             entry.theme.level2 = theme.level2Name

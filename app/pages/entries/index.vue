@@ -181,15 +181,12 @@
     </template>
 
     <!-- Loading state -->
-    <div v-if="!isMobile && loading" class="flex-1 min-h-72 bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)] p-4">
-      <div v-for="i in 8" :key="i" class="flex items-center gap-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
-        <USkeleton class="h-5 w-8 flex-shrink-0" />
-        <USkeleton class="h-5 w-24" />
-        <USkeleton class="h-5 w-16" />
-        <USkeleton class="h-5 w-32" />
-        <USkeleton class="h-5 flex-1" />
-        <USkeleton class="h-5 w-20" />
+    <div v-if="!isMobile && loading" class="flex-1 min-h-72 flex flex-col items-center justify-center bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard)]">
+      <div class="relative">
+        <div class="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+        <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
       </div>
+      <p class="mt-4 text-gray-500 dark:text-gray-400">加載中...</p>
     </div>
 
     <!-- Empty state -->
@@ -321,8 +318,8 @@
       @batch-delete="batchDeleteSelected"
       @jump-to-page="(page: number) => { currentPage = page }"
       @table-keydown="(event: KeyboardEvent) => handleTableKeydown(event)"
-      @ai-definition="(entry: any) => generateAIDefinition(entry)"
-      @ai-theme="(entry: any) => generateAICategorization(entry)"
+      @ai-definition="(entry: any) => generateAIDefinitionFromDesktopCell(entry)"
+      @ai-theme="(entry: any, rowIndex: number, colIndex: number) => { focusedCell = { rowIndex, colIndex }; generateAICategorization(entry) }"
       @ai-register="(entry: any, rowIndex: number, colIndex: number) => { focusedCell = { rowIndex, colIndex }; generateAIRegister(entry) }"
       @accept-suggestion="acceptAISuggestion"
       @dismiss-suggestion="dismissAISuggestion"
@@ -1459,6 +1456,17 @@ const {
   extractInlineSuggestedValue
 } = useEntriesAISuggestions({ editingCell, editValue, currentPageEntries })
 
+// Provide reactive state directly to EntriesDesktopTable to bypass prop-chain reactivity issues
+provide('entryTableFocusedCell', computed(() => focusedCell.value))
+provide('entryTableThemeAISuggestions', computed(() => themeAISuggestions.value))
+provide('entryTableRegisterAISuggestions', computed(() => registerAISuggestions.value))
+
+function generateAIDefinitionFromDesktopCell(entry: Entry) {
+  expandedEntryId.value = getEntryIdString(entry)
+  ensureSensesStructure(entry)
+  generateAIDefinition(entry)
+}
+
 /** 將 ThemeAISuggestion 的 alternatives 轉為 AISuggestionRow 需要的格式 */
 function getThemeAlternativesForRow(entry: Entry) {
   const suggestion = themeAISuggestions.value.get(getEntryIdString(entry))
@@ -1698,6 +1706,13 @@ function migrateSavedEntryTransientState(prevId: string, nextId: string) {
     definitionAISuggestions.value.set(nextId, definitionSuggestion)
     definitionAISuggestions.value.delete(prevId)
     definitionAISuggestions.value = new Map(definitionAISuggestions.value)
+  }
+
+  const registerSuggestion = registerAISuggestions.value.get(prevId)
+  if (registerSuggestion) {
+    registerAISuggestions.value.set(nextId, registerSuggestion)
+    registerAISuggestions.value.delete(prevId)
+    registerAISuggestions.value = new Map(registerAISuggestions.value)
   }
 
   if (jyutdictHandled.value.has(prevId)) {
@@ -1974,7 +1989,7 @@ function handleKeydown(event: KeyboardEvent, entry: Entry, field: string) {
         break
       }
       event.preventDefault()
-      saveCellEdit()
+      saveCellEdit({ focusWrapper: true })
       break
     case 'Tab':
       event.preventDefault()

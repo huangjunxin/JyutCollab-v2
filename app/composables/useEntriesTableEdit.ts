@@ -38,7 +38,8 @@ export function useEntriesTableEdit(
     }
     if (col.type === 'theme') {
       if (!value) return '選擇分類'
-      return getThemeNameById(value as number) || '選擇分類'
+      const themeId = typeof value === 'number' ? value : Number(value)
+      return Number.isFinite(themeId) ? getThemeNameById(themeId) || '選擇分類' : '選擇分類'
     }
     if (col.type === 'select') {
       if (col.key === 'dialect') return dialectCodeToName[String(value)] || (value as string) || '-'

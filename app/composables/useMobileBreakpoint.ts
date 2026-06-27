@@ -7,12 +7,9 @@ export const MOBILE_BREAKPOINT = 768
  * Reactive mobile detection using `window.matchMedia`.
  * Updates automatically on viewport resize / orientation change.
  * Cleans up the listener on component unmount.
- *
- * SSR-safe: defaults to `true` (mobile-first) during SSR to avoid
- * a flash of desktop content on mobile devices.
  */
 export function useMobileBreakpoint() {
-  const isMobile = ref(import.meta.client ? window.innerWidth < MOBILE_BREAKPOINT : true)
+  const isMobile = ref(false)
 
   let mql: MediaQueryList | null = null
 
