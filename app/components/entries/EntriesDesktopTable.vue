@@ -620,6 +620,7 @@ const props = withDefaults(defineProps<{
   selectedCount: number
   selectedSavedEntries: Entry[]
   selectAllChecked: boolean
+  selectAllIndeterminate: boolean
   isEntrySelected: (entry: Entry) => boolean
   batchDeleting: boolean
 
@@ -797,9 +798,9 @@ const tableRef = ref<HTMLTableElement | null>(null)
 const headerCheckboxEl = ref<HTMLInputElement | null>(null)
 const jumpToPageInput = ref('')
 
-// Sync headerCheckboxRef with parent
-watch(headerCheckboxEl, (el) => {
-  // Handled via prop-based indeterminate if needed
+// Sync header checkbox indeterminate state with parent
+watch([headerCheckboxEl, () => props.selectAllIndeterminate], ([el, indeterminate]) => {
+  if (el) el.indeterminate = indeterminate
 })
 
 // ---- Template helpers (local to this component) ----

@@ -253,6 +253,7 @@
       :selected-count="selectedCount"
       :selected-saved-entries="selectedSavedEntries"
       :select-all-checked="selectAllChecked"
+      :select-all-indeterminate="selectAllIndeterminate"
       :is-entry-selected="isEntrySelected"
       :batch-deleting="batchDeleting"
       :get-cell-overlay-meta="(e: any, f: string) => ruleOverlays.getCellOverlayMeta(e, f)"
