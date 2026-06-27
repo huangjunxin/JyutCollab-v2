@@ -897,21 +897,6 @@ const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentP
 const route = useRoute()
 const toast = useToast()
 
-// 頁面跳轉輸入
-const jumpToPageInput = ref<string>('')
-
-function handleJumpToPage() {
-  const pageNum = parseInt(jumpToPageInput.value, 10)
-  const totalPages = pagination.totalPages || 1
-  
-  if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
-    currentPage.value = pageNum
-    jumpToPageInput.value = ''
-  } else {
-    alert(`請輸入有效頁碼（1-${totalPages}）`)
-  }
-}
-
 /** API 僅支援以下欄位排序 */
 
 // Inline editing state
@@ -1414,8 +1399,7 @@ const {
   deleteConfirmOpen,
   batchDeleteSelected,
   confirmBatchDelete,
-  cancelBatchDelete,
-  headerCheckboxRef
+  cancelBatchDelete
 } = useEntriesSelection(currentPageEntries, fetchEntries, invalidateCache)
 
 const {
