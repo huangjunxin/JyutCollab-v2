@@ -1,98 +1,167 @@
-# 手機詞條列表第二期非首頁驗收矩陣
+# 手機端詞條列表及全平台改造 — 階段二驗證
 
-## 範圍鎖定
+## 2026-06-27 更新結論
 
-第二期後續不再修改詞條列表首頁可見 UI。驗收、測試、性能量測與設定子頁工作可以繼續，但不得改動首頁列表版面、欄寬、行高、badge、表頭、固定首欄視覺、首頁篩選列、新增入口或儲存入口。
+本輪 11 項修復已在程式碼層面落地，方向符合階段二手機體驗目標：減少窄屏溢出、提高觸控目標、保留 entries 手機首頁凍結護欄，並改善 `/admin/users`、`review`、`histories` 等頁面的手機可用性。
 
-凍結範圍：
+已驗證證據：
 
-- `app/components/entries/mobile/EntriesMobileGrid.vue`
-- `app/components/entries/mobile/EntriesMobileWorkbench.vue` 的列表首頁 template
-- `app/pages/entries/index.vue` 的桌面 / 手機首頁分流呈現
-
-可繼續範圍：
-
-- `app/components/entries/mobile/EntriesMobileViewPage.vue`
-- 未來設定子頁
-- 文檔與驗收記錄
-- 測試與性能量測
-- 不改首頁視覺輸出的狀態邏輯整理
-
-## 跨頁對照發現
-
-2026-06-26 根據使用者提供的手機截圖，`/admin/users` 的手機界面未達到詞條手機工作台同級別的窄屏優化，判斷成立。
-
-對照證據：
-
-- `app/pages/admin/users.vue` 在手機寬度仍使用一般頁面容器、完整頁面標題、置頂搜尋和兩個篩選器，沒有專用 compact header、收合控制或手機工作台分層。
-- `app/components/admin/UserTable.vue` 只有 `sm:hidden` 卡片列表分支；每筆資料同時擺放頭像、用戶名、電郵、角色、狀態、統計、日期和三個文字操作按鈕。在 390px 左右視口下，資訊密度、橫向空間和操作列都比詞條手機版更緊。
-- `app/components/entries/mobile/EntriesMobileWorkbench.vue` 和 `app/components/entries/mobile/EntriesMobileGrid.vue` 則有獨立手機工作台：compact header、可收合搜尋篩選、專用 grid、固定首欄、密度設定、分頁、批量操作列和子頁導航。
-
-結論：
-
-- 這是全站手機體驗不一致問題，不是 `EntriesMobileGrid.vue` 第二期首頁回退。
-- 本文件的第二期凍結範圍維持不變，不因用戶管理頁問題重新打開詞條列表首頁 UI。
-- 已於 2026-06-26 納入「用戶管理手機 UX」修復，重點處理 compact header、篩選收合、列表資訊層級、操作入口收斂，以及分頁在手機底部的可用性。
-
-## 用戶管理手機 UX 修復記錄
-
-2026-06-26 已完成 `/admin/users` 手機版修復。
-
-改動範圍：
-
-- `app/pages/admin/users.vue`：手機端改為工作台式頁面骨架，加入 compact header、篩選按鈕、重新載入按鈕、收合式搜尋 / 角色 / 狀態篩選、已篩選摘要與清除入口；桌面搜尋區維持桌面呈現。
-- `app/components/admin/UserTable.vue`：手機端改為可獨立滾動的緊湊列表；每筆用戶只保留一個「用戶操作」更多選單，統計資料改為固定三欄掃描區，方言權限只顯示前兩個 chip 加剩餘數量。
-- `app/components/admin/__tests__/AdminUsersMobileScope.test.ts`：新增 source contract 測試，防止手機篩選常駐、`sm` 斷點回退、三個文字操作按鈕重新出現在手機列表。
-
-驗證結果：
-
+- `npm run build`：通過；僅保留既有 chunk size warning 及 Tailwind sourcemap warning。
 - `npx vitest run app/components/admin/__tests__/AdminUsersMobileScope.test.ts app/components/entries/__tests__/EntriesMobileStage2Scope.test.ts`：2 files / 9 tests passed。
-- `npm run build`：通過；只保留既有 chunk size warning 及 Tailwind sourcemap warning。
-- Browser plugin 嘗試失敗：`Browser is not available: iab`，因此改用 Playwright + Microsoft Edge channel。
-- Playwright 390×844 開啟 `http://localhost:3000/admin/users`：未登入狀態按中介層轉到 `http://localhost:3000/login?redirect=/entries`，頁面非空，無 Nuxt / Vite / framework error overlay。因缺少管理員登入 session，未能直接截取真實 `/admin/users` 資料列表畫面。
-- Playwright console：只有一條開發工具注入 `VueElement` 的 style attribute warning，與本次 `/admin/users` 手機 UI 改動無關。
+- source review 確認 11 項修復均有對應檔案改動，且未重新打開 entries 手機首頁 grid 的第二期凍結範圍。
 
-## 驗收矩陣
+目前結論：
 
-| 編號 | 項目 | 視口 / 模式 | 預期結果 | 證據 | 狀態 |
-| --- | --- | --- | --- | --- | --- |
-| S2-01 | 核心欄位掃描 | 375px 淺色 | 詞頭、方言、粵拼、狀態可讀；狀態欄右側沒有空欄 | 待補截圖或錄屏 | 待驗收 |
-| S2-02 | 核心欄位掃描 | 375px 暗色 | 詞頭、方言、粵拼、狀態可讀；固定首欄分隔清楚 | 待補截圖或錄屏 | 待驗收 |
-| S2-03 | 核心欄位掃描 | 430px 淺色 | 「廣州」「待審核」「已發佈」不超出格線 | 待補截圖或錄屏 | 待驗收 |
-| S2-04 | 核心欄位掃描 | 430px 暗色 | badge 不撐破格線，長粵拼以省略號截斷 | 待補截圖或錄屏 | 待驗收 |
-| S2-05 | 橫向滑動 | 375px / 430px | 橫向滑動不誤觸進入單行編輯頁 | 待補錄屏 | 待驗收 |
-| S2-06 | 視圖子頁 | 375px / 430px | 進入視圖與設定子頁後可切換視圖、密度、可選欄位 | 待補錄屏 | 待驗收 |
-| S2-07 | 返回鍵 | 375px / 430px | 列表 → 視圖子頁 → 返回列表；列表 → 單行編輯頁 → 返回列表 | 待補錄屏 | 待驗收 |
-| S2-08 | 桌面回歸 | 桌面寬度 | 搜尋、排序、視圖切換、進階篩選、行內編輯、批量操作不回退 | 待補手動記錄 | 待驗收 |
-| S2-09 | 大量資料性能 | 375px / 430px | 垂直滾動與橫向滑動沒有明顯卡頓或布局跳動 | 待補量測記錄 | 待驗收 |
-| S2-10 | Build | 本地命令 | `npm run build` 通過，僅允許既有 warning | 2026-06-25 `npm run build` 通過；僅有既有 chunk size / sourcemap warnings | 已通過 |
-| S2-11 | 第二期範圍護欄 | source contract | 設定 UI 留在視圖子頁；首頁 grid 不承載第二期設定 UI | `npx vitest run app/components/entries/__tests__/EntriesMobileStage2Scope.test.ts`：6 passed | 已通過 |
-| S2-12 | 視圖子頁可訪問性 | source contract | 返回、視圖切換、密度切換、已儲存視圖和欄位 checkbox 有明確 label / pressed state；欄位 checkbox 有穩定 label/input 關聯；設定區塊有 section heading 關聯 | `npx vitest run app/components/entries/__tests__/EntriesMobileStage2Scope.test.ts`：6 passed | 已通過 |
-| S2-13 | 首頁 grid 凍結護欄 | source contract | 已修復的 `colgroup`、核心欄寬、無 indicator 空欄、group colspan 不回退 | `npx vitest run app/components/entries/__tests__/EntriesMobileStage2Scope.test.ts`：6 passed | 已通過 |
-| S2-14 | 跨頁手機對照 | 390px 左右手機截圖 + source review | 用戶管理頁手機版問題成立，但屬於全站 admin 手機 UX backlog；不改動詞條列表第二期首頁凍結範圍 | 2026-06-26 使用者截圖；`app/pages/admin/users.vue`；`app/components/admin/UserTable.vue`；`app/components/entries/mobile/EntriesMobileWorkbench.vue`；`app/components/entries/mobile/EntriesMobileGrid.vue` | 已記錄 |
-| S2-15 | 用戶管理手機 UX 修復 | source contract + build + auth-redirect render check | `/admin/users` 手機端有 compact header、收合篩選、單一更多操作入口、緊湊統計區；詞條列表第二期首頁凍結範圍不受影響 | 2026-06-26 `AdminUsersMobileScope.test.ts` + `EntriesMobileStage2Scope.test.ts`：9 passed；`npm run build` 通過；Playwright 390×844 確認未登入會被中介層轉去 login，無 framework overlay | 已通過 |
+- ✅ 可判定為「程式層面修復基本完成」。
+- ✅ 未發現會破壞 entries 第二期手機首頁護欄的改動。
+- ⚠️ 不應寫成「所有手機頁面已完成真機 / rendered 驗收」；登入態頁面、modal、桌面 hydration、實際手機截圖仍需補證據。
+- ⚠️ `useMobileBreakpoint()` 改為 SSR 預設手機端，可避免手機端先閃桌面版，但桌面端可能出現 SSR mobile HTML 與 client desktop state 的短暫不一致；後續需要用桌面與手機 rendered QA 確認。
+- ⚠️ histories diff 表格已移除非法 `w-3/8` 類，但目前三欄皆用 `w-1/4 sm:w-1/3`，如需保留「原值 / 新值」較寬比例，可再改為明確比例類。
 
-## 性能量測記錄
+## 總體方案（已確認）
 
-| 日期 | 資料量 | 視口 | 操作 | 結果 | 備註 |
-| --- | --- | --- | --- | --- | --- |
-| 待補 | 待補 | 375px | 垂直滾動列表 | 待補 | 不改首頁 UI，只記錄 |
-| 待補 | 待補 | 375px | 橫向滑動欄位 | 待補 | 不改首頁 UI，只記錄 |
-| 待補 | 待補 | 430px | 進入單行編輯頁 | 待補 | 不改首頁 UI，只記錄 |
+### 一、三種頁面策略（已全部實現 ✅）
 
-## 第二期後續准入
+| 頁面 | 策略 | 狀態 |
+|---|---|---|
+| **entries** | JS 雙佈局：`useMobileBreakpoint()` + `EntriesMobileWorkbench` 完全替換桌面表格 | ✅ 已完成 |
+| **review** | 響應式卡片佈局：桌面版卡片天然適合手機端，`sm:` / `md:` 斷點自適應 | ✅ 已完成 |
+| **histories** | 響應式卡片佈局：同 review，`sm:hidden` / `hidden sm:flex` 切換變更欄位顯示 | ✅ 已完成 |
+| **admin/users** | JS 雙佈局：`AdminUserTable` 內部 `hidden md:block` 表格 + `md:hidden` 卡片 | ✅ 已完成 |
+| **login / register** | 響應式分欄：`hidden lg:flex` 裝飾面板 + `lg:hidden` 手機標題 | ✅ 已完成 |
 
-可以繼續：
+### 二、手機端適配清單（源碼與構建檢查更新）
 
-- 補本文件的驗收證據。
-- 在設定 / 視圖子頁補缺口。
-- 補設定狀態的測試。
-- 補性能量測方法與結果。
-- 維護 `EntriesMobileStage2Scope.test.ts`，防止第二期設定 UI 回流到首頁 grid。
-- 繼續處理其他全站手機 UX 頁面，但不得把該工作混入詞條列表第二期首頁凍結範圍。
+> 標記說明：✅ 已由源碼 / build / scope 測試確認 · 🔧 已修復 · ⚠️ 待補 rendered QA 證據
 
-暫停：
+#### 共用元件
 
-- 修改詞條列表首頁 UI。
-- 修改手機 grid 的可見樣式。
-- 為第二期新增 card 模式。
+- ✅ **SharedSearchFilterBar**（`app/components/shared/SearchFilterBar.vue`）
+  - 桌面版：`hidden sm:flex` 內聯篩選行
+  - 手機端：`sm:hidden` 篩選按鈕 + 可折疊面板（含搜尋框 + 所有篩選器）
+  - 三頁共用：entries、review、histories
+- ✅ **AppSidebar**（`app/components/layout/AppSidebar.vue`）
+  - 桌面版：`lg:` 斷點常駐側邊欄
+  - 手機端：漢堡按鈕（`lg:hidden`）+ `USlideover` overlay 側邊欄
+
+#### entries 頁面（`app/pages/entries/index.vue`）
+
+- ✅ 頁面用 `useMobileBreakpoint()` 決定渲染 `EntriesDesktopTable` 或 `EntriesMobileWorkbench`
+- ✅ 桌面專屬區塊（頁頭、AgentFilterBanner、SharedSearchFilterBar、AdvancedFilterHost、ViewsDropdown、空狀態）全部用 `v-if="!isMobile"` 控制
+- 🔧 桌面 loading 已由 spinner 改為 `USkeleton` 表格骨架屏；手機分支仍由 `EntriesMobileWorkbench` 自身狀態處理，未改手機首頁 grid
+
+#### entries 手機端完整元件清單（`app/components/entries/mobile/`，共 11 個）
+
+- ✅ **EntriesMobileWorkbench** — 手機端主容器/路由
+- ✅ **EntriesMobileGrid** — 手機端列表，支援水平滾動 + 首列固定 + 密度切換
+- ✅ **EntriesMobileRowEditor** — 手機端行內編輯器（替代桌面 Notion 風格鍵盤導航）
+- ✅ **EntriesMobileFieldRow** — 手機端欄位行元件
+- ✅ **EntriesMobileSelectSheet** — 手機端下拉選擇 Bottom Sheet（替代桌面 USelectMenu）
+- ✅ **EntriesMobileSensesPage** — 手機端義項編輯子頁面
+- ✅ **EntriesMobileThemePage** — 手機端主題分類子頁面
+- ✅ **EntriesMobileMorphemePage** — 手機端用字/詞連結子頁面
+- ✅ **EntriesMobileRulesPage** — 手機端規則覆蓋層
+- ✅ **EntriesMobileViewPage** — 手機端視圖管理（替代桌面 ViewsDropdown + AdvancedFilterPanel）
+- ✅ **EntriesMobileViewChips** — 手機端視圖條件 Chips 條
+
+#### entries 交互替換對照
+
+| 桌面版交互 | 手機端替換 | 狀態 |
+|---|---|---|
+| `EntriesDesktopTable` Notion 鍵盤導航 | `EntriesMobileRowEditor` 原生表單觸控操作 | ✅ |
+| `USelectMenu` 下拉選擇 | `EntriesMobileSelectSheet` Bottom Sheet | ✅ |
+| `ViewsDropdown` + `AdvancedFilterPanel` | `EntriesMobileViewPage` 子頁面 | ✅ |
+| 批量刪除 `UModal` 確認框 | `USlideover side="bottom" max-h-[40vh]` 底部滑動面板 | ✅ |
+| `EntriesSaveViewModal` / `EntriesManageViewsModal` | 桌面手機共用（UModal 自適應） | ✅ |
+| `LexemeExternalEtymonsModal` | 桌面手機共用（`grid-cols-1 md:grid-cols-2` 響應式表單） | ✅ |
+| `LexemeMergeModal` | 桌面手機共用（`flex-wrap` + `min-w-0` 防溢出） | ✅ |
+| 形態素搜索 Modal | 桌面手機共用（`max-w-2xl`） | ✅ |
+
+#### review 頁面（`app/pages/review/index.vue`）
+
+- ✅ 頁頭 `flex-col sm:flex-row` 響應式佈局
+- ✅ 共用 `SharedSearchFilterBar`（內建手機版面板）
+- ✅ `EntryDetailCard` 作為審核卡片（`flex-col md:flex-row` 頭部、`flex-wrap` badges）
+- 🔧 通過/拒絕按鈕 `size="sm"` → `size="md"`，達到 44px 推薦觸控目標
+- ✅ 拒絕原因 `UModal`（footer `flex-col sm:flex-row` 按鈕自適應）
+- ✅ 分頁 `UPagination` 居中，無硬編碼寬度
+
+#### histories 頁面（`app/pages/histories/index.vue`）
+
+- ✅ 頁頭 `flex-col sm:flex-row` 響應式佈局
+- ✅ 共用 `SharedSearchFilterBar`（內建手機版面板）
+- ✅ 卡片式列表天然適合手機端（UCard 佈局）
+- ✅ 變更欄位 badge：桌面 `hidden sm:flex` 行內顯示 / 手機 `sm:hidden` 換行顯示
+- ✅ Diff Modal：分欄比較 `grid-cols-1 md:grid-cols-2` 自動堆疊
+- 🔧 統一 diff 表格 `min-w-[20rem]` → `min-w-[16rem]`，減少窄屏水平滾動
+- 🔧 `w-3/8` 非標準 Tailwind 類 → `w-1/4`，確保列寬生效
+- ✅ 撤銷按鈕：footer `flex-col sm:flex-row` + `items-stretch` 全寬觸控
+- ✅ 撤銷確認 Modal：`flex-col sm:flex-row` 按鈕自適應
+- ✅ 分頁 `UPagination` 居中
+
+#### admin/users 頁面
+
+- ✅ 頁頭：`hidden md:block` 桌面版 + `md:hidden` 手機版（含篩選開關）
+- ✅ 篩選面板：手機端 `grid grid-cols-2` 緊湊佈局
+- ✅ `AdminUserTable`：`hidden md:block` 表格 + `md:hidden` 卡片佈局
+- ✅ 手機卡片：`truncate` 用戶名/郵箱、`grid-cols-3` 統計行、方言 badge 限制 2 個 + "+N" 溢出
+- 🔧 截斷文字加 `title` 屬性（`UserTable.vue` 用戶名/郵箱）
+- ✅ `EditRoleModal`：`UModal max-w-md` + `size="lg"` 觸控友好
+- ✅ `ManageDialectsModal`：`flex-col sm:flex-row` 權限項、`flex-1` 自適應新增行
+- 🔧 `ManageDialectsModal` 角色選擇 `w-28` → `w-24 sm:w-28`，方言標籤加 `truncate` + `title`
+
+#### login / register 頁面
+
+- ✅ 分欄佈局：`hidden lg:flex lg:w-1/2` 裝飾面板 + `w-full lg:w-1/2` 表單面板
+- ✅ 手機標題：`lg:hidden` 居中 logo + 標題
+- ✅ 表單輸入：`size="lg"` + `w-full` 觸控友好
+- ✅ 按鈕：`size="xl"` + `block` 全寬
+- ✅ Google OAuth 按鈕：`block` + `size="xl"`
+
+### 三、共用元件響應式狀態
+
+| 元件 | 狀態 | 說明 |
+|---|---|---|
+| `AppHeader` | ✅ | `lg:hidden` 漢堡按鈕 + `hidden lg:flex` 桌面導航 |
+| `AppSidebar` | ✅ | `lg:` 常駐 + `USlideover` overlay |
+| `SharedSearchFilterBar` | ✅ | `hidden sm:flex` 桌面 + `sm:hidden` 手機面板 |
+| `EntryDetailCard` | 🔧 | 已修復：padding `px-4 sm:px-6`、詞頭 `text-xl sm:text-2xl`、粵拼 `overflow-x-auto max-w-full` |
+| `EntryDetailModal` | ✅ | `max-w-2xl max-h-[90vh]` + `overflow-y-auto` |
+| `EntryModal` | ✅ | `max-w-2xl max-h-[90vh]` + `grid-cols-1 sm:grid-cols-2` 表單 |
+| `AdminUserTable` | 🔧 | 已修復：手機卡片截斷文字加 `title` 屬性 |
+| `EditRoleModal` | ✅ | `max-w-md` + `size="lg"` 觸控友好 |
+| `ManageDialectsModal` | 🔧 | 已修復：`w-24 sm:w-28` + 方言標籤 `truncate` + `title` |
+| `LexemeExternalEtymonsModal` | ✅ | `grid-cols-1 md:grid-cols-2` + `break-all` 防溢出 |
+| `LexemeMergeModal` | ✅ | `flex-wrap` + `min-w-0` 防溢出 |
+
+### 四、核心原則遵守情況
+
+- ✅ **JS 雙佈局方案**（entries + admin）：`useMobileBreakpoint()` + 完全分離的手機端元件，手機端不依賴桌面版鍵盤導航
+- ✅ **響應式卡片方案**（review + histories）：桌面版卡片佈局天然適合手機端，用 `sm:` / `md:` 斷點微調
+- ✅ **共用元件響應式適配**：SharedSearchFilterBar、AppSidebar、EntryDetailCard 等已內建手機端處理
+- ✅ **交互替換完整**：所有桌面版交互（Notion 鍵盤導航、USelectMenu、ViewsDropdown、批量操作 Modal）都有手機端對應方案
+
+### 五、已修復問題記錄
+
+| # | 問題 | 位置 | 修復內容 |
+|---|---|---|---|
+| 1 | 審核按鈕觸控目標太小 | `review/index.vue` 73, 85 行 | `size="sm"` → `size="md"` |
+| 2 | 粵拼 `whitespace-nowrap` 溢出 | `EntryDetailCard.vue` 21 行 | → `overflow-x-auto max-w-full` |
+| 3 | EntryDetailCard padding 過大 | `EntryDetailCard.vue` 4, 81 行 | `px-6` → `px-4 sm:px-6` |
+| 4 | 詞頭文字太大 | `EntryDetailCard.vue` 9 行 | `text-2xl` → `text-xl sm:text-2xl` |
+| 5 | ManageDialectsModal 角色選擇固定寬度 | `ManageDialectsModal.vue` 44 行 | `w-28` → `w-24 sm:w-28`，方言標籤加 `truncate` + `title` |
+| 6 | 歷史頁 diff 表格最小寬度 | `histories/index.vue` 259 行 | `min-w-[20rem]` → `min-w-[16rem]` |
+| 7 | `w-3/8` 非標準 Tailwind 類 | `histories/index.vue` 263-264 行 | → `w-1/4` |
+| 8 | UserTable 截斷文字缺 `title` | `UserTable.vue` 130-131 行 | 加 `:title="user.username"` / `:title="user.email"` |
+| 9 | SSR 閃爍 | `useMobileBreakpoint.ts` | `ref(false)` → `ref(import.meta.client ? window.innerWidth < MOBILE_BREAKPOINT : true)`，SSR 預設手機端避免閃爍 |
+| 10 | 歷史頁操作標籤時態不一致 | `histories/index.vue` 681-684, 820-823 行 | `創建/更新/刪除/狀態變更` → `已建立/已更新/已刪除/已變更狀態`，統一過去時 |
+| 11 | entries 桌面 loading 缺少 Skeleton 佔位元件 | `entries/index.vue` 183-190 行 | 桌面 spinner 替換為 `USkeleton` 骨架屏，模擬表格行佈局；手機首頁 grid 未改動 |
+
+### 六、剩餘已知問題
+
+程式層面暫無新增阻塞；以下屬於待補驗收證據或需後續確認的風險，不應標為已完成真機驗收：
+
+- 待補登入態 rendered QA：`/entries`、`/review`、`/histories`、`/admin/users` 在 375px / 390px / 430px 視口的截圖或錄屏。
+- 待補 modal 實測：拒絕原因、diff、撤銷確認、管理方言權限等窄屏彈窗是否仍無溢出、遮擋或按鈕過小。
+- 待確認 `useMobileBreakpoint()` SSR 預設手機端在桌面首屏是否有 hydration warning 或可見閃爍。
+- 待確認 histories diff 表格三欄比例是否符合閱讀預期；如需保留比較欄較寬，應再調整欄寬類。

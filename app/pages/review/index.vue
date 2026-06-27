@@ -72,7 +72,7 @@
             <div class="flex gap-2 flex-shrink-0">
               <UButton
                 color="success"
-                size="sm"
+                size="md"
                 icon="i-heroicons-check"
                 :loading="processing === entry.id && action === 'approve'"
                 @click="handleApprove(entry.id)"
@@ -82,7 +82,7 @@
               <UButton
                 color="error"
                 variant="soft"
-                size="sm"
+                size="md"
                 icon="i-heroicons-x-mark"
                 :loading="processing === entry.id && action === 'reject'"
                 @click="showRejectModal(entry)"

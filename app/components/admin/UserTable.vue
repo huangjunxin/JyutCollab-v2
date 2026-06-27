@@ -127,8 +127,8 @@
             <div class="min-w-0 flex-1">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
-                  <h2 class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ user.username }}</h2>
-                  <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
+                  <h2 class="text-sm font-semibold text-gray-900 dark:text-white truncate" :title="user.username">{{ user.username }}</h2>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 truncate" :title="user.email">{{ user.email }}</p>
                 </div>
                 <UDropdownMenu
                   :items="getActionItems(user)"

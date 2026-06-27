@@ -35,13 +35,13 @@
                 :key="perm.dialectName"
                 class="flex flex-col sm:flex-row sm:items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
               >
-                <span class="flex-1 text-sm">{{ getDialectLabel(perm.dialectName) }}</span>
+                <span class="flex-1 text-sm min-w-0 truncate" :title="getDialectLabel(perm.dialectName)">{{ getDialectLabel(perm.dialectName) }}</span>
                 <div class="flex items-center gap-2">
                   <USelect
                     v-model="perm.role"
                     :items="dialectRoleOptions"
                     size="xs"
-                    class="w-28"
+                    class="w-24 sm:w-28"
                   />
                   <UButton
                     icon="i-heroicons-x-mark"

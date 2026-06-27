@@ -2,12 +2,12 @@
   <div class="entry-detail-card">
     <!-- 頭部：詞頭 + 粵拼 + 標籤 + 可選操作區 -->
     <div
-      class="card-header px-6 py-4 border-b border-gray-100 dark:border-gray-700"
+      class="card-header px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-700"
       :class="{ 'pb-4': !!$slots.actions }"
     >
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
         <div class="flex-1 min-w-0">
-          <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 break-words">
+          <h3 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 break-words">
             {{ displayEntry.headwordDisplay }}
             <sup
               v-if="displayEntry.meta?.variant_number"
@@ -18,7 +18,7 @@
           </h3>
           <div
             v-if="displayEntry.jyutpingDisplay"
-            class="mt-2 font-mono text-lg text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap"
+            class="mt-2 font-mono text-lg text-blue-600 dark:text-blue-400 font-semibold overflow-x-auto max-w-full"
           >
             {{ displayEntry.jyutpingDisplay }}
           </div>
@@ -78,7 +78,7 @@
     </div>
 
     <!-- 內容：釋義、例句、使用説明、備註、提交信息 -->
-    <div class="card-body px-6 py-4">
+    <div class="card-body px-4 sm:px-6 py-4">
       <div
         v-for="(sense, senseIdx) in displayEntry.senses"
         :key="senseIdx"

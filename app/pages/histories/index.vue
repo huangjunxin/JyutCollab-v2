@@ -256,12 +256,12 @@
                 無變化
               </div>
               <div v-else class="max-h-96 overflow-auto border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                <table class="w-full text-xs min-w-[20rem]">
+                <table class="w-full text-xs min-w-[16rem]">
                   <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0">
                     <tr>
                       <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/4 sm:w-1/3">字段</th>
-                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-3/8 sm:w-1/3">原值</th>
-                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-3/8 sm:w-1/3">新值</th>
+                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/4 sm:w-1/3">原值</th>
+                      <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 w-1/4 sm:w-1/3">新值</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -678,10 +678,10 @@ function formatValue(value: any): string {
 
 const actionOptions = [
   { label: '全部', value: undefined },
-  { label: '創建', value: 'create' },
-  { label: '更新', value: 'update' },
-  { label: '刪除', value: 'delete' },
-  { label: '狀態變更', value: 'status_change' }
+  { label: '已建立', value: 'create' },
+  { label: '已更新', value: 'update' },
+  { label: '已刪除', value: 'delete' },
+  { label: '已變更狀態', value: 'status_change' }
 ]
 
 function showDiff(history: EditHistory) {
@@ -817,10 +817,10 @@ function getActionColor(action: string) {
 
 function getActionLabel(action: string) {
   const labels: Record<string, string> = {
-    create: '創建',
-    update: '更新',
-    delete: '刪除',
-    status_change: '狀態變更'
+    create: '已建立',
+    update: '已更新',
+    delete: '已刪除',
+    status_change: '已變更狀態'
   }
   return labels[action] || action
 }
