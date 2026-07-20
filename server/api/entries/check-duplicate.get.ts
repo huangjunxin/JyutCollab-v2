@@ -72,10 +72,12 @@ export default defineEventHandler(async (event) => {
       otherDialects: otherDialectsRaw.map(mapEntryWithPreview)
     }
   } catch (error: any) {
+    console.error('Check duplicate error:', error.message || error)
+    if (process.dev) console.error('Error stack:', error.stack)
     if (error.statusCode) throw error
     throw createError({
       statusCode: 500,
-      message: error.message || '重複性檢測失敗'
+      message: '重複性檢測失敗'
     })
   }
 })

@@ -329,11 +329,11 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error: any) {
     console.error('Get entries error:', error.message || error)
-    console.error('Error stack:', error.stack)
+    if (process.dev) console.error('Error stack:', error.stack)
     if (error.statusCode) throw error
     throw createError({
       statusCode: 500,
-      message: error.message || '獲取詞條列表失敗'
+      message: '獲取詞條列表失敗'
     })
   }
 })
