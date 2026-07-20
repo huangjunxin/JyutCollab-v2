@@ -10,7 +10,11 @@ const dialectString = z.string().trim().refine(val => VALID_DIALECTS.includes(va
 const RegisterSchema = z.object({
   email: z.string().trim().min(1, '請輸入郵箱').email('郵箱格式不正確').max(254, '郵箱過長'),
   username: z.string().trim().min(2, '用戶名至少2個字符').max(50, '用戶名最多50個字符'),
-  password: z.string().min(6, '密碼至少6個字符').max(128, '密碼最多128個字符'),
+  password: z.string()
+    .min(8, '密碼至少8個字符')
+    .max(128, '密碼最多128個字符')
+    .regex(/[A-Za-z]/, '密碼需包含至少一個字母')
+    .regex(/[0-9]/, '密碼需包含至少一個數字'),
   displayName: z.string().trim().max(100).optional(),
   location: z.string().trim().max(100).optional(),
   nativeDialect: z.string().trim().max(50).optional(),
