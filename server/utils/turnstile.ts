@@ -44,8 +44,7 @@ export async function verifyTurnstile(token: string): Promise<boolean> {
 
     return result.success === true
   } catch (err) {
-    console.error('[Turnstile] siteverify 請求失敗:', err)
-    // 網路錯誤時放行，避免擋住真實用戶
-    return !!process.dev
+    console.error('[Turnstile] siteverify 請求失敗，跳過驗證:', err)
+    return true
   }
 }
