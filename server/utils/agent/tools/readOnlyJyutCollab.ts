@@ -75,7 +75,7 @@ export const searchEntriesTool: AgentToolDefinition<z.infer<typeof EntrySearchIn
   description: '安全搜尋詞條，不修改資料。支援按詞頭(headword)、粵拼(jyutping)、方言(dialectName)、狀態(status)、分類主題(category)、語域(register)和通用搜尋(query)。語義搜尋（如「動物相關」「食物類」）應使用 category 欄位。',
   risk: 'safe',
   inputSchema: EntrySearchInput,
-  async execute(input) {
+  async execute(input, ctx) {
     await connectDB()
     const filter: Record<string, any> = {}
     const trimmedQuery = input.query?.trim()
@@ -106,6 +106,15 @@ export const searchEntriesTool: AgentToolDefinition<z.infer<typeof EntrySearchIn
     if (input.status) filter.status = input.status
     if (input.category) filter['meta.category'] = new RegExp(escapeRegex(input.category), 'i')
     if (input.register) filter['meta.register'] = input.register
+
+    const actor = ctx?.actor
+    const isReviewerOrAdmin = actor?.role === 'admin' || actor?.role === 'reviewer'
+    if (!isReviewerOrAdmin) {
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ status: 'approved' }, ...(actor?.id ? [{ createdBy: actor.id }] : [])] }
+      ]
+    }
 
     const [entries, total] = await Promise.all([
       Entry.find(filter).sort({ updatedAt: -1 }).skip((input.page - 1) * input.perPage).limit(input.perPage).lean(),
@@ -157,7 +166,7 @@ export const getEntryDetailTool: AgentToolDefinition<z.infer<typeof EntryDetailI
   description: '讀取單個詞條的完整詳情，包括詞頭、方言、音系、義項、例句、分類和狀態。不修改資料。',
   risk: 'safe',
   inputSchema: EntryDetailInput,
-  async execute(input) {
+  async execute(input, ctx) {
     await connectDB()
     const conditions: Record<string, unknown>[] = [{ id: input.id }]
     if (/^[a-f\d]{24}$/i.test(input.id)) conditions.push({ _id: input.id })
@@ -167,6 +176,17 @@ export const getEntryDetailTool: AgentToolDefinition<z.infer<typeof EntryDetailI
         ok: false,
         summary: '找不到指定詞條。',
         warnings: [`entry id ${input.id} 不存在。`],
+        nextAction: '確認詞條 ID 後重試。'
+      }
+    }
+
+    const actor = ctx?.actor
+    const isReviewerOrAdmin = actor?.role === 'admin' || actor?.role === 'reviewer'
+    if (!isReviewerOrAdmin && entry.status === 'draft' && entry.createdBy !== actor?.id) {
+      return {
+        ok: false,
+        summary: '找不到指定詞條或無權訪問。',
+        warnings: ['該詞條不存在或尚未公開。'],
         nextAction: '確認詞條 ID 後重試。'
       }
     }
