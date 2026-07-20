@@ -370,6 +370,20 @@ export default defineEventHandler(async (event) => {
           message: '無權將待審核詞條退回草稿'
         })
       }
+      if (data.status === 'pending_review' && existingEntry.status !== 'pending_review') {
+        if (!existingEntry.headword?.display) {
+          throw createError({
+            statusCode: 400,
+            message: '詞條文本不能為空'
+          })
+        }
+        if (!existingEntry.senses?.length || !existingEntry.senses[0]?.definition) {
+          throw createError({
+            statusCode: 400,
+            message: '釋義不能為空'
+          })
+        }
+      }
       existingEntry.status = data.status
       if (statusActuallyChanged) {
         changedFields.push('status')
