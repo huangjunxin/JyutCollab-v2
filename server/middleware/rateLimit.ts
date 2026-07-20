@@ -46,13 +46,13 @@ const CONFIGS: Array<{
   keyFn: (event: any) => string
 }> = [
   {
-    path: '/api/agent/chat',
-    config: { windowMs: 60_000, maxRequests: 10, keyPrefix: 'agent:chat' },
+    path: '/api/agent/chat.stream',
+    config: { windowMs: 60_000, maxRequests: 10, keyPrefix: 'agent:stream' },
     keyFn: (event) => `${getRequestIP(event)}:${event.context?.auth?.id ?? 'anon'}`,
   },
   {
-    path: '/api/agent/chat.stream',
-    config: { windowMs: 60_000, maxRequests: 10, keyPrefix: 'agent:stream' },
+    path: '/api/agent/chat',
+    config: { windowMs: 60_000, maxRequests: 10, keyPrefix: 'agent:chat' },
     keyFn: (event) => `${getRequestIP(event)}:${event.context?.auth?.id ?? 'anon'}`,
   },
   {
