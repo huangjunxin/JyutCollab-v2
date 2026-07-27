@@ -22,7 +22,7 @@
 
 ## 簡介
 
-JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計，致力於收錄粵方言詞語。平台支援廣東、廣西、香港、澳門及海外華人社區共 190 多個方言點。
+JyutCollab v2 是一個網頁應用程式，專為協作式詞典編輯而設計，致力於收錄粵方言詞語。平台支援廣東、廣西、香港、澳門及海外華人社區共 160 個方言點。
 
 粵方言詞語的收集與整理長期面臨以下挑戰：方言點分散、缺乏統一的編纂工具、審核流程繁瑣。JyutCollab v2 旨在提供一個現代化的協作平台，讓貢獻者可以方便地記錄詞語，審核者可以高效地把關品質，同時借助 AI 輔助減輕重複勞動。
 
@@ -109,6 +109,7 @@ NUXT_PUBLIC_SITE_NAME=JyutCollab v2
 | `/histories` | 編輯歷史與還原 |
 | `/profile` | 個人資料、Google 帳號連結與方言設定 |
 | `/admin/users` | 管理員用戶與權限管理 |
+| `/setup` | 新用戶方言點設定 |
 | `/docs` | 站內使用指南 |
 
 ## 功能特點
@@ -140,7 +141,7 @@ NUXT_PUBLIC_SITE_NAME=JyutCollab v2
 - **活動時間軸**——顯示個人及全站最近編輯活動
 
 ### 詞典管理
-- **190 多個方言點**——涵蓋珠江三角洲、五邑、廣西及海外地區
+- **160 個方言點**——涵蓋珠江三角洲、五邑、廣西及海外地區
 - **跨方言關聯**——透過詞位 ID 連結不同方言的詞條
 - **語素參照**——連結詞條至字元級別資料
 - **外部詞源參照**——為詞位記錄外部詞源或參考資料
@@ -224,6 +225,10 @@ flowchart LR
 ```
 JyutCollab-v2/
 ├── app/                          # 前端應用程式
+│   ├── app.vue                   # 根元件（UApp + NuxtLayout）
+│   ├── app.config.ts             # 應用程式層級 UI 設定
+│   ├── auth.d.ts                 # 認證型別擴充
+│   ├── assets/                   # CSS 等前端資源
 │   ├── components/               # Vue 元件
 │   │   ├── admin/               # 用戶及權限管理元件
 │   │   ├── agent/               # AI 助手元件
@@ -232,55 +237,77 @@ JyutCollab-v2/
 │   │   ├── entries/mobile/      # 手機詞條工作台元件
 │   │   ├── layout/              # 佈局元件
 │   │   └── shared/              # 共用 UI 元件
-│   ├── assets/                  # CSS 等前端資源
-│   ├── composables/             # 可重用的組合式函數
-│   ├── middleware/              # 路由中介軟體
-│   ├── pages/                   # 檔案式路由
-│   ├── types/                   # TypeScript 型別定義
-│   └── utils/                   # 前端工具函數
+│   ├── composables/              # 可重用的組合式函數
+│   ├── layouts/                  # 頁面佈局（default, blank）
+│   ├── middleware/               # 路由中介軟體
+│   ├── pages/                    # 檔案式路由
+│   │   ├── admin/               # 管理員頁面
+│   │   ├── docs/                # 文件頁面
+│   │   ├── entries/             # 詞條頁面
+│   │   ├── histories/           # 歷史頁面
+│   │   ├── review/              # 審核頁面
+│   │   ├── index.vue            # 儀表板
+│   │   ├── login.vue            # 登入
+│   │   ├── register.vue         # 註冊
+│   │   ├── setup.vue            # 初始設定
+│   │   └── profile.vue          # 個人資料
+│   ├── types/                    # TypeScript 型別定義
+│   └── utils/                    # 前端工具函數
 ├── server/                       # 後端伺服器
 │   ├── api/                     # REST API 端點
-│   │   ├── auth/               # 認證路由
-│   │   ├── entries/            # 詞條 CRUD 操作
-│   │   ├── reviews/            # 審核流程
-│   │   ├── histories/          # 編輯歷史
-│   │   ├── ai/                 # AI 整合
-│   │   ├── agent/              # 全站 AI 助手對話、工具與審計
-│   │   ├── stats/              # 統計數據
-│   │   ├── upload/             # 檔案上傳
-│   │   ├── lexemes/            # 詞位管理
+│   │   ├── agent/               # AI 助手對話、工具與審計
+│   │   ├── ai/                  # AI 整合
+│   │   ├── auth/                # 認證路由
+│   │   ├── entries/             # 詞條 CRUD 操作
 │   │   ├── external-etymons/    # 外部詞源參照
-│   │   ├── views/              # 已儲存視圖
-│   │   ├── notifications/      # 通知
-│   │   ├── users/              # 管理員用戶管理
+│   │   ├── histories/           # 編輯歷史
+│   │   ├── jyutdict/            # 粵典整合
+│   │   ├── jyutjyu/             # 粵語整合
+│   │   ├── lexemes/             # 詞位管理
+│   │   ├── notifications/       # 通知
 │   │   ├── reference-helpers/   # 參照填寫輔助事件
-│   │   ├── jyutdict/           # 粵典整合
-│   │   └── jyutjyu/            # 粵語整合
-│   ├── middleware/              # 伺服器中介軟體
-│   └── utils/                   # 伺服器工具函數
-│       ├── Entry.ts            # 詞條模型
-│       ├── User.ts             # 用戶模型
-│       ├── Theme.ts            # 主題模型
-│       ├── EditHistory.ts      # 歷史模型
-│       ├── AISuggestion.ts     # AI 建議成效記錄
-│       ├── SavedView.ts        # 已儲存視圖模型
-│       ├── Lexeme.ts           # 詞位分組模型
-│       ├── ExternalEtymon.ts   # 外部詞源參照模型
-│       ├── Notification.ts     # 通知模型
+│   │   ├── reviews/             # 審核流程
+│   │   ├── stats/               # 統計數據
+│   │   ├── upload/              # 檔案上傳
+│   │   ├── users/               # 管理員用戶管理
+│   │   ├── views/               # 已儲存視圖
+│   │   └── stats.get.ts         # 全站統計（根層級）
+│   ├── middleware/               # 伺服器中介軟體
+│   ├── routes/                   # 非 API 路由（Google OAuth 回調）
+│   └── utils/                    # 伺服器工具函數
+│       ├── agent/               # AI 助手框架
+│       │   ├── core/            # 核心（contracts, registry, runner）
+│       │   ├── policies/        # 確認策略
+│       │   └── tools/           # 工具（audit, docs, filter, history, UI, read-only, write）
+│       ├── Entry.ts             # 詞條模型
+│       ├── User.ts              # 用戶模型
+│       ├── Theme.ts             # 主題模型
+│       ├── EditHistory.ts       # 歷史模型
+│       ├── AISuggestion.ts      # AI 建議成效記錄
+│       ├── SavedView.ts         # 已儲存視圖模型
+│       ├── Lexeme.ts            # 詞位分組模型
+│       ├── ExternalEtymon.ts    # 外部詞源參照模型
+│       ├── Notification.ts      # 通知模型
+│       ├── ReferenceHelperEvent.ts # 參照填寫輔助事件模型
 │       ├── AgentConversation.ts # AI 助手對話模型
-│       ├── AgentMessage.ts     # AI 助手訊息模型
-│       ├── AgentAuditEvent.ts  # AI 助手審計事件模型
-│       ├── ai.ts               # AI 服務
-│       ├── auth.ts             # 認證工具
-│       ├── cloudinary.ts       # 圖片上傳工具
-│       ├── db.ts               # 數據庫連線
-│       └── textConversion.ts   # 中文文字轉換
-├── content/                       # Nuxt Content 使用指南
-│   └── docs/                     # 站內文件 Markdown
-├── scripts/                       # 維護腳本
+│       ├── AgentMessage.ts      # AI 助手訊息模型
+│       ├── AgentAuditEvent.ts   # AI 助手審計事件模型
+│       ├── ai.ts                # AI 服務
+│       ├── auth.ts              # 認證工具
+│       ├── cloudinary.ts        # 圖片上傳工具
+│       ├── db.ts                # 數據庫連線
+│       ├── textConversion.ts    # 中文文字轉換
+│       ├── themeMapping.ts      # 主題映射
+│       ├── turnstile.ts         # Turnstile 驗證
+│       ├── validation.ts        # Zod 錯誤格式化
+│       ├── dialects.ts          # 方言驗證
+│       └── types.ts             # 共享型別
+├── content/                      # Nuxt Content 使用指南
+│   └── docs/                     # 站內文件 Markdown（13 頁）
+├── scripts/                      # 維護腳本
 │   └── generate-headword-rare-font.mjs
 ├── shared/                       # 共用程式碼
-│   └── dialects.ts              # 方言定義
+│   └── dialects.ts              # 160 個方言定義
 └── public/                       # 靜態資源
 ```
 
@@ -292,9 +319,18 @@ JyutCollab-v2/
 | 詞條 | GET/POST `/api/entries`、PUT `/api/entries/:id` | CRUD 操作 |
 | 審核 | POST `/api/reviews/:id/approve`、POST `/api/reviews/:id/reject` | 通過、拒絕 |
 | AI | POST `/api/ai/categorize`、POST `/api/ai/definitions` | 分類、釋義 |
+| Agent | POST `/api/agent/chat`、POST `/api/agent/chat.stream` | AI 助手對話 |
 | 統計 | GET `/api/stats`、GET `/api/stats/mine` | 全站及個人統計 |
 | 歷史 | GET `/api/histories`、POST `/api/histories/:id/revert` | 查看、還原 |
 | 視圖 | GET/POST `/api/views` | 已儲存視圖 |
+| 通知 | GET `/api/notifications`、PUT `/api/notifications/read-all` | 通知管理 |
+| 用戶 | GET `/api/users`、PATCH `/api/users/:id/role` | 管理員用戶管理 |
+| 上傳 | POST `/api/upload/image` | 圖片上傳 |
+| 詞位 | PATCH `/api/entries/:id/lexeme` | 詞位關聯 |
+| 外部詞源 | GET/POST `/api/lexemes/:id/external-etymons` | 外部詞源參照 |
+| 參照輔助 | POST `/api/reference-helpers/events` | 填寫輔助事件 |
+| 粵典 | GET `/api/jyutdict/general`、GET `/api/jyutdict/sheet` | 粵典查詢 |
+| 粵語 | GET `/api/jyutjyu/search` | 粵語搜尋 |
 
 <details>
 <summary>完整 API 端點列表</summary>
@@ -322,6 +358,8 @@ JyutCollab-v2/
 | POST | /api/entries/:id/submit | 提交審核 |
 | GET | /api/entries/check-duplicate | 檢查重複 |
 | GET | /api/entries/contributors | 詞條貢獻者列表 |
+| GET | /api/entries/search-morphemes | 搜尋語素參照 |
+| PATCH | /api/entries/:id/lexeme | 更新詞位關聯 |
 
 ### 審核
 | 方法 | 端點 | 說明 |
@@ -338,6 +376,10 @@ JyutCollab-v2/
 | POST | /api/ai/examples | 生成例句 |
 | POST | /api/ai/register | 語域建議 |
 | POST | /api/ai/suggestions/:id/action | 記錄 AI 建議採納、拒絕、修改或忽略 |
+
+### Agent
+| 方法 | 端點 | 說明 |
+|------|------|------|
 | POST | /api/agent/chat | AI 助手非串流對話與確認回覆 |
 | POST | /api/agent/chat.stream | AI 助手串流對話、工具調用與本地頁面操作 |
 | GET | /api/agent/conversations | 取得 AI 助手對話列表 |
@@ -386,8 +428,6 @@ JyutCollab-v2/
 | 方法 | 端點 | 說明 |
 |------|------|------|
 | POST | /api/upload/image | 上傳釋義配圖 |
-| GET | /api/entries/search-morphemes | 搜尋語素參照 |
-| PATCH | /api/entries/:id/lexeme | 更新詞位關聯 |
 | GET | /api/lexemes/:lexemeId/external-etymons | 取得外部詞源參照 |
 | POST | /api/lexemes/:lexemeId/external-etymons | 新增外部詞源參照 |
 | PUT | /api/external-etymons/:id | 更新外部詞源參照 |
@@ -410,7 +450,7 @@ JyutCollab-v2/
 
 ## 方言覆蓋範圍
 
-平台支援 190 多個方言點，按地區分佈如下：
+平台支援 160 個方言點，按地區分佈如下：
 
 - **珠江三角洲**——廣州、佛山、東莞等
 - **五邑地區**——台山、開平、恩平等
