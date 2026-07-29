@@ -68,6 +68,20 @@ export interface IEntryMeta {
   region?: string
   usage?: string
   notes?: string
+  // 泛粵字表導入來源追溯（見 ImportDataContract.md §5.2）
+  sourceWorkbook?: string
+  sourceSheet?: string
+  sourceRow?: number
+  sourceColumn?: string
+  sourceColumnIndex?: number
+  sourceCell?: string
+  sourceKey?: string
+  combinedSound?: string
+  searchSound?: string
+  importBatchId?: string
+  importReviewStatus?: 'unreviewed_import' | 'checked' | 'needs_discussion' | 'locked'
+  editedAfterImport?: boolean
+  parseWarnings?: string[]
   [key: string]: any
 }
 
@@ -167,7 +181,21 @@ const EntryMetaSchema = new mongoose.Schema<IEntryMeta>({
   register: { type: String, enum: ['口語', '書面', '粗俗', '文雅', '中性'] },
   region: { type: String },
   usage: { type: String },
-  notes: { type: String }
+  notes: { type: String },
+  // 泛粵字表導入來源追溯
+  sourceWorkbook: { type: String },
+  sourceSheet: { type: String },
+  sourceRow: { type: Number },
+  sourceColumn: { type: String },
+  sourceColumnIndex: { type: Number },
+  sourceCell: { type: String },
+  sourceKey: { type: String },
+  combinedSound: { type: String },
+  searchSound: { type: String },
+  importBatchId: { type: String },
+  importReviewStatus: { type: String, enum: ['unreviewed_import', 'checked', 'needs_discussion', 'locked'] },
+  editedAfterImport: { type: Boolean },
+  parseWarnings: [{ type: String }]
 }, { _id: false, strict: false })
 
 // Main Entry Schema
@@ -230,8 +258,12 @@ EntrySchema.index({ 'theme.level1Id': 1, 'theme.level2Id': 1, 'theme.level3Id': 
 EntrySchema.index({ 'dialect.name': 1 })
 EntrySchema.index({ entryType: 1 })
 EntrySchema.index({ createdAt: -1 })
+// 泛粵字表導入查詢（見 NewTablesDesign.md §5.1；殘留/新增索引由 scripts/migrate-faanjyut-indexes.ts 管理）
+EntrySchema.index({ lexemeId: 1, 'dialect.name': 1 })
+EntrySchema.index({ 'meta.importBatchId': 1 })
+EntrySchema.index({ sourceBook: 1, 'meta.sourceKey': 1 })
 
-// Pre-save hook：僅確保 normalized 存在；search/variants 由 API 層負責
+// Pre-save hook：僅確保 normalized 存在；variants 由 API 層負責
 EntrySchema.pre('save', function() {
   if (this.headword) {
     if (!this.headword.normalized || this.headword.normalized.trim() === '') {

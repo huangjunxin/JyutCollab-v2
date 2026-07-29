@@ -357,7 +357,7 @@ function updateField(field: string, value: string) {
   const entry = props.entry
   switch (field) {
     case 'headword':
-      if (!entry.headword) entry.headword = { display: '', search: '', normalized: '', isPlaceholder: false, variants: [] }
+      if (!entry.headword) entry.headword = { display: '', normalized: '', isPlaceholder: false, variants: [] }
       // 桌面端相同的 bracket parsing：「主詞頭 [異形1; 異形2]」
       const raw = (value || '').trim()
       let outside = raw

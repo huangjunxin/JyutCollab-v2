@@ -30,6 +30,9 @@ logs
 .agents/
 .reasonix/
 
+# FaanJyut 導入報告等本地產物（見 ImportDataContract.md §8）
+.artifacts/
+
 # Local font sources for subset generation
 assets/fonts/
 

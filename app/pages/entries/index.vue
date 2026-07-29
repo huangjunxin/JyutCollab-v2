@@ -2269,7 +2269,7 @@ function addNewRow() {
   const newEntry: any = {
     _tempId: tempId,
     id: tempId,
-    headword: { display: '', search: '', normalized: '', isPlaceholder: false },
+    headword: { display: '', normalized: '', isPlaceholder: false },
     text: '',
     dialect: { name: defaultDialect },
     phonetic: { jyutping: [] },
@@ -2299,7 +2299,7 @@ function duplicateEntry(entry: Entry) {
   const tempId = createLocalEntryId('dup')
   const clonedHeadword = entry.headword
     ? deepCopy(entry.headword)
-    : { display: '', search: '', normalized: '', isPlaceholder: false }
+    : { display: '', normalized: '', isPlaceholder: false }
   const clonedPhonetic = entry.phonetic ? deepCopy(entry.phonetic) : { jyutping: [] }
   const clonedSenses = entry.senses?.length
     ? deepCopy(entry.senses)
