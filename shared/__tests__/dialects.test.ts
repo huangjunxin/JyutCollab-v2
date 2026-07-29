@@ -21,7 +21,7 @@ const NEW_DIALECTS: Array<[string, string, string]> = [
   ['rongxian_ziliang', '容縣 自良', 'RXZL'],
   ['tengxian_lingjing', '藤縣 嶺景', 'TXLJ'],
   ['tengxian_tandongzhonghe', '藤縣 潭東中和', 'TXTDZH'],
-  ['xinli', '新立', 'XL'],
+  ['xinli', '欽州［新立話］', 'XL'],
   ['zengcheng_xishanxinwei', '增城 西山新圍', 'ZCXSXW'],
   ['baiyun_banghuzhenhu', '白雲 蚌湖鎮湖', 'BYBHZH']
 ]

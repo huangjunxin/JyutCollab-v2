@@ -161,6 +161,7 @@ export const DIALECT_IDS = [
   'beihai_yingpan',
   'beihai_haibianhua',
   'qinzhou',
+  'xinli',
   'fangchenggang',
   'haining_hehui',
   'lingshan',
@@ -184,8 +185,6 @@ export const DIALECT_IDS = [
   'shaoguan',
   // 賀州（原有）
   'hezhou',
-  // 泛粵字表新增（2026-07）：新立
-  'xinli',
   // 海外 — 北美
   'usa_san_francisco',
   'usa_new_york',
@@ -349,6 +348,7 @@ export const DIALECT_LABELS: Record<DialectId, string> = {
   beihai_yingpan: '北海 營盤',
   beihai_haibianhua: '北海［海邊話］',
   qinzhou: '欽州',
+  xinli: '欽州［新立話］',
   fangchenggang: '防城港',
   haining_hehui: '海寧 河檜',
   lingshan: '靈山',
@@ -368,7 +368,6 @@ export const DIALECT_LABELS: Record<DialectId, string> = {
   liannan_zhaigang: '連南 寨崗',
   shaoguan: '韶關',
   hezhou: '賀州',
-  xinli: '新立',
   usa_san_francisco: '美國 三藩市',
   usa_new_york: '美國 紐約',
   usa_los_angeles: '美國 洛杉磯',
