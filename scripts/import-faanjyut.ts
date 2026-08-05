@@ -277,7 +277,7 @@ async function runWrite(
       mode,
       environment,
       precheckRunId: runId,
-      reportDir: args.reportDir,
+      reportDir,
       onProgress: (collection, written) => console.log(`  寫入 ${collection}: ${written}`)
     })
 
