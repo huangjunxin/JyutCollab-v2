@@ -1,8 +1,13 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { fileURLToPath } from 'node:url'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
+
+// 泛粵導入產物根目錄：相對路徑相對倉庫根（本文件所在目錄）解析；報告 API 讀取限制在此目錄之內
+const faanjyutArtifactsRoot = process.env.NUXT_FAANJYUT_ARTIFACTS_ROOT
+  ? resolve(__dirname, process.env.NUXT_FAANJYUT_ARTIFACTS_ROOT)
+  : join(__dirname, '.artifacts/faanjyut')
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -42,6 +47,10 @@ export default defineNuxtConfig({
     jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? undefined : 'dev-jwt-secret-do-not-use-in-production'),
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
     openrouterModel: process.env.OPENROUTER_MODEL || 'deepseek-v4-flash',
+    // 泛粵導入報告產物根目錄（絕對路徑；可用 NUXT_FAANJYUT_ARTIFACTS_ROOT 覆蓋）
+    faanjyutArtifactsRoot,
+    // 泛粵寫接口開關（FaanjyutV1Design.md §9；P3 恒 false，P4 寫接口啟用）
+    faanjyutWriteEnabled: process.env.NUXT_FAANJYUT_WRITE_ENABLED === 'true',
     cloudinaryCloudName: process.env.NUXT_CLOUDINARY_CLOUD_NAME || '',
     cloudinaryApiKey: process.env.NUXT_CLOUDINARY_API_KEY || '',
     cloudinaryApiSecret: process.env.NUXT_CLOUDINARY_API_SECRET || '',

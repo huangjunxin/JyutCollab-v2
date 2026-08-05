@@ -187,6 +187,11 @@
             :title="overlayTitle"
           >
             {{ displayText }}
+            <FaanjyutSourceBadge
+              v-if="col.key === 'headword' && showSourceBadge"
+              :lexeme-id="sourceLexemeId"
+              class="ml-1"
+            />
           </div>
           <!-- 按鈕區 -->
           <div class="flex items-center gap-1 flex-shrink-0" @click.stop>
@@ -336,6 +341,7 @@
 <script setup lang="ts">
 import type { EntryCellOverlayMeta } from '~/composables/useEntriesRuleOverlays'
 import { getThemePathById } from '~/composables/useThemeData'
+import FaanjyutSourceBadge from '~/components/entries/FaanjyutSourceBadge.vue'
 
 const MAX_TEXTAREA_HEIGHT_PX = 240
 
@@ -369,6 +375,10 @@ const props = withDefaults(
     isHeadwordExpanded?: boolean
     /** 詞頭展開提示文字 */
     headwordExpandHint?: string
+    /** 詞頭列來源小標（泛粵）：代表字後顯示「泛」標並提示唯讀來源 */
+    showSourceBadge?: boolean
+    /** 泛粵詞語組 ID（配合 showSourceBadge，供小標跳轉） */
+    sourceLexemeId?: string
     /** 粵拼多讀音提示文字（例如「3 其他讀音」） */
     phoneticHint?: string
     /** 主題 ID，用於顯示 tooltip 路徑 */
@@ -398,6 +408,8 @@ const props = withDefaults(
     expandHint: '',
     isHeadwordExpanded: false,
     headwordExpandHint: '',
+    showSourceBadge: false,
+    sourceLexemeId: '',
     themeId: undefined,
     isThemeExpanded: false,
     themeExpandHint: '',

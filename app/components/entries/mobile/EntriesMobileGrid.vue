@@ -57,9 +57,15 @@
             >
               <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0 flex-1">
-                  <span class="font-medium text-gray-900 dark:text-white text-sm block truncate">
-                    {{ row.group.headwordDisplay || '—' }}
-                  </span>
+                  <div class="flex items-center gap-1 min-w-0">
+                    <span class="font-medium text-gray-900 dark:text-white text-sm block truncate">
+                      {{ row.group.headwordDisplay || '—' }}
+                    </span>
+                    <FaanjyutSourceBadge
+                      v-if="isGroupAllFaanjyut(row.group)"
+                      :lexeme-id="getGroupFaanjyutLexemeId(row.group)"
+                    />
+                  </div>
                   <div class="flex flex-wrap gap-1 mt-1">
                     <UBadge
                       v-for="(e, idx) in row.group.entries.slice(0, 3)"
@@ -133,6 +139,10 @@
                 <span class="truncate text-sm">
                   {{ columns[0] ? getCellDisplay(row.entry, columns[0]) : '—' }}
                 </span>
+                <FaanjyutSourceBadge
+                  v-if="isFaanJyutEntry(row.entry)"
+                  :lexeme-id="row.entry.lexemeId"
+                />
                 <span v-if="row.entry._isDirty" class="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" title="未儲存" />
                 <span v-else-if="(row.entry as any)._isNew" class="shrink-0 w-1.5 h-1.5 rounded-full bg-blue-500" title="新建" />
               </div>
@@ -184,7 +194,9 @@
 <script setup lang="ts">
 import type { Entry } from '~/types'
 import { getDialectLabel } from '~/utils/dialects'
+import { isFaanJyutEntry } from '~shared/faanjyut'
 import { STATUS_LABELS } from '~/utils/entriesTableConstants'
+import FaanjyutSourceBadge from '~/components/entries/FaanjyutSourceBadge.vue'
 
 type MobileGroup = { headwordDisplay: string; headwordNormalized: string; entries: Entry[] }
 type MobileRow =
@@ -223,6 +235,16 @@ const emit = defineEmits<{
 }>()
 
 const scrollContainer = ref<HTMLElement | null>(null)
+
+// 組內全部詞條均為泛粵來源時，組行頭詞後才顯示「泛」小標
+function isGroupAllFaanjyut(group: MobileGroup): boolean {
+  return group.entries.length > 0 && group.entries.every(isFaanJyutEntry)
+}
+
+// 組行小標的跳轉目標：取組內第一條帶 lexemeId 的泛粵詞條
+function getGroupFaanjyutLexemeId(group: MobileGroup): string | undefined {
+  return group.entries.find((e) => e.lexemeId)?.lexemeId
+}
 
 const firstColumnWidth = computed(() => parseColumnWidth(props.columns[0]?.width, 94))
 

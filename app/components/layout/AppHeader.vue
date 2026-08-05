@@ -55,6 +55,16 @@
             詞條列表
           </UButton>
           <UButton
+            v-if="isAuthenticated"
+            to="/faanjyut"
+            variant="ghost"
+            color="gray"
+            icon="i-heroicons-table-cells"
+            :class="[$route.path.startsWith('/faanjyut') ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
+          >
+            泛粵字表
+          </UButton>
+          <UButton
             v-if="canReview"
             to="/review"
             variant="ghost"
@@ -336,6 +346,9 @@ const mobileNavItems = computed(() => {
     { to: '/histories', icon: 'i-heroicons-clock', label: '編輯歷史' },
     { to: '/profile', icon: 'i-heroicons-user-circle', label: '個人資料' },
   ]
+  if (isAuthenticated.value) {
+    items.splice(3, 0, { to: '/faanjyut', icon: 'i-heroicons-table-cells', label: '泛粵字表' })
+  }
   if (canReview.value) {
     items.splice(3, 0, { to: '/review', icon: 'i-heroicons-clipboard-document-check', label: '審核隊列' })
   }

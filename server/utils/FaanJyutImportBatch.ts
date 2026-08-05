@@ -17,6 +17,8 @@ export interface IFaanJyutImportBatch {
   }
   /** dry-run 預檢的 runId（fjdr_ 前綴） */
   precheckRunId?: string
+  /** 寫入產物目錄（schema_dry_run_report.json / import_write_report.json / index-plan.json 所在），導入報告 API 依此讀取 */
+  reportDir?: string
   bulkSize: number
   counts: {
     written: Record<string, number>
@@ -45,6 +47,7 @@ const FaanJyutImportBatchSchema = new mongoose.Schema<IFaanJyutImportBatch>({
     manifestSha256: { type: String, required: true }
   },
   precheckRunId: { type: String },
+  reportDir: { type: String },
   bulkSize: { type: Number, required: true },
   counts: {
     written: { type: mongoose.Schema.Types.Mixed, default: {} }

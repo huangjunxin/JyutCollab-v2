@@ -1,5 +1,23 @@
 <template>
   <div class="entry-detail-card">
+    <!-- 泛粵詞條唯讀提示條（FaanjyutV1Design §9）：普通詳情面只讀放行 + 指路泛粵模塊 -->
+    <div
+      v-if="isFaanjyut"
+      class="border-l-4 border-l-amber-500 bg-[#FFFBEB] dark:bg-amber-900/20 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3"
+    >
+      <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5 shrink-0 text-[#B45309] dark:text-amber-400" />
+      <p class="text-sm font-medium text-[#92400E] dark:text-amber-200 flex-1 min-w-[220px]">
+        此詞條來自泛粵字表，資料為唯讀。如需編輯，請前往泛粵模塊。
+      </p>
+      <NuxtLink
+        v-if="displayEntry.lexemeId"
+        :to="`/faanjyut/lexemes/${displayEntry.lexemeId}`"
+        class="px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5 bg-[var(--jc-accent)] text-white hover:bg-[var(--jc-accent-active)]"
+      >
+        前往泛粵詞條詳情
+        <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" />
+      </NuxtLink>
+    </div>
     <!-- 頭部：詞頭 + 粵拼 + 標籤 + 可選操作區 -->
     <div
       class="card-header px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-700"
@@ -15,6 +33,11 @@
             >
               {{ displayEntry.meta.variant_number }}
             </sup>
+            <FaanjyutSourceBadge
+              v-if="isFaanjyut"
+              :lexeme-id="displayEntry.lexemeId"
+              class="ml-1"
+            />
           </h3>
           <div
             v-if="displayEntry.jyutpingDisplay"
@@ -160,8 +183,13 @@
 <script setup lang="ts">
 import type { DisplayEntry } from '~/composables/useEntryDisplay'
 import { formatEntryDate } from '~/composables/useEntryDisplay'
+import { isFaanJyutEntry } from '~shared/faanjyut'
+import FaanjyutSourceBadge from '~/components/entries/FaanjyutSourceBadge.vue'
 
-defineProps<{
+const props = defineProps<{
   displayEntry: DisplayEntry
 }>()
+
+/** 是否泛粵詞條（sourceBook === 'faanjyut'，統一判定） */
+const isFaanjyut = computed(() => isFaanJyutEntry(props.displayEntry))
 </script>

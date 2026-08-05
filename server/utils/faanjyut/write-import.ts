@@ -55,6 +55,8 @@ export interface WriteImportOptions {
   mode: 'initial' | 'final_cutover'
   environment: Environment
   precheckRunId: string
+  /** 寫入產物目錄（schema_dry_run_report.json / import_write_report.json / index-plan.json），記入 ImportBatch.reportDir 供導入報告 API 讀取 */
+  reportDir?: string
   bulkSize?: number
   onProgress?: (collection: string, written: number) => void
 }
@@ -139,6 +141,7 @@ export async function runWriteImport(
       manifestSha256: validated.manifestSha256
     },
     precheckRunId: options.precheckRunId,
+    reportDir: options.reportDir,
     bulkSize,
     counts: { written: {} },
     startedAt

@@ -98,7 +98,13 @@
               {{ (pagination.page - 1) * pagination.perPage + row.groupIndex + 1 }}
             </td>
             <td class="jc-headword-rare-font px-3 py-2 border-r border-gray-200 dark:border-gray-700 font-medium text-gray-900 dark:text-white">
-              {{ row.group.headwordDisplay || '—' }}
+              <div class="flex items-center gap-1 min-w-0">
+                <span class="truncate">{{ row.group.headwordDisplay || '—' }}</span>
+                <FaanjyutSourceBadge
+                  v-if="isGroupAllFaanjyut(row.group)"
+                  :lexeme-id="getGroupFaanjyutLexemeId(row.group)"
+                />
+              </div>
             </td>
             <td class="px-3 py-2 border-r border-gray-200 dark:border-gray-700">
               <div class="flex flex-wrap gap-1">
@@ -204,6 +210,8 @@
               :show-ai-definition="col.key === 'definition' && !!row.entry.headword?.display && !row.entry.senses?.[0]?.definition"
               :show-ai-theme="col.key === 'theme' && !!row.entry.headword?.display && !row.entry.theme?.level3Id"
               :show-ai-register="col.key === 'register' && !!row.entry.headword?.display && !row.entry.meta?.register"
+              :show-source-badge="col.key === 'headword' && isFaanJyutEntry(row.entry)"
+              :source-lexeme-id="row.entry.lexemeId"
               :ai-loading-definition="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'definition') || (!!aiLoadingInlineFor && aiLoadingInlineFor.field === 'definition' && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
               :ai-loading-theme="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'theme') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
               :ai-loading-register="(aiLoadingFor?.entryKey === getEntryKey(row.entry) && aiLoadingFor?.action === 'register') || (!!aiLoadingInlineFor && getEntryIdString(row.entry) === aiLoadingInlineFor.entryId)"
@@ -568,6 +576,7 @@
 import type { Entry } from '~/types'
 import type { AdvancedFilterFieldKey } from '~/utils/entriesAdvancedFilter'
 import { getEntryKey, getEntryIdString } from '~/utils/entryKey'
+import { isFaanJyutEntry } from '~shared/faanjyut'
 import { SORTABLE_COLUMN_KEYS } from '~/utils/entriesTableConstants'
 import { getDialectLabel } from '~/utils/dialects'
 import { getGroupPhonetic, getGroupEntryType, getGroupTheme, getGroupRegister, getGroupStatus } from '~/composables/useEntryGroupDisplay'
@@ -577,6 +586,7 @@ import EntrySensesExpand from '~/components/entries/EntrySensesExpand.vue'
 import EntryThemeExpand from '~/components/entries/EntryThemeExpand.vue'
 import EntryRowActions from '~/components/entries/EntryRowActions.vue'
 import EntriesEditableCell from '~/components/entries/EntriesEditableCell.vue'
+import FaanjyutSourceBadge from '~/components/entries/FaanjyutSourceBadge.vue'
 import DuplicateCheckRow from '~/components/entries/DuplicateCheckRow.vue'
 import OtherDialectsRefRow from '~/components/entries/OtherDialectsRefRow.vue'
 import JyutjyuRefRow from '~/components/entries/JyutjyuRefRow.vue'
@@ -804,6 +814,16 @@ watch([headerCheckboxEl, () => props.selectAllIndeterminate], ([el, indeterminat
 })
 
 // ---- Template helpers (local to this component) ----
+/** 組內全部詞條均為泛粵來源時，組行頭詞後才顯示「泛」小標 */
+function isGroupAllFaanjyut(group: { entries: Entry[] }): boolean {
+  return group.entries.length > 0 && group.entries.every(isFaanJyutEntry)
+}
+
+/** 組行小標的跳轉目標：取組內第一條帶 lexemeId 的泛粵詞條 */
+function getGroupFaanjyutLexemeId(group: { entries: Entry[] }): string | undefined {
+  return group.entries.find((e) => e.lexemeId)?.lexemeId
+}
+
 function isEditing(entryId: string | number, field: string) {
   return props.editingCell != null && String(props.editingCell.entryId) === String(entryId) && props.editingCell.field === field
 }

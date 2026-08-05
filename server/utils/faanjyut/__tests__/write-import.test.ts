@@ -94,11 +94,13 @@ describe('faanjyut/write-import 寫入階段', () => {
       mode: 'initial',
       environment: 'local',
       precheckRunId: 'fjdr_test',
+      reportDir: '.artifacts/faanjyut/write',
       bulkSize: 1 // 強制多批，驗證有界 bulkWrite 聚批正確
     })
     expect(result.status).toBe('completed')
     expect(db.batchDoc?.status).toBe('running')
     expect(db.batchDoc?.batchId).toBe('fjb_test3')
+    expect(db.batchDoc?.reportDir).toBe('.artifacts/faanjyut/write')
     for (const { collection, ndjsonFile } of WRITE_ORDER) {
       const expected = validated.counts[ndjsonFile]?.valid ?? 0
       expect(result.counts[collection]).toBe(expected)

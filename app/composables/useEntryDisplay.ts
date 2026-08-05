@@ -26,6 +26,8 @@ export interface DisplayEntry {
   register?: string
   categoryLabel: string
   sourceBook?: string
+  /** 泛粵詞語組 ID（僅泛粵詞條有），用於跳轉泛粵詞條詳情頁 */
+  lexemeId?: string
   senses: DisplaySense[]
   usage?: string
   notes?: string
@@ -66,6 +68,7 @@ export function entryToDisplay(e: Entry): DisplayEntry {
       [e.theme?.level1, e.theme?.level2, e.theme?.level3].filter(Boolean).join(' → ') ||
       '',
     sourceBook: (e as any).sourceBook,
+    lexemeId: (e as any).lexemeId,
     senses,
     usage: e.meta?.usage || e.usageNotes,
     notes: e.meta?.notes,
