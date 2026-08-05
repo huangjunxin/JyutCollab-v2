@@ -132,8 +132,7 @@ export interface FaanJyutImportBatchSummary {
 
 // ---- 導入批次詳情（GET /api/faanjyut/import-batches/:id） ----
 
-export interface FaanJyutFindingItem {
-  sourceKey?: string
+export interface FaanJyutFindingItem {  sourceKey?: string
   sourceCell?: string
   message: string
   file?: string
@@ -205,3 +204,26 @@ export interface FaanJyutImportBatchDetail {
     headwordSearchResidue: number
   } | null
 }
+
+// ---- 導出批次（POST /api/faanjyut/export、GET /api/faanjyut/export-batches） ----
+
+export interface FaanJyutExportOptions {
+  includeDrafts: boolean
+  includeAudit: boolean
+  includeStyles: boolean
+}
+
+export interface FaanJyutExportBatchSummary {
+  id: string
+  fileName: string
+  fileSize: number | null
+  options: FaanJyutExportOptions
+  status: 'running' | 'completed' | 'failed' | string
+  createdBy: string
+  error: string | null
+  startedAt: string | null
+  completedAt: string | null
+  createdAt: string | null
+  downloadable: boolean
+}
+

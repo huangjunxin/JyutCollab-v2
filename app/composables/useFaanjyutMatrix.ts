@@ -105,6 +105,21 @@ export interface FaanjyutCellWriteData {
   failed: number
 }
 
+/** P5 新建詞條契約（FaanjyutV1Design §8 `POST /api/faanjyut/lexemes`） */
+export interface FaanjyutCreateLexemePayload {
+  definitionRaw: string
+  compositePronunciation?: string
+  representativeChar?: string
+  note?: string
+  initialCells: Array<{ dialectId: string; raw: string }>
+}
+
+export interface FaanjyutCreateLexemeData {
+  lexemeId: string
+  sourceKey: string
+  entries: Array<{ dialectId: string; entryId: string }>
+}
+
 interface ApiEnvelope<T> {
   success: boolean
   data: T
@@ -168,6 +183,18 @@ export function useFaanjyutMatrix() {
   }
 
   /**
+   * P5 新建詞條（§8 / §13.1）：POST /api/faanjyut/lexemes。
+   * 成功返回 { lexemeId, sourceKey, entries }；整批級錯誤（401/400/403/503/409/500）由 $fetch 拋出。
+   */
+  async function createLexeme(payload: FaanjyutCreateLexemePayload): Promise<FaanjyutCreateLexemeData> {
+    const res = await $fetch<ApiEnvelope<FaanjyutCreateLexemeData>>('/api/faanjyut/lexemes', {
+      method: 'POST',
+      body: payload
+    })
+    return res.data
+  }
+
+  /**
    * 按 matrixOrder 二分定位詞條所在頁（?q= 定位用）。
    * 矩陣按 meta.matrixOrder 升序分頁，頁邊界可由每頁首行的 matrixOrder 判定。
    * 返回 1-based 頁碼；matrixOrder 缺失或定位失敗時返回 null。
@@ -198,5 +225,5 @@ export function useFaanjyutMatrix() {
     return lo
   }
 
-  return { fetchMatrix, fetchColumns, search, writeCells, locatePageByMatrixOrder }
+  return { fetchMatrix, fetchColumns, search, writeCells, createLexeme, locatePageByMatrixOrder }
 }

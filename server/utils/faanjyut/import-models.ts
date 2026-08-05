@@ -13,6 +13,7 @@ import { FaanJyutCellState } from '../FaanJyutCellState'
 import { FaanJyutComment } from '../FaanJyutComment'
 import { FaanJyutLink } from '../FaanJyutLink'
 import { FaanJyutImportBatch } from '../FaanJyutImportBatch'
+import { FaanJyutExportBatch } from '../FaanJyutExportBatch'
 
 export interface FaanJyutImportCollection {
   collection: string
@@ -36,9 +37,10 @@ export function modelForCollection(collection: string): mongoose.Model<unknown> 
   return FAANJYUT_IMPORT_COLLECTIONS.find((c) => c.collection === collection)?.model
 }
 
-/** 無 NDJSON 對應的輔助 collection（P2 引入）：僅參與索引計劃/遷移，不參與契約校驗與衝突檢查 */
+/** 無 NDJSON 對應的輔助 collection（P2 引入導入批次、P5 引入導出批次）：僅參與索引計劃/遷移，不參與契約校驗與衝突檢查 */
 export const FAANJYUT_AUX_COLLECTIONS: FaanJyutImportCollection[] = [
-  { collection: 'faanjyut_import_batches', model: FaanJyutImportBatch }
+  { collection: 'faanjyut_import_batches', model: FaanJyutImportBatch },
+  { collection: 'faanjyut_export_batches', model: FaanJyutExportBatch }
 ]
 
 /** 索引計劃/遷移管理的全部 collection（7 個導入 collection + 輔助 collection） */

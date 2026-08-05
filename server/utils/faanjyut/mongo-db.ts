@@ -8,6 +8,8 @@ import type { DryRunDb, DryRunIndexDescription } from './dry-run'
 import type { WriteDb } from './write-import'
 import type { RollbackDb } from './rollback'
 import type { CellsDb, CellsTx, CellStateUpsertArgs } from './cells'
+import type { LexemeCreateDb, LexemeCreateTx } from './lexeme-create'
+import type { ExportSource, ExportFileName } from './export-backup'
 import { cellStateId } from './stable-id'
 import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import { Lexeme } from '../Lexeme'
@@ -103,20 +105,31 @@ export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb &
 
 // ---- P4 格級寫入：單格事務（§11：MongoDB 須支持 transactions——replica set/Atlas） ----
 
+// ---- P5 新建詞條：JC- sourceKey 計數器（同一事務內原子遞增，回滾時序號一併回滾） ----
+
+const FAANJYUT_COUNTERS_COLLECTION = 'faanjyut_counters'
+const LEXEME_SOURCE_KEY_COUNTER_ID = 'lexeme_sourceKey'
+
 /**
- * 泛粵單格寫入的事務 helper（§13.1：全平台首個 transaction 先例）。
- * 每格的 Entry + CellState + EditHistory 在同一 session 提交：
- * withTransaction 內部任一操作拋錯 → 整格回滾；批次其他格各自獨立、不受影響。
+ * 泛粵寫入事務 helper（§13.1：全平台首個 transaction 先例；P5 復用於新建詞條）。
+ * 每格的 Entry + CellState + EditHistory（P4），或 Lexeme + 多格三件套（P5），
+ * 在同一 session 提交：withTransaction 內部任一操作拋錯 → 整事務回滾。
+ * 傳入的 tx 即 adaptMongooseCellsTx 全量（CellsTx & LexemeCreateTx），
+ * P5 新建詞條以 `(tx) => fn(tx as LexemeCreateTx)` 包裝（見 adaptMongooseLexemeCreateDb）。
  */
 export async function withMongoTransaction<T>(
   connection: mongoose.Connection,
   fn: (tx: CellsTx) => Promise<T>
 ): Promise<T> {
+  const db = connection.db
+  if (!db) {
+    throw new Error('MongoDB 未連接：connection.db 為空（請先 await mongoose.connect(...)）')
+  }
   const session = await connection.startSession()
   try {
     let result: T | undefined
     await session.withTransaction(async () => {
-      result = await fn(adaptMongooseCellsTx(session))
+      result = await fn(adaptMongooseCellsTx(session, db))
     })
     return result as T
   } finally {
@@ -124,7 +137,10 @@ export async function withMongoTransaction<T>(
   }
 }
 
-function adaptMongooseCellsTx(session: mongoose.ClientSession): CellsTx {
+function adaptMongooseCellsTx(
+  session: mongoose.ClientSession,
+  db: mongoose.mongo.Db
+): CellsTx & LexemeCreateTx {
   return {
     async findEntry(lexemeId, dialectId) {
       return Entry.findOne({ lexemeId, 'dialect.name': dialectId, sourceBook: FAANJYUT_SOURCE_BOOK })
@@ -183,6 +199,27 @@ function adaptMongooseCellsTx(session: mongoose.ClientSession): CellsTx {
     },
     async createEditHistory(doc) {
       await EditHistory.create([doc as any], { session })
+    },
+    async createLexeme(doc) {
+      const created = new Lexeme(doc as any)
+      await created.save({ session })
+      return { id: created.id }
+    },
+    async nextSourceKeySeq() {
+      // 原生 driver v7：findOneAndUpdate 直接返回文檔；upsert + returnDocument after 取遞增後 seq。
+      // 同一 session → 計數器遞增與 Lexeme 落庫同生共死（事務回滾時序號不跳號）。
+      // collection 以 { _id: string } 顯式定型，避免 Document 預設 _id: ObjectId 誤報。
+      const counters = db.collection<{ _id: string; seq?: number }>(FAANJYUT_COUNTERS_COLLECTION)
+      const doc = await counters.findOneAndUpdate(
+        { _id: LEXEME_SOURCE_KEY_COUNTER_ID },
+        { $inc: { seq: 1 } },
+        { upsert: true, returnDocument: 'after', session }
+      )
+      const seq = doc?.seq
+      if (typeof seq !== 'number') {
+        throw new Error('泛粵計數器異常：未能取得詞條編號序號')
+      }
+      return seq
     }
   }
 }
@@ -207,6 +244,91 @@ export function adaptMongooseCellsDb(connection: mongoose.Connection): CellsDb {
     },
     withTransaction<T>(fn: (tx: CellsTx) => Promise<T>) {
       return withMongoTransaction(connection, fn)
+    }
+  }
+}
+
+/**
+ * mongoose 連接 → LexemeCreateDb 適配器（P5 新建詞條用）。
+ * 事務外列批查/max matrixOrder 走 lean；Lexeme + 逐格三件套走 withMongoTransaction
+ * （adapter 已實現 createLexeme / nextSourceKeySeq，同一事務內原子遞增 JC- 計數器）。
+ */
+export function adaptMongooseLexemeCreateDb(connection: mongoose.Connection): LexemeCreateDb {
+  return {
+    async findColumnsByDialectIds(dialectIds) {
+      if (dialectIds.length === 0) return []
+      return FaanJyutColumn.find({ sourceBook: FAANJYUT_SOURCE_BOOK, dialectId: { $in: dialectIds } })
+        .select('id sourceRole status dialectId sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
+        .lean()
+    },
+    async findMaxMatrixOrder() {
+      const top = await Lexeme.findOne({ 'meta.sourceBook': FAANJYUT_SOURCE_BOOK })
+        .sort({ 'meta.matrixOrder': -1 })
+        .limit(1)
+        .select({ 'meta.matrixOrder': 1 })
+        .lean()
+      const value = (top as { meta?: { matrixOrder?: unknown } } | null)?.meta?.matrixOrder
+      return typeof value === 'number' && Number.isFinite(value) ? value : 0
+    },
+    withTransaction<T>(fn: (tx: LexemeCreateTx) => Promise<T>) {
+      // withMongoTransaction 傳入的 tx 即 adaptMongooseCellsTx 全量（CellsTx & LexemeCreateTx），
+      // 包裝 cast 是安全的（P5 方法已由 adapter 實現）
+      return withMongoTransaction(connection, (tx) => fn(tx as unknown as LexemeCreateTx))
+    }
+  }
+}
+
+// ---- P5 backup 導出：只讀流式游標（§10.2 導出頁） ----
+
+/** 文件名 → 真實 collection（與 import-contract.ts FILE_TO_COLLECTION 一致） */
+const EXPORT_FILE_TO_COLLECTION: Record<string, string> = {
+  'columns.ndjson': 'faanjyut_columns',
+  'lexemes.ndjson': 'lexemes',
+  'entries.ndjson': 'entries',
+  'external_etymons.ndjson': 'external_etymons',
+  'cell_states.ndjson': 'faanjyut_cell_states',
+  'comments.ndjson': 'faanjyut_comments',
+  'links.ndjson': 'faanjyut_links'
+}
+
+/**
+ * mongoose 連接 → ExportSource 適配器（P5 backup 導出用）。
+ * 每集合用 lean 游標分批迭代（entries 8 萬條流式，不整表 load 進內存）；
+ * 泛粵 Entry._id 亦走游標（分塊收集，約 2MB）。
+ */
+export function adaptMongooseExportDb(connection: mongoose.Connection): ExportSource {
+  const db = connection.db
+  if (!db) {
+    throw new Error('MongoDB 未連接：connection.db 為空（請先 await mongoose.connect(...)）')
+  }
+  return {
+    async *iterateDocs(name: ExportFileName) {
+      const collection = EXPORT_FILE_TO_COLLECTION[name]
+      if (!collection) {
+        throw new Error(`無導出對應的 collection：${name}`)
+      }
+      // 原生 driver 游標分批（batchSize 2000），8 萬條 entries 流式讀取，不整表 load 進內存
+      const cursor = db.collection(collection).find({}).batchSize(2000)
+      for await (const doc of cursor) {
+        yield doc as Record<string, unknown>
+      }
+    },
+    async *iterateFaanjyutEntryIds() {
+      const cursor = Entry.find({ sourceBook: FAANJYUT_SOURCE_BOOK })
+        .select('_id')
+        .lean()
+        .cursor({ batchSize: 2000 })
+      for await (const doc of cursor) {
+        yield String((doc as { _id: unknown })._id)
+      }
+    },
+    async *iterateEditHistories() {
+      const cursor = EditHistory.find({})
+        .lean()
+        .cursor({ batchSize: 2000 })
+      for await (const doc of cursor) {
+        yield doc as Record<string, unknown>
+      }
     }
   }
 }

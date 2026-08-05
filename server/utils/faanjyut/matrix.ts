@@ -68,6 +68,21 @@ export interface MatrixCellView {
   version?: number
 }
 
+/**
+ * 詞條文檔的最小結構（handler 傳 lean 結果，測試傳內存 fake）：
+ * 供無 cell_state 的 domestic 格回退取值（值只在 entries.phonetic.original）。
+ */
+export interface MatrixEntryDoc {
+  lexemeId?: string
+  dialect?: { name?: string }
+  phonetic?: { original?: string | string[] | null }
+  meta?: {
+    sourceCell?: string
+    sourceColumnIndex?: number
+    editedAfterImport?: boolean
+  }
+}
+
 /** 詞條文檔的最小結構 */
 export interface MatrixLexemeDoc {
   id: string
@@ -180,22 +195,70 @@ export function computeCellState(cell: MatrixCellDoc | null | undefined): Matrix
 }
 
 /**
+ * 由 Entry 推導 domestic 格視圖（§6.3 之 normal）：
+ * ETL 對 domestic 正常值不生成 cell_state，值只存在於 entries.phonetic.original
+ *（實測：entries 80884 條 ↔ cell_states 僅 48438 條，後者幾乎全為 absent/域外/批注格），
+ * 故無 cell_state 的 domestic 格須回退查 Entry。本函數僅在格無 cell_state 時被調用
+ *（cell_state 優先——P4 編輯過的格 cell_state.raw 才是最新值）。entry 缺失 → null 態。
+ */
+export function entryCellView(entry: MatrixEntryDoc | null | undefined): MatrixCellView {
+  if (!entry) return { state: 'null' }
+  const original = entry.phonetic?.original
+  const raw = typeof original === 'string' && original.length > 0
+    ? original
+    : Array.isArray(original)
+      ? original.join(' ')
+      : undefined
+  return {
+    state: 'normal',
+    raw,
+    sourceCell: entry.meta?.sourceCell,
+    editedAfterImport: entry.meta?.editedAfterImport ?? false
+  }
+}
+
+/**
  * 內存 pivot（§12）：行 = 詞條摘要 + cells: Record<columnId, CellView>。
+ * 格視圖推導優先序：
+ *   1. 有 cell_state → computeCellState（cell_state 優先，P4 編輯過的格以 cell_state 為準）；
+ *   2. 無 cell_state 且列為 domestic → 按 (lexemeId, dialectId) 回退查 Entry
+ *      （domestic 正常值只在 entries.phonetic.original，ETL 不落 cell_state）；
+ *   3. 其餘（無 cell_state 且 external / 無 dialectId 可匹配）→ null 態。
  * cellFilter 指定時，只保留在所選列中至少一格命中該態的行（§6.5 篩選 chip）。
  */
 export function pivotMatrix(args: {
   lexemes: MatrixLexemeDoc[]
   cells: MatrixCellDoc[]
-  columns: Array<{ id: string }>
+  columns: Array<{ id: string; sourceRole?: string; dialectId?: string }>
+  entries?: MatrixEntryDoc[]
   cellFilter?: MatrixCellStateName
 }): MatrixRow[] {
-  const { lexemes, cells, columns, cellFilter } = args
+  const { lexemes, cells, columns, entries = [], cellFilter } = args
   const cellByKey = new Map(cells.map((c) => [`${c.lexemeId}::${c.columnId}`, c]))
+  // 無 cell_state 的 domestic 格回退：按 (lexemeId, dialectId) 匹配 Entry
+  const entryByLexemeDialect = new Map<string, MatrixEntryDoc>()
+  for (const e of entries) {
+    if (e.lexemeId && e.dialect?.name) {
+      entryByLexemeDialect.set(`${e.lexemeId}::${e.dialect.name}`, e)
+    }
+  }
 
   const rows: MatrixRow[] = lexemes.map((lex) => {
     const cellViews: Record<string, MatrixCellView> = {}
     for (const col of columns) {
-      cellViews[col.id] = computeCellState(cellByKey.get(`${lex.id}::${col.id}`))
+      const cell = cellByKey.get(`${lex.id}::${col.id}`)
+      if (cell) {
+        // ① cell_state 優先
+        cellViews[col.id] = computeCellState(cell)
+      } else if (col.sourceRole === 'domestic' && col.dialectId) {
+        // ② domestic 正常值回退 Entry
+        cellViews[col.id] = entryCellView(
+          entryByLexemeDialect.get(`${lex.id}::${col.dialectId}`)
+        )
+      } else {
+        // ③ external 值一律在 cell_states；無 cell_state → null
+        cellViews[col.id] = { state: 'null' }
+      }
     }
     return {
       id: lex.id,

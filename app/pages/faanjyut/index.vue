@@ -36,6 +36,17 @@
           </template>
         </p>
       </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <UButton
+          v-if="canCreateLexeme"
+          size="sm"
+          color="primary"
+          icon="i-heroicons-plus"
+          @click="createModalOpen = true"
+        >
+          新建詞條
+        </UButton>
+      </div>
     </div>
 
     <!-- 篩選欄（§6.1/6.5） -->
@@ -148,6 +159,9 @@
       />
       <p class="text-[11px] text-gray-400">每頁 {{ PER_PAGE }} 行 × 最多 {{ FAANJYUT_MATRIX_MAX_COLUMNS }} 列</p>
     </div>
+
+    <!-- P5 新建詞條彈窗（§8：至少一列編輯權限 + 寫入旗標開啟時顯示按鈕） -->
+    <FaanjyutCreateLexemeModal v-model:open="createModalOpen" :columns="allColumns" />
   </div>
 </template>
 
@@ -182,6 +196,12 @@ const page = ref(1)
 /** 已選列 id；空數組 = 服務端默認列集（本人可編輯列＋穗港） */
 const selectedColumnIds = ref<string[]>([])
 const cellFilter = ref<FaanjyutCellState | null>(null)
+
+/** P5 新建詞條彈窗（§8：按鈕僅在寫入旗標開啟且至少一列可編輯時顯示） */
+const createModalOpen = ref(false)
+const canCreateLexeme = computed(() =>
+  matrixData.value?.writeEnabled === true && allColumns.value.some((c) => c.canEdit)
+)
 
 const matrixData = ref<FaanjyutMatrixData | null>(null)
 /** 初始即 true：首次 onMounted 請求完成前顯示載入態，避免閃「沒有符合條件的詞條」 */

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { Lexeme } from '../../utils/Lexeme'
+import { Entry } from '../../utils/Entry'
 import { FaanJyutColumn } from '../../utils/FaanJyutColumn'
 import { FaanJyutCellState } from '../../utils/FaanJyutCellState'
 import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
@@ -83,9 +84,22 @@ export default defineEventHandler(async (event) => {
       }).lean()
     : []
 
+  // ③b 詞條回退：ETL 對 domestic 正常值不生成 cell_state，值只在 entries.phonetic.original
+  //（見 FaanjyutV1Design §13.1 P4 復用清單）；cell_state 優先，本查詢僅補無 cell_state 的
+  // domestic 格。50 行 × ≤30 方言列，量級很小（每行 ≤ 30 條 entry 投影）。
+  const entryDocs = lexemeIds.length > 0
+    ? await Entry.find({
+        lexemeId: { $in: lexemeIds },
+        sourceBook: FAANJYUT_SOURCE_BOOK
+      })
+      .select('lexemeId dialect.name phonetic.original meta.sourceCell meta.sourceColumnIndex meta.editedAfterImport')
+      .lean()
+    : []
+
   const rows = pivotMatrix({
     lexemes: lexemeDocs,
     cells: cellDocs,
+    entries: entryDocs,
     columns: selectedColumns,
     cellFilter
   })

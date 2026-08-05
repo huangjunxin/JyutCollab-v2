@@ -65,6 +65,16 @@
             泛粵字表
           </UButton>
           <UButton
+            v-if="isAdmin"
+            to="/faanjyut/export"
+            variant="ghost"
+            color="gray"
+            icon="i-heroicons-arrow-up-tray"
+            :class="[$route.path.startsWith('/faanjyut/export') ? 'bg-[var(--jc-accent-soft)] text-[var(--jc-accent)]' : '']"
+          >
+            導出
+          </UButton>
+          <UButton
             v-if="canReview"
             to="/review"
             variant="ghost"
@@ -348,6 +358,9 @@ const mobileNavItems = computed(() => {
   ]
   if (isAuthenticated.value) {
     items.splice(3, 0, { to: '/faanjyut', icon: 'i-heroicons-table-cells', label: '泛粵字表' })
+  }
+  if (isAdmin.value) {
+    items.push({ to: '/faanjyut/export', icon: 'i-heroicons-arrow-up-tray', label: '導出' })
   }
   if (canReview.value) {
     items.splice(3, 0, { to: '/review', icon: 'i-heroicons-clipboard-document-check', label: '審核隊列' })

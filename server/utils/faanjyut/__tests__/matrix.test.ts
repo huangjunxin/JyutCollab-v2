@@ -1,7 +1,7 @@
 /**
  * matrix 純邏輯單元測試（FaanjyutV1Design.md §6/§12）：
- * 默認列集、30 列上限、canEdit、格四態推導、內存 pivot、cellFilter、
- * 性能預算守衛（50 行 × 30 列 < 500 KB）。不連真庫、不測 handler。
+ * 默認列集、30 列上限、canEdit、格四態推導、無 cell_state 的 domestic 格 Entry 回退、
+ * 內存 pivot、cellFilter、性能預算守衛（50 行 × 30 列 < 500 KB）。不連真庫、不測 handler。
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -9,11 +9,13 @@ import {
   buildColumnSelection,
   canEditColumn,
   computeCellState,
+  entryCellView,
   estimatePayloadBytes,
   listMatrixColumns,
   pivotMatrix,
   type MatrixCellDoc,
   type MatrixColumnDoc,
+  type MatrixEntryDoc,
   type MatrixLexemeDoc,
   type MatrixUser
 } from '../matrix'
@@ -39,6 +41,17 @@ function cell(lexemeId: string, columnId: string, over: Partial<MatrixCellDoc> =
 
 function lexeme(id: string, over: Partial<MatrixLexemeDoc> = {}): MatrixLexemeDoc {
   return { id, ...over }
+}
+
+/** 泛粵 entry 最小樣本（形態對齊 fixtures.ts 的 entries 樣例：dialect.name / phonetic.original / meta.sourceCell 等） */
+function entry(lexemeId: string, dialectId: string, over: Partial<MatrixEntryDoc> = {}): MatrixEntryDoc {
+  return {
+    lexemeId,
+    dialect: { name: dialectId },
+    phonetic: { original: `raw-${dialectId}` },
+    meta: { sourceCell: `主表!A7`, editedAfterImport: false },
+    ...over
+  }
 }
 
 const contributor: MatrixUser = { role: 'contributor', dialectPermissions: [] }
@@ -252,8 +265,112 @@ describe('faanjyut/matrix pivotMatrix', () => {
   })
 })
 
+describe('faanjyut/matrix entryCellView（無 cell_state 的 domestic 格回退）', () => {
+  it('entry 缺失 → null 態', () => {
+    expect(entryCellView(undefined)).toEqual({ state: 'null' })
+    expect(entryCellView(null)).toEqual({ state: 'null' })
+  })
+
+  it('有 entry → normal + raw=phonetic.original + sourceCell/editedAfterImport', () => {
+    const view = entryCellView(entry('l1', 'guangzhou', {
+      phonetic: { original: 'jyut6' },
+      meta: { sourceCell: '主表!AI7', editedAfterImport: false }
+    }))
+    expect(view).toEqual({
+      state: 'normal',
+      raw: 'jyut6',
+      sourceCell: '主表!AI7',
+      editedAfterImport: false
+    })
+  })
+
+  it('editedAfterImport 缺省 → false；phonetic.original 為數組時 join 顯示', () => {
+    expect(entryCellView(entry('l1', 'taishan', { meta: { sourceCell: '主表!Q7' } }))).toMatchObject({
+      state: 'normal',
+      raw: 'raw-taishan',
+      editedAfterImport: false
+    })
+    expect(entryCellView(entry('l1', 'guangzhou', { phonetic: { original: ['jyut6', 'jyut6a'] } }))?.raw)
+      .toBe('jyut6 jyut6a')
+  })
+})
+
+describe('faanjyut/matrix pivotMatrix entries 回退（domestic 格無 cell_state）', () => {
+  const domesticCol = { id: 'c1', sourceRole: 'domestic', dialectId: 'guangzhou' }
+  const externalCol = { id: 'ext1', sourceRole: 'external', dialectId: 'guangzhou' }
+
+  it('domestic 格無 cell_state 有 entry → normal + raw 正確', () => {
+    const rows = pivotMatrix({
+      lexemes: [lexeme('l1')],
+      cells: [],
+      columns: [domesticCol],
+      entries: [entry('l1', 'guangzhou', {
+        phonetic: { original: 'jyut6' },
+        meta: { sourceCell: '主表!AI7', editedAfterImport: false }
+      })]
+    })
+    expect(rows[0].cells.c1).toEqual({
+      state: 'normal',
+      raw: 'jyut6',
+      sourceCell: '主表!AI7',
+      editedAfterImport: false
+    })
+  })
+
+  it('有 cell_state 時 entry 被忽略（cell_state 優先，含 normal/absent 態）', () => {
+    // cell_state normal（P4 編輯後的 raw）優先於 entry 的導入值
+    const rows = pivotMatrix({
+      lexemes: [lexeme('l1')],
+      cells: [cell('l1', 'c1', { raw: 'edited-raw', status: { flags: {} }, editedAfterImport: true })],
+      columns: [domesticCol],
+      entries: [entry('l1', 'guangzhou', { phonetic: { original: 'import-raw' } })]
+    })
+    expect(rows[0].cells.c1).toMatchObject({
+      state: 'normal',
+      raw: 'edited-raw',
+      editedAfterImport: true
+    })
+
+    // absent cell_state 同樣優先（entry 存在也不回退）
+    const rows2 = pivotMatrix({
+      lexemes: [lexeme('l1')],
+      cells: [cell('l1', 'c1', { status: { flags: { explicitlyAbsent: true } } })],
+      columns: [domesticCol],
+      entries: [entry('l1', 'guangzhou')]
+    })
+    expect(rows2[0].cells.c1?.state).toBe('absent')
+  })
+
+  it('domestic 無 cell_state 無 entry → null；external 無 cell_state → null（同名 entry 也不匹配）', () => {
+    const rows = pivotMatrix({
+      lexemes: [lexeme('l1'), lexeme('l2')],
+      cells: [],
+      columns: [domesticCol, externalCol],
+      entries: [
+        // ext1 是 dialectId=guangzhou 的 external 列，不得被同名 entry 誤填
+        entry('l1', 'guangzhou', { phonetic: { original: 'jyut6' } })
+      ]
+    })
+    expect(rows[0].cells.c1?.state).toBe('normal')
+    expect(rows[0].cells.ext1?.state).toBe('null')
+    expect(rows[1].cells.c1?.state).toBe('null')
+    expect(rows[1].cells.ext1?.state).toBe('null')
+  })
+
+  it('cellFilter=normal 能命中 join 出來的 normal 格', () => {
+    const rows = pivotMatrix({
+      lexemes: [lexeme('l1'), lexeme('l2'), lexeme('l3')],
+      cells: [cell('l3', 'c1', { status: { flags: { explicitlyAbsent: true } } })],
+      columns: [domesticCol],
+      entries: [entry('l1', 'guangzhou')], // l1: join normal；l2: null；l3: cell_state absent
+      cellFilter: 'normal'
+    })
+    expect(rows.map((r) => r.id)).toEqual(['l1'])
+  })
+})
+
 describe('faanjyut/matrix estimatePayloadBytes 性能預算守衛', () => {
-  it('50 行 × 30 列構造數據 < 500 KB（§6.6）', () => {
+  it('50 行 × 30 列構造數據 < 500 KB（§6.6；含 raw 值的 join 回退形態）', () => {
     const columns = Array.from({ length: MATRIX_MAX_COLUMNS }, (_, i) => ({
       id: `fjcol_${String(i).padStart(24, '0')}`,
       label: `方言點${i}`,
