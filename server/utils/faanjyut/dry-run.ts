@@ -9,7 +9,7 @@
  *  - command 監控：allowlist 之外的任何命令 → DATABASE_WRITE_COMMAND_OBSERVED
  */
 import { FINDING_CODES, type Environment, type Finding, type ValidatedExport } from './import-contract'
-import { FAANJYUT_IMPORT_COLLECTIONS } from './import-models'
+import { FAANJYUT_INDEXED_COLLECTIONS } from './import-models'
 import {
   computeIndexPlan,
   expectedIndexPlan,
@@ -99,9 +99,9 @@ export async function runDryRunDbPhase(db: DryRunDb, validated: ValidatedExport,
     const collectionNamesBefore = (await db.listCollectionNames()).sort()
     const collectionsBefore = await countAll(db, collectionNamesBefore)
 
-    // ---- 索引計劃（真實 DB 索引 vs Mongoose 期望） ----
+    // ---- 索引計劃（真實 DB 索引 vs Mongoose 期望；含 P2 輔助 collection） ----
     const existingByCollection: Record<string, ExistingIndex[]> = {}
-    for (const { collection } of FAANJYUT_IMPORT_COLLECTIONS) {
+    for (const { collection } of FAANJYUT_INDEXED_COLLECTIONS) {
       if (!collectionNamesBefore.includes(collection)) continue
       const idxs = await db.indexes(collection)
       existingByCollection[collection] = idxs.map((i) => ({
@@ -115,7 +115,7 @@ export async function runDryRunDbPhase(db: DryRunDb, validated: ValidatedExport,
         }
       }))
     }
-    const expectedByCollection = expectedIndexPlan(FAANJYUT_IMPORT_COLLECTIONS)
+    const expectedByCollection = expectedIndexPlan(FAANJYUT_INDEXED_COLLECTIONS)
     const indexPlan = computeIndexPlan(existingByCollection, expectedByCollection)
 
     // 殘留 unique 索引會阻礙導入（ImplementationPlan P1 任務 5）

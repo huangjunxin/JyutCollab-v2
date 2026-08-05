@@ -1,24 +1,25 @@
 #!/usr/bin/env tsx
 /**
- * 泛粵字表索引遷移（P1 實現，見 ImportDataContract.md §10）。
+ * 泛粵字表索引遷移（P1 計劃 + P2 apply，見 ImportDataContract.md §10）。
  *
  * 職責：對比真實 DB 索引與 7 個導入 collection 的 Mongoose 期望索引，
  * 輸出 existing/expected/create/drop 四清單（含 headword.search 方案 B 殘留索引
- * 顯式列入 drop）。只讀，不 create/drop 任何索引。
+ * 顯式列入 drop）。
  *
- * 寫模式（--apply / --confirm-write）按 ImplementationPlan Phase 2 屬 P2（人工審閱後在 staging 應用），
- * 保持退出碼 3。
+ * --apply（P2）：人工審閱計劃後應用 create/drop；防誤寫要求 --confirm-write
+ * 等於實際連接的 db 名；`headword.search` 殘留索引按方案 B 清除（production 僅 P6）。
  *
- * 退出碼：0 通過（計劃已產出，不要求無差異）/ 1 運行錯誤 / 3 未實現（apply 屬 P2）。
+ * 退出碼：0 通過 / 1 運行錯誤（含 --confirm-write 不符）。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import mongoose from 'mongoose'
-import { FAANJYUT_IMPORT_COLLECTIONS } from '../server/utils/faanjyut/import-models'
+import { FAANJYUT_INDEXED_COLLECTIONS } from '../server/utils/faanjyut/import-models'
 import {
   computeIndexPlan,
   expectedIndexPlan,
+  type IndexPlan,
   type IndexPlanItem,
   type ExistingIndex
 } from '../server/utils/faanjyut/index-plan'
@@ -81,14 +82,15 @@ function usage(): string {
   return [
     '用法：npm run migrate:faanjyut-indexes -- [options]',
     '',
-    '  --dry-run              只讀輸出 existing/expected/create/drop 計劃（P1；默認）',
-    '  --apply                應用索引計劃（P2：人工審閱後在 staging 應用），本期退出碼 3',
-    '  --confirm-write <db>   apply 模式要求（P2）',
+    '  --dry-run              只讀輸出 existing/expected/create/drop 計劃（默認）',
+    '  --apply                應用索引計劃（人工審閱後執行 create/drop）',
+    '  --confirm-write <db>   apply 模式必填：必須等於實際連接的 db 名（防誤寫）',
     '  --report-dir <dir>     產物目錄，默認 .artifacts/faanjyut/index-plan',
     '  --help',
     '',
     '示例：',
     '  npm run migrate:faanjyut-indexes -- --dry-run --report-dir .artifacts/faanjyut/index-plan',
+    '  npm run migrate:faanjyut-indexes -- --apply --confirm-write <db>',
     ''
   ].join('\n')
 }
@@ -109,9 +111,13 @@ function main(): void {
     process.stdout.write(usage())
     process.exit(0)
   }
-  if (args.apply || args.confirmWrite !== null) {
-    console.error('尚未實現：apply 索引計劃（--apply）按 ImplementationPlan Phase 2 屬 P2；本期只做 dry-run 計劃。')
-    process.exit(3)
+  if (args.apply && !args.confirmWrite) {
+    console.error('錯誤：--apply 必須提供 --confirm-write <精確 db 名>（防誤寫）')
+    process.exit(1)
+  }
+  if (!args.apply && args.confirmWrite !== null) {
+    console.error('錯誤：--confirm-write 僅 --apply 模式使用')
+    process.exit(1)
   }
 
   const mongoUri = process.env.FAANJYUT_MONGODB_URI || process.env.MONGODB_URI
@@ -120,7 +126,7 @@ function main(): void {
     process.exit(1)
   }
 
-  runIndexPlan(args.reportDir, mongoUri)
+  runIndexPlan(args.reportDir, mongoUri, args.apply ? args.confirmWrite : null)
     .then((exitCode) => process.exit(exitCode))
     .catch((error: unknown) => {
       console.error('運行錯誤:', error)
@@ -128,20 +134,25 @@ function main(): void {
     })
 }
 
-async function runIndexPlan(reportDir: string, mongoUri: string): Promise<number> {
+async function runIndexPlan(reportDir: string, mongoUri: string, confirmWrite: string | null): Promise<number> {
   await mongoose.connect(mongoUri, {
     autoIndex: false,
     autoCreate: false,
     dbName: process.env.FAANJYUT_DB_NAME || undefined
   })
-  console.log(`已連接 MongoDB（db: ${mongoose.connection.name}，autoIndex:false autoCreate:false）`)
+  const dbName = mongoose.connection.name
+  console.log(`已連接 MongoDB（db: ${dbName}，autoIndex:false autoCreate:false）`)
 
   try {
+    if (confirmWrite !== null && confirmWrite !== dbName) {
+      console.error(`錯誤：--confirm-write '${confirmWrite}' 與實際連接的 db '${dbName}' 不一致，拒絕 apply（防誤寫）`)
+      return 1
+    }
     const db = adaptMongooseDb(mongoose.connection)
     const collectionNames = await db.listCollectionNames()
 
     const existingByCollection: Record<string, ExistingIndex[]> = {}
-    for (const { collection } of FAANJYUT_IMPORT_COLLECTIONS) {
+    for (const { collection } of FAANJYUT_INDEXED_COLLECTIONS) {
       if (!collectionNames.includes(collection)) {
         console.log(`[info] collection 不存在（索引將隨 P2 導入創建）：${collection}`)
         continue
@@ -155,7 +166,7 @@ async function runIndexPlan(reportDir: string, mongoUri: string): Promise<number
       }))
     }
 
-    const expectedByCollection = expectedIndexPlan(FAANJYUT_IMPORT_COLLECTIONS)
+    const expectedByCollection = expectedIndexPlan(FAANJYUT_INDEXED_COLLECTIONS)
     const plan = computeIndexPlan(existingByCollection, expectedByCollection)
 
     const output = {
@@ -190,11 +201,48 @@ async function runIndexPlan(reportDir: string, mongoUri: string): Promise<number
     }
     console.log('')
     console.log(`計劃已寫入：${jsonPath}`)
-    console.log('人工審閱後再以 --apply（P2）應用；importer 不會自動 syncIndexes（契約 §10）。')
+
+    if (confirmWrite === null) {
+      console.log('人工審閱後再以 --apply --confirm-write <db> 應用；importer 不會自動 syncIndexes（契約 §10）。')
+      return 0
+    }
+
+    // --apply：應用 create → drop（create 先於 drop，避免瞬時無索引窗口擴大）
+    const applied = await applyIndexPlan(plan)
+    const appliedPath = resolve(reportDir, 'index-plan-applied.json')
+    writeFileSync(appliedPath, `${JSON.stringify(applied, null, 2)}\n`, 'utf8')
+    console.log(`已應用：created=${applied.created.length} dropped=${applied.dropped.length}（記錄: ${appliedPath}）`)
     return 0
   } finally {
     await mongoose.disconnect()
   }
+}
+
+async function applyIndexPlan(plan: IndexPlan): Promise<{ created: IndexPlanItem[]; dropped: IndexPlanItem[] }> {
+  const db = mongoose.connection.db
+  if (!db) throw new Error('MongoDB 未連接')
+  const created: IndexPlanItem[] = []
+  const dropped: IndexPlanItem[] = []
+
+  for (const item of plan.create) {
+    const options: Record<string, unknown> = {}
+    if (item.options.unique) options.unique = true
+    if (item.options.sparse) options.sparse = true
+    if (item.options.partialFilterExpression) options.partialFilterExpression = item.options.partialFilterExpression
+    await db.collection(item.collection).createIndex(item.key as Record<string, number>, options)
+    created.push(item)
+    console.log(`  [created] ${keyText(item)}`)
+  }
+  for (const item of plan.drop) {
+    if (!item.name) {
+      console.log(`  [skip-drop] 無索引名，跳過：${keyText(item)}`)
+      continue
+    }
+    await db.collection(item.collection).dropIndex(item.name)
+    dropped.push(item)
+    console.log(`  [dropped] ${keyText(item)}`)
+  }
+  return { created, dropped }
 }
 
 main()

@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import type { Environment, Finding, FileCounts, ValidatedExport } from './import-contract'
 import type { IndexPlan, IndexPlanItem } from './index-plan'
 import type { DatabaseProof } from './dry-run'
+import { WRITE_ORDER } from './write-import'
+import type { RollbackResult } from './rollback'
 
 export interface SchemaDryRunReport {
   schemaVersion: 1
@@ -186,5 +188,157 @@ export function writeDryRunReports(reportDir: string, report: SchemaDryRunReport
   writeFileSync(paths[0], `${JSON.stringify(report, null, 2)}\n`, 'utf8')
   writeFileSync(paths[1], renderMarkdown(report), 'utf8')
   writeFileSync(paths[2], `${JSON.stringify(indexPlan, null, 2)}\n`, 'utf8')
+  return paths
+}
+
+// ---------------------------------------------------------------------------
+// P2 寫入/回滾報告（契約 §9：批大小記錄在報告中；回滾前後保存各 collection 計數）
+// ---------------------------------------------------------------------------
+
+export interface ImportWriteReport {
+  schemaVersion: 1
+  batchId: string
+  mode: 'initial' | 'final_cutover'
+  environment: Environment
+  precheckRunId: string
+  startedAt: string
+  completedAt: string
+  source: {
+    sourceWorkbook: string
+    sourceFileSha256: string
+    manifestSha256: string
+  }
+  bulkSize: number
+  /** written = 實際寫入；expected = 契約預檢 valid 計數 */
+  counts: {
+    written: Record<string, number>
+    expected: Record<string, number>
+  }
+  /** 7 個 collection written 全部等於 expected */
+  matched: boolean
+}
+
+export interface BuildWriteReportInput {
+  batchId: string
+  mode: 'initial' | 'final_cutover'
+  environment: Environment
+  precheckRunId: string
+  startedAt: string
+  completedAt: string
+  validated: ValidatedExport
+  bulkSize: number
+  written: Record<string, number>
+}
+
+export function buildImportWriteReport(input: BuildWriteReportInput): ImportWriteReport {
+  const expected: Record<string, number> = {}
+  for (const { collection, ndjsonFile } of WRITE_ORDER) {
+    expected[collection] = input.validated.counts[ndjsonFile]?.valid ?? 0
+  }
+  const matched = WRITE_ORDER.every(
+    ({ collection }) => (input.written[collection] ?? 0) === expected[collection]
+  )
+  return {
+    schemaVersion: 1,
+    batchId: input.batchId,
+    mode: input.mode,
+    environment: input.environment,
+    precheckRunId: input.precheckRunId,
+    startedAt: input.startedAt,
+    completedAt: input.completedAt,
+    source: {
+      sourceWorkbook: input.validated.manifest.sourceWorkbook,
+      sourceFileSha256: input.validated.manifest.sourceFileSha256,
+      manifestSha256: input.validated.manifestSha256
+    },
+    bulkSize: input.bulkSize,
+    counts: { written: input.written, expected },
+    matched
+  }
+}
+
+export interface ImportRollbackReport {
+  schemaVersion: 1
+  batchId: string
+  startedAt: string
+  completedAt: string
+  countsBefore: Record<string, number>
+  deleted: Record<string, number>
+  countsAfter: Record<string, number>
+  /** 7 個 collection 按 batchId 計數全部歸零 */
+  drained: boolean
+}
+
+export function buildImportRollbackReport(result: RollbackResult): ImportRollbackReport {
+  const drained = Object.values(result.countsAfter).every((n) => n === 0)
+  return {
+    schemaVersion: 1,
+    batchId: result.batchId,
+    startedAt: result.startedAt,
+    completedAt: result.completedAt,
+    countsBefore: result.countsBefore,
+    deleted: result.deleted,
+    countsAfter: result.countsAfter,
+    drained
+  }
+}
+
+function countsLines(title: string, a: Record<string, number>, b: Record<string, number>, headerA: string, headerB: string): string[] {
+  const lines = [`## ${title}`, '', '| collection | ' + headerA + ' | ' + headerB + ' |', '|------|------|------|']
+  for (const key of Object.keys(a)) {
+    lines.push(`| ${key} | ${a[key] ?? 0} | ${b[key] ?? 0} |`)
+  }
+  lines.push('')
+  return lines
+}
+
+export function renderWriteMarkdown(report: ImportWriteReport): string {
+  const lines: string[] = []
+  lines.push('# 泛粵字表導入寫入報告')
+  lines.push('')
+  lines.push(`- batchId: \`${report.batchId}\``)
+  lines.push(`- mode: \`${report.mode}\` / environment: \`${report.environment}\``)
+  lines.push(`- precheckRunId: \`${report.precheckRunId}\``)
+  lines.push(`- startedAt: ${report.startedAt}`)
+  lines.push(`- completedAt: ${report.completedAt}`)
+  lines.push(`- bulkSize: ${report.bulkSize}`)
+  lines.push(`- **matched: ${report.matched}**（written 全部等於契約 valid 計數）`)
+  lines.push('')
+  lines.push(...countsLines('計數（written / expected）', report.counts.written, report.counts.expected, 'written', 'expected'))
+  return lines.join('\n')
+}
+
+export function renderRollbackMarkdown(report: ImportRollbackReport): string {
+  const lines: string[] = []
+  lines.push('# 泛粵字表導入回滾報告')
+  lines.push('')
+  lines.push(`- batchId: \`${report.batchId}\``)
+  lines.push(`- startedAt: ${report.startedAt}`)
+  lines.push(`- completedAt: ${report.completedAt}`)
+  lines.push(`- **drained: ${report.drained}**（按 batchId 計數全部歸零）`)
+  lines.push('')
+  lines.push(...countsLines('計數（before / after）', report.countsBefore, report.countsAfter, 'before', 'after'))
+  lines.push('## 刪除數')
+  lines.push('')
+  for (const [key, n] of Object.entries(report.deleted)) lines.push(`- ${key}: ${n}`)
+  lines.push('')
+  return lines.join('\n')
+}
+
+/** 寫入寫入模式產物（import_write_report.json / write-report.md） */
+export function writeImportWriteReports(reportDir: string, report: ImportWriteReport): string[] {
+  mkdirSync(reportDir, { recursive: true })
+  const paths = [join(reportDir, 'import_write_report.json'), join(reportDir, 'write-report.md')]
+  writeFileSync(paths[0], `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+  writeFileSync(paths[1], renderWriteMarkdown(report), 'utf8')
+  return paths
+}
+
+/** 寫入回滾產物（import_rollback_report.json / rollback-report.md） */
+export function writeImportRollbackReports(reportDir: string, report: ImportRollbackReport): string[] {
+  mkdirSync(reportDir, { recursive: true })
+  const paths = [join(reportDir, 'import_rollback_report.json'), join(reportDir, 'rollback-report.md')]
+  writeFileSync(paths[0], `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+  writeFileSync(paths[1], renderRollbackMarkdown(report), 'utf8')
   return paths
 }

@@ -34,10 +34,16 @@ describe('CLI 退出碼契約（不依賴 MongoDB 的分支）', () => {
     expect(code).toBe(1)
   })
 
-  it('寫入模式（--mode initial）→ 退出碼 3（P2 未實現）', () => {
-    const { code, stderr } = runCli(seedScript, ['--input', '/tmp/x', '--mode', 'initial', '--confirm-write', 'staging_db'])
-    expect(code).toBe(3)
-    expect(stderr).toContain('P2')
+  it('寫入模式缺 --confirm-write → 退出碼 1（防誤寫）', () => {
+    const { code, stderr } = runCli(seedScript, ['--input', '/tmp/x', '--mode', 'initial'])
+    expect(code).toBe(1)
+    expect(stderr).toContain('confirm-write')
+  })
+
+  it('dry-run 攜帶 --confirm-write → 退出碼 1（僅寫入模式接受）', () => {
+    const { code, stderr } = runCli(seedScript, ['--input', '/tmp/x', '--dry-run', '--confirm-write', 'staging_db'])
+    expect(code).toBe(1)
+    expect(stderr).toContain('confirm-write')
   })
 
   it('未知 --mode → 退出碼 1', () => {
@@ -45,10 +51,16 @@ describe('CLI 退出碼契約（不依賴 MongoDB 的分支）', () => {
     expect(code).toBe(1)
   })
 
-  it('migrate --apply → 退出碼 3（P2 未實現）', () => {
-    const { code, stderr } = runCli(migrateScript, ['--apply', '--confirm-write', 'staging_db'])
-    expect(code).toBe(3)
-    expect(stderr).toContain('P2')
+  it('migrate --apply 缺 --confirm-write → 退出碼 1（防誤寫）', () => {
+    const { code, stderr } = runCli(migrateScript, ['--apply'])
+    expect(code).toBe(1)
+    expect(stderr).toContain('confirm-write')
+  })
+
+  it('migrate --apply 攜 --confirm-write 但無 MongoDB URI → 退出碼 1', () => {
+    const { code, stderr } = runCli(migrateScript, ['--apply', '--confirm-write', 'staging_db'], { FAANJYUT_MONGODB_URI: '', MONGODB_URI: '' })
+    expect(code).toBe(1)
+    expect(stderr).toContain('MONGODB_URI')
   })
 
   it('dry-run 無 MongoDB URI → 退出碼 1', () => {
