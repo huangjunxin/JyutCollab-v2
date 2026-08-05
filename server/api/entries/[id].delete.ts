@@ -1,3 +1,4 @@
+import { assertNotFaanJyutEntry } from '../../utils/faanjyut/intercept'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -30,6 +31,9 @@ export default defineEventHandler(async (event) => {
         message: '詞條不存在'
       })
     }
+
+    // 泛粵字表數據一律拒絕普通寫入口（FaanjyutV1Design.md §9）
+    assertNotFaanJyutEntry(existingEntry)
 
     const userId = event.context.auth.id
     const userRole = event.context.auth.role

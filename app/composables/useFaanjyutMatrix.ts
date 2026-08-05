@@ -75,6 +75,36 @@ export interface FaanjyutSearchGroup {
   hits: FaanjyutSearchHit[]
 }
 
+/**
+ * P4 格寫入契約（FaanjyutV1Design §12 `POST /api/faanjyut/cells/batch`）：
+ * 單格自動保存每格一條 edits（batch 保留設計不變），單格 transaction、批次允許部分成功。
+ * op 語義：set=寫值（raw，trim 後非空）；clear=曾有內容被清空；absent=確定沒有（`_`）。
+ * 請求以 dialectId 鍵定格（與服務端 CellEditSchema 一致；clear/absent 不得攜帶 raw）。
+ */
+export type FaanjyutCellOp = 'set' | 'clear' | 'absent'
+
+export interface FaanjyutCellEdit {
+  lexemeId: string
+  /** 方言 ID（矩陣列 dialectId；僅域內可編輯列持有） */
+  dialectId: string
+  op: FaanjyutCellOp
+  raw?: string
+}
+
+export interface FaanjyutCellWriteResult {
+  lexemeId: string
+  dialectId: string
+  ok: boolean
+  entryId?: string
+  error?: string
+}
+
+export interface FaanjyutCellWriteData {
+  results: FaanjyutCellWriteResult[]
+  succeeded: number
+  failed: number
+}
+
 interface ApiEnvelope<T> {
   success: boolean
   data: T
@@ -125,6 +155,19 @@ export function useFaanjyutMatrix() {
   }
 
   /**
+   * P4 格寫入（§6.4 即改即存 / §13.1）：POST /api/faanjyut/cells/batch。
+   * 響應信封 { success, data: { results, succeeded, failed } }；單格失敗以 200 +
+   * 逐格 result 表達（部分成功），整批級錯誤（503 flag 關閉等）由 $fetch 拋出。
+   */
+  async function writeCells(edits: FaanjyutCellEdit[]): Promise<FaanjyutCellWriteData> {
+    const res = await $fetch<ApiEnvelope<FaanjyutCellWriteData>>('/api/faanjyut/cells/batch', {
+      method: 'POST',
+      body: { edits }
+    })
+    return res.data
+  }
+
+  /**
    * 按 matrixOrder 二分定位詞條所在頁（?q= 定位用）。
    * 矩陣按 meta.matrixOrder 升序分頁，頁邊界可由每頁首行的 matrixOrder 判定。
    * 返回 1-based 頁碼；matrixOrder 缺失或定位失敗時返回 null。
@@ -155,5 +198,5 @@ export function useFaanjyutMatrix() {
     return lo
   }
 
-  return { fetchMatrix, fetchColumns, search, locatePageByMatrixOrder }
+  return { fetchMatrix, fetchColumns, search, writeCells, locatePageByMatrixOrder }
 }

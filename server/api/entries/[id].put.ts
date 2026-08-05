@@ -5,6 +5,7 @@ import { formatZodErrorToMessage } from '../../utils/validation'
 import { connectDB } from '../../utils/db'
 import { AISuggestion } from '../../utils/AISuggestion'
 import { createNotificationSafely, getEntryNotificationRecipients } from '../../utils/Notification'
+import { assertNotFaanJyutEntry } from '../../utils/faanjyut/intercept'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -183,6 +184,9 @@ export default defineEventHandler(async (event) => {
         message: '詞條不存在'
       })
     }
+
+    // 泛粵字表數據一律拒絕普通寫入口（FaanjyutV1Design.md §9）
+    assertNotFaanJyutEntry(existingEntry)
 
     const body = await readBody(event)
     const validated = UpdateEntrySchema.safeParse(body)

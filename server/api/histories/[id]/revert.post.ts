@@ -1,3 +1,5 @@
+import { assertNotFaanJyutEntry } from '../../../utils/faanjyut/intercept'
+
 export default defineEventHandler(async (event) => {
   try {
     // 檢查認證
@@ -37,6 +39,10 @@ export default defineEventHandler(async (event) => {
     }
 
     const entry = await Entry.findById(history.entryId)
+    // 泛粵字表數據一律拒絕普通寫入口（FaanjyutV1Design.md §9）
+    assertNotFaanJyutEntry(entry)
+    // 還原刪除場景：entry 已不存在，改用歷史快照判斷來源
+    assertNotFaanJyutEntry(history.beforeSnapshot as { sourceBook?: string | null } | null | undefined)
     const snapshotForPermission = history.beforeSnapshot || history.afterSnapshot
     const ownerId = entry?.createdBy || (snapshotForPermission as any)?.createdBy
     const canRevert = ownerId === user.id || user.role === 'admin' || user.role === 'reviewer'

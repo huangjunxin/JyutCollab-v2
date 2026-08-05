@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
         .select('id columnId raw status projection source')
         .lean(),
       Entry.find({ lexemeId: id, sourceBook: 'faanjyut' })
-        .select('id dialect headword phonetic senses')
+        .select('_id id dialect headword phonetic senses')
         .lean(),
       ExternalEtymon.find({ lexemeId: id, 'meta.softDeleted': { $ne: true } })
         .select('id languageCode scriptForm raw phonetic gloss sourceType sourceDetail note meta')
@@ -90,8 +90,12 @@ export default defineEventHandler(async (event) => {
       ]
     }).lean()
 
-    // 編輯歷史：按本詞條泛粵 entries 的 id 集合聚合（時間倒序交由純函數再排）
-    const entryIds = entries.map((entry: any) => entry.id)
+    // 編輯歷史：按本詞條泛粵 entries 的 _id（Mongo ObjectId 字符串）聚合。
+    // 平台所有寫側一律存 entry._id.toString()，此處按同一約定查詢（見 FaanjyutV1Design §13.1 既有問題 1；
+    // P2 導入不寫 EditHistory，故此前按應用層 fj_ id 查詢的錯誤從未暴露）。
+    const entryIds = entries
+      .map((entry: any) => entry._id?.toString?.() ?? entry._id)
+      .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
     const histories = entryIds.length
       ? await EditHistory.find({ entryId: { $in: entryIds } }).lean()
       : []

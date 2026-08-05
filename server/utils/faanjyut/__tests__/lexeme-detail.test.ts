@@ -28,6 +28,10 @@ const ETYMON_YIZHANG = 'fje_yizhang'
 const ETYMON_SOFT_DELETED = 'fje_hak_deleted'
 const ENTRY_GZ = 'fj_gz'
 const ENTRY_TS = 'fj_ts'
+// 讀側聚合約定（§13.1 既有問題 1）：EditHistory.entryId 一律存 Entry 的 Mongo _id 字符串，
+// 詳情頁歷史查詢也按 _id 聚合；應用層 id（fj_…）僅用於格 projection 與詞條映射。
+const ENTRY_GZ_OID = 'mongo_oid_gz'
+const ENTRY_TS_OID = 'mongo_oid_ts'
 
 function buildInput(overrides: Partial<AssembleLexemeDetailInput> = {}): AssembleLexemeDetailInput {
   const base: AssembleLexemeDetailInput = {
@@ -62,6 +66,7 @@ function buildInput(overrides: Partial<AssembleLexemeDetailInput> = {}): Assembl
     ],
     entries: [
       {
+        _id: ENTRY_GZ_OID,
         id: ENTRY_GZ,
         dialect: { name: 'guangzhou', regionCode: 'GZ' },
         headword: { display: '粵', normalized: '粵', isPlaceholder: false },
@@ -72,6 +77,7 @@ function buildInput(overrides: Partial<AssembleLexemeDetailInput> = {}): Assembl
         ]
       },
       {
+        _id: ENTRY_TS_OID,
         id: ENTRY_TS,
         dialect: { name: 'taishan', regionCode: 'TS' },
         headword: { display: '粵', normalized: '粵', isPlaceholder: false },
@@ -135,7 +141,7 @@ function buildInput(overrides: Partial<AssembleLexemeDetailInput> = {}): Assembl
     histories: [
       {
         _id: 'fh_1',
-        entryId: ENTRY_GZ,
+        entryId: ENTRY_GZ_OID,
         userId: 'system:faanjyut_import',
         action: 'create',
         changedFields: ['headword', 'phonetic'],
@@ -145,7 +151,7 @@ function buildInput(overrides: Partial<AssembleLexemeDetailInput> = {}): Assembl
       },
       {
         _id: 'fh_2',
-        entryId: ENTRY_GZ,
+        entryId: ENTRY_GZ_OID,
         userId: 'user_abc',
         action: 'update',
         changedFields: ['phonetic.original'],
@@ -275,12 +281,12 @@ describe('faanjyut/lexeme-detail assembleLexemeDetail', () => {
     expect(comments[3].targetType).toBe('externalEtymon')
   })
 
-  it('editHistory：時間倒序；userId 原樣返回（system:faanjyut_import 由前端顯示）', () => {
+  it('editHistory：時間倒序；entryId 為 Mongo _id 字符串（讀側聚合約定）；userId 原樣返回（system:faanjyut_import 由前端顯示）', () => {
     const { editHistory } = assembleLexemeDetail(buildInput())
     expect(editHistory.map((h) => h.id)).toEqual(['fh_2', 'fh_1'])
     expect(editHistory[0]).toMatchObject({
       id: 'fh_2',
-      entryId: ENTRY_GZ,
+      entryId: ENTRY_GZ_OID,
       userId: 'user_abc',
       action: 'update',
       changedFields: ['phonetic.original'],

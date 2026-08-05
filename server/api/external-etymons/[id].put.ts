@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ExternalEtymon } from '../../utils/ExternalEtymon'
 import { convertToHongKongTraditional } from '../../utils/textConversion'
+import { assertNotFaanJyutExternalEtymon } from '../../utils/faanjyut/intercept'
 
 const ParamsSchema = z.object({
   id: z.string().min(1)
@@ -51,10 +52,14 @@ export default defineEventHandler(async (event) => {
   if (typeof d.sourceDetail === 'string') update.sourceDetail = convertToHongKongTraditional(d.sourceDetail.trim())
   if (typeof d.note === 'string') update.note = convertToHongKongTraditional(d.note.trim())
 
-  const row = await ExternalEtymon.findOneAndUpdate({ id }, { $set: update }, { new: true }).lean()
-  if (!row) {
+  const existing = await ExternalEtymon.findOne({ id }).lean()
+  if (!existing) {
     throw createError({ statusCode: 404, message: '域外方音不存在' })
   }
+  // 泛粵字表數據一律拒絕普通寫入口（FaanjyutV1Design.md §9）
+  assertNotFaanJyutExternalEtymon(existing)
+
+  const row = await ExternalEtymon.findOneAndUpdate({ id }, { $set: update }, { new: true }).lean()
 
   return {
     success: true,

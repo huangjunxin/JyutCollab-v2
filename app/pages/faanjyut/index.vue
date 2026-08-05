@@ -28,7 +28,12 @@
           </template>
         </p>
         <p class="text-[11px] text-gray-400 mt-1">
-          可編輯列頭為正常色並標「可編輯」；其餘列唯讀（列頭灰化帶鎖）。格編輯屬後續階段，目前全頁唯讀。
+          <template v-if="matrixData?.writeEnabled">
+            點擊可編輯格的格即可編輯，即改即存；輸入 <span class="jc-mono">_</span> 表「確定沒有」，清空表「已清空」，保存後 5 秒內可撤銷。
+          </template>
+          <template v-else>
+            可編輯列頭為正常色並標「可編輯」；其餘列唯讀（列頭灰化帶鎖）。目前後台寫入旗標未開啟，全頁唯讀。
+          </template>
         </p>
       </div>
     </div>
@@ -124,6 +129,8 @@
       :loading="loading"
       :highlight-lexeme-id="highlightLexemeId"
       :highlight-source-cell="highlightSourceCell"
+      :write-enabled="matrixData?.writeEnabled ?? false"
+      :cell-edit="cellEdit"
     />
     <p class="text-[10px] text-gray-400 mt-2 mb-4">
       篩選 chip 只影響本頁顯示的行（在所選列中至少一格命中該態才顯示），總數仍為全表詞條數。
@@ -169,7 +176,7 @@ const PER_PAGE = 50
 const COLUMNS_STORAGE_KEY = 'faanjyut:matrix:columns'
 
 const route = useRoute()
-const { fetchMatrix, fetchColumns, search, locatePageByMatrixOrder } = useFaanjyutMatrix()
+const { fetchMatrix, fetchColumns, search, writeCells, locatePageByMatrixOrder } = useFaanjyutMatrix()
 
 const page = ref(1)
 /** 已選列 id；空數組 = 服務端默認列集（本人可編輯列＋穗港） */
@@ -180,6 +187,9 @@ const matrixData = ref<FaanjyutMatrixData | null>(null)
 /** 初始即 true：首次 onMounted 請求完成前顯示載入態，避免閃「沒有符合條件的詞條」 */
 const loading = ref(true)
 const errorMessage = ref<string | null>(null)
+
+/** P4 格編輯狀態機（§6.4 編輯微交互）；writeEnabled=false 時保持純只讀（§14.3） */
+const cellEdit = useFaanjyutCellEdit({ matrixData, writeCells })
 
 const allColumns = ref<FaanjyutMatrixColumn[]>([])
 const allColumnsTotal = ref(0)
@@ -201,6 +211,8 @@ const cellFilterChips: Array<{ value: FaanjyutCellState; label: string; title: s
 async function fetchMatrixData() {
   loading.value = true
   errorMessage.value = null
+  // 數據重載（翻頁/篩選/定位/列集變化）時清空全部編輯態（舊格可能已不在本頁）
+  cellEdit.resetAll()
   try {
     matrixData.value = await fetchMatrix({
       page: page.value,

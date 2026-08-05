@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import { Entry } from '../../../utils/Entry'
 import { Lexeme } from '../../../utils/Lexeme'
 import { EditHistory } from '../../../utils/EditHistory'
+import { assertNotFaanJyutEntry } from '../../../utils/faanjyut/intercept'
 
 const BodySchema = z.object({
   action: z.enum(['new', 'set']),
@@ -32,6 +33,9 @@ export default defineEventHandler(async (event) => {
   if (!existingEntry) {
     throw createError({ statusCode: 404, message: '詞條不存在' })
   }
+
+  // 泛粵字表數據一律拒絕普通寫入口（FaanjyutV1Design.md §9）
+  assertNotFaanJyutEntry(existingEntry)
 
   const body = await readBody(event)
   const parsed = BodySchema.safeParse(body)

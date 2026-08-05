@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { formatZodErrorToMessage } from '../../../utils/validation'
 import { createNotificationSafely, getEntryNotificationRecipients } from '../../../utils/Notification'
+import { assertNotFaanJyutEntry } from '../../../utils/faanjyut/intercept'
 
 const RejectSchema = z.object({
   reason: z.string().trim().min(1, '請提供拒絕原因').max(500, '拒絕原因最多500個字符')
@@ -59,6 +60,9 @@ export default defineEventHandler(async (event) => {
         message: '詞條不存在'
       })
     }
+
+    // 泛粵字表數據一律拒絕普通寫入口（FaanjyutV1Design.md §9）
+    assertNotFaanJyutEntry(entry)
 
     // 檢查是否已被其他審核員審核（並發保護）
     if (entry.status !== 'pending_review') {
