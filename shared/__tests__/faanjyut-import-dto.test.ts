@@ -52,7 +52,7 @@ const validExternalEtymon = {
   scriptForm: '測',
   raw: '測 tak',
   sourceType: 'dictionary',
-  sourceDetail: '泛粵字表 21.202607292320.xlsx',
+  sourceDetail: '南昌',
   meta: {
     sourceBook: 'faanjyut',
     sourceWorkbook: '泛粵字表 21.202607292320.xlsx',

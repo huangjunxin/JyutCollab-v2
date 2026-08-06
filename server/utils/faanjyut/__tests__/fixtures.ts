@@ -80,7 +80,7 @@ const externalEtymons = [
     scriptForm: '[ɢ]ʷat',
     raw: '[ɢ]ʷat',
     sourceType: 'dictionary',
-    sourceDetail: WORKBOOK,
+    // 2026-08-06：raw 無中文方括號語言點 → 省略 sourceDetail（DTO optional）
     meta: { sourceBook: 'faanjyut', sourceWorkbook: WORKBOOK, sourceSheet: SHEET, sourceColumn: '上古漢', sourceColumnIndex: 126, sourceRow: 7, sourceCell: `${SHEET}!DV7`, segmentIndex: 1, softDeleted: false, editedAfterImport: false },
     createdBy: 'system:faanjyut_import'
   }

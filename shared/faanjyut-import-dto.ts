@@ -136,7 +136,8 @@ export const FaanJyutExternalEtymonDtoSchema = rejectInjectedKeys(z.strictObject
   gloss: z.string().optional(),
   note: z.string().optional(),
   sourceType: z.literal('dictionary'),
-  sourceDetail: z.string().min(1),
+  // 2026-08-06：語言點（從 raw 方括號提取，如 [南昌|]→南昌）；無語言點的域外記錄可省略
+  sourceDetail: z.string().optional(),
   meta: z.strictObject({
     sourceBook: sourceBookSchema,
     sourceWorkbook: z.string().min(1),
