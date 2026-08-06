@@ -18,6 +18,10 @@
       v-if="open"
       class="absolute z-30 mt-1 w-72 max-h-[420px] flex flex-col bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard-lg)]"
     >
+      <!-- 默認列集說明（§6.2）：預設 = 本人可編輯列＋廣州/香港；選擇會記住 -->
+      <div class="px-3 py-1.5 border-b border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] text-[11px] text-gray-400 dark:text-gray-500">
+        預設：可編輯列＋廣州、香港；選擇會記住
+      </div>
       <div class="flex-1 overflow-y-auto p-2">
         <p v-if="loading" class="text-xs text-gray-400 px-2 py-3">列清單載入中…</p>
         <template v-else>

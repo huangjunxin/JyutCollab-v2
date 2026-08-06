@@ -39,6 +39,7 @@
           </template>
         </p>
       </div>
+      <!-- 右側：新建詞條 -->
       <div class="flex items-center gap-2 ml-auto">
         <UButton
           v-if="canCreateLexeme"
@@ -54,6 +55,45 @@
 
     <!-- 篩選欄（§6.1/6.5） -->
     <div class="jc-card p-3 mb-3 flex flex-wrap items-center gap-2">
+      <!-- 圖例入口（§6.3）：hover 彈出完整四態說明，不常駐佔位 -->
+      <UPopover
+        mode="hover"
+        :content="{ side: 'bottom', sideOffset: 6, align: 'start' }"
+        :ui="{ content: 'bg-default text-highlighted shadow-sm rounded-sm ring ring-default px-3 py-2 text-xs' }"
+      >
+        <button
+          type="button"
+          class="h-9 px-3 text-sm border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] bg-white dark:bg-slate-800 text-[var(--jc-body)] dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1.5"
+        >
+          <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4" />
+          圖例
+        </button>
+        <template #content>
+          <div class="space-y-1.5">
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-center leading-5 jc-mono text-[10px]">mai1</span>
+              正常值
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-absent text-center leading-5 text-gray-400 text-[10px] jc-mono">_</span>
+              <span class="jc-mono">_</span>（確定沒有）
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-cleared text-center leading-5 text-gray-400 text-[10px] jc-mono">∅</span>
+              已清空
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-null"></span>
+              空白（從未填寫）
+            </span>
+            <span class="h-px bg-gray-300 dark:bg-gray-600 my-1"></span>
+            <span class="flex items-center gap-1.5">
+              <UIcon name="i-heroicons-lock-closed" class="w-3.5 h-3.5 text-gray-400" />
+              你沒有此列的編輯權限（唯讀可見）
+            </span>
+          </div>
+        </template>
+      </UPopover>
       <FaanjyutSearchSuggest />
       <FaanjyutColumnPicker
         v-model="selectedColumnIds"
@@ -79,18 +119,10 @@
           @click="toggleCellFilter(chip.value)"
         >{{ chip.label }}</button>
       </div>
-      <span v-if="matrixData" class="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+      <span v-if="matrixData" class="ml-auto text-xs text-gray-500 dark:text-gray-400">
         共 <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 條 · 第
         <strong>{{ matrixData.pagination.page }}/{{ matrixData.pagination.totalPages || 1 }}</strong> 頁
       </span>
-    </div>
-
-    <!-- 默認列集說明條（§6.2） -->
-    <div
-      v-if="selectedColumnIds.length === 0"
-      class="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950/40 px-4 py-2.5 mb-3 text-xs text-blue-900 dark:text-blue-200"
-    >
-      預設顯示你可編輯的列＋常用參照（廣州、香港）；列選擇會記住，下次進入保持。
     </div>
 
     <!-- ?q= / ?cell= 定位提示 -->
@@ -101,32 +133,6 @@
       <UIcon name="i-heroicons-map-pin" class="w-4 h-4 shrink-0" />
       <span>{{ locateNote }}</span>
       <button type="button" class="ml-auto underline shrink-0" @click="locateNote = null">關閉</button>
-    </div>
-
-    <!-- 四態圖例（§6.1/6.3） -->
-    <div class="jc-card px-3 py-2 mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--jc-body)] dark:text-gray-300">
-      <span class="font-semibold text-[var(--jc-ink-strong)] dark:text-white">圖例</span>
-      <span class="flex items-center gap-1.5">
-        <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-center leading-5 jc-mono text-[10px]">mai1</span>
-        正常值
-      </span>
-      <span class="flex items-center gap-1.5">
-        <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-absent text-center leading-5 text-gray-400 text-[10px] jc-mono">_</span>
-        <span class="jc-mono">_</span>（確定沒有）
-      </span>
-      <span class="flex items-center gap-1.5">
-        <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-cleared text-center leading-5 text-gray-400 text-[10px] jc-mono">∅</span>
-        已清空
-      </span>
-      <span class="flex items-center gap-1.5">
-        <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-null"></span>
-        空白（從未填寫）
-      </span>
-      <span class="h-4 w-px bg-gray-300 dark:bg-gray-600"></span>
-      <span class="flex items-center gap-1.5">
-        <UIcon name="i-heroicons-lock-closed" class="w-3.5 h-3.5 text-gray-400" />
-        你沒有此列的編輯權限（唯讀可見）
-      </span>
     </div>
 
     <!-- 錯誤態 -->
