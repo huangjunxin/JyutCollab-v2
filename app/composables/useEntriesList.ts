@@ -21,6 +21,7 @@ export function useEntriesList(
   filters: Reactive<{ dialect: string; status: string; theme: string | number; createdBy?: string }>,
   sortBy: Ref<string>,
   sortOrder: Ref<'asc' | 'desc'>,
+  includeFaanjyut: Ref<boolean>,
   entryBaselineById: Ref<Map<string, any>>,
   makeBaselineSnapshot: (entry: Entry) => EntryBaselineSnapshot,
   applyDraftOntoEntry: (target: Entry, draft: Entry) => void
@@ -47,6 +48,7 @@ export function useEntriesList(
       `s:${filters.status || 'all'}`,
       `t:${filters.theme || 'all'}`,
       `c:${filters.createdBy || 'all'}`,
+      `fj:${includeFaanjyut.value ? '1' : '0'}`,
       `sb:${sortBy.value}`,
       `so:${sortOrder.value}`,
       `p:${currentPage.value}`,
@@ -64,6 +66,7 @@ export function useEntriesList(
       `s:${filters.status || 'all'}`,
       `t:${filters.theme || 'all'}`,
       `c:${filters.createdBy || 'all'}`,
+      `fj:${includeFaanjyut.value ? '1' : '0'}`,
       `sb:${sortBy.value}`,
       `so:${sortOrder.value}`
     ]
@@ -83,6 +86,7 @@ export function useEntriesList(
     if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
     if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
     if (filters.createdBy) query.createdBy = filters.createdBy
+    if (includeFaanjyut.value) query.includeFaanjyut = true
 
     if (viewMode.value === 'aggregated') query.groupBy = 'headword'
     if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'
@@ -117,6 +121,7 @@ export function useEntriesList(
         if (filters.status && filters.status !== ALL_FILTER_VALUE) query.status = filters.status
         if (filters.theme && filters.theme !== ALL_FILTER_VALUE) query.themeIdL3 = Number(filters.theme)
         if (filters.createdBy) query.createdBy = filters.createdBy
+        if (includeFaanjyut.value) query.includeFaanjyut = true
 
         if (viewMode.value === 'aggregated') query.groupBy = 'headword'
         if (viewMode.value === 'lexeme') query.groupBy = 'lexeme'

@@ -27,7 +27,8 @@ const QuerySchema = z.object({
   register: z.enum(['口語', '書面', '粗俗', '文雅', '中性']).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'viewCount', 'likeCount', 'headword']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
-  groupBy: z.enum(['headword', 'lexeme']).optional() // 聚合視圖：按詞形/按詞語(lexeme)分組
+  groupBy: z.enum(['headword', 'lexeme']).optional(), // 聚合視圖：按詞形/按詞語(lexeme)分組
+  includeFaanjyut: z.coerce.boolean().optional() // 2026-08-06：缺省/false 時排除泛粵字表詞條（§9）
 })
 
 export default defineEventHandler(async (event) => {
@@ -69,7 +70,8 @@ export default defineEventHandler(async (event) => {
       register,
       sortBy,
       sortOrder,
-      groupBy
+      groupBy,
+      includeFaanjyut
     } = validated.data
 
     // Build filter
@@ -165,6 +167,9 @@ export default defineEventHandler(async (event) => {
 
     // 語域篩選
     if (register) filter['meta.register'] = register
+
+    // 泛粵字表詞條默認排除（§9：8 萬條導入詞條會淹沒平台原生列表；勾選「顯示泛粵字表詞條」才包含）
+    if (!includeFaanjyut) filter.sourceBook = { $ne: 'faanjyut' }
 
     const isReviewerOrAdmin = viewer?.role === 'admin' || viewer?.role === 'reviewer'
     const visibilityFilter: Record<string, any> = isReviewerOrAdmin

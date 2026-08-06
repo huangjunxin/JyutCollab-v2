@@ -96,6 +96,7 @@
         <EntriesAdvancedFilterPanel
           v-model:expanded="advancedFilters.advancedFilterExpanded.value"
           v-model:formula-input="advancedFilters.formulaInput.value"
+          v-model:include-faanjyut="includeFaanjyut"
           teleport-to="#entries-advanced-filter-host"
           :regex-rows="advancedFilters.regexRows.value"
           :regex-row-errors="advancedFilters.advancedFilterErrors.regexRows"
@@ -892,7 +893,15 @@ const savingEntryKeys = ref<Set<string>>(new Set())
 const isAnyEntrySaving = computed(() => savingEntryKeys.value.size > 0)
 const sortBy = ref('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
-const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentPage, pagination, fetchEntries, fetchAllEntries, handleSearch, handleSort, invalidateCache } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
+/** 2026-08-06：顯示泛粵字表詞條（默認 false——導入詞條默認排除，§9）；進階篩選面板開關 */
+const includeFaanjyut = ref(false)
+const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentPage, pagination, fetchEntries, fetchAllEntries, handleSearch, handleSort, invalidateCache } = useEntriesList(viewMode, searchQuery, filters, sortBy, sortOrder, includeFaanjyut, entryBaselineById, makeBaselineSnapshot, applyDraftOntoEntry)
+
+// 開關變化 → 失效緩存並重取（含 all 模式）
+watch(includeFaanjyut, () => {
+  invalidateCache()
+  void fetchEntries()
+})
 
 // Handle URL parameters - will be processed in onMounted before fetchEntries
 const route = useRoute()

@@ -38,6 +38,7 @@ import type { AdvancedFilterRegexRowState, AdvancedFilterRegexConditionPayload }
 const emit = defineEmits<{
   'update:expanded': [value: boolean]
   'update:formulaInput': [value: string]
+  'update:includeFaanjyut': [value: boolean]
   'add-regex-row': []
   'remove-regex-row': [id: string]
   'update-regex-row': [id: string, patch: Partial<AdvancedFilterRegexConditionPayload>]
@@ -57,6 +58,8 @@ const props = defineProps<{
   hasActiveAdvancedFilters: boolean
   visibleCount: number
   loadedCount: number
+  /** 2026-08-06：顯示泛粵字表詞條（默認 false——8 萬條導入詞條默認排除，§9） */
+  includeFaanjyut: boolean
 }>()
 
 const regexFieldOptions = computed(() => [
@@ -79,11 +82,21 @@ const panelBody = computed(() => ({
     const UInput = resolveComponent('UInput')
     const USelectMenu = resolveComponent('USelectMenu')
     const UButton = resolveComponent('UButton')
+    const USwitch = resolveComponent('USwitch')
 
     return h('div', {
       id: 'entries-advanced-filter-panel',
       class: 'w-full flex flex-col gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 p-3 mt-2 mb-4'
     }, [
+      // 泛粵字表詞條開關（§9）：默認排除，勾選才顯示
+      h('div', { class: 'flex items-center justify-between gap-2' }, [
+        h('span', { class: 'text-xs text-gray-700 dark:text-gray-200' }, '顯示泛粵字表詞條'),
+        h(USwitch, {
+          modelValue: props.includeFaanjyut,
+          size: 'md',
+          'onUpdate:modelValue': (value: unknown) => emit('update:includeFaanjyut', value === true)
+        })
+      ]),
       h('div', { class: 'flex flex-col gap-1' }, [
         h('label', {
           for: 'advanced-formula-input',
