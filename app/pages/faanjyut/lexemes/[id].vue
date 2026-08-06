@@ -17,7 +17,7 @@ definePageMeta({
 const SYSTEM_IMPORT_USER = 'system:faanjyut_import'
 
 const route = useRoute()
-const { data, loading, errorMessage, fetchLexeme } = useFaanjyutLexemeDetail()
+const { data, loading, errorMessage, writeEnabled, canEditComposite, fetchLexeme } = useFaanjyutLexemeDetail()
 
 const lexemeId = computed(() => String(route.params.id ?? ''))
 
@@ -51,6 +51,81 @@ const compositePronunciation = computed(() => header.value?.compositePronunciati
 const hasMarkers = computed(() =>
   Boolean(compositePronunciation.value?.markers?.hasBang || compositePronunciation.value?.markers?.hasQuestion)
 )
+
+// ---- 綜合音編輯（2026-08-06 方案 A：admin 可改，即改即存 + 撤銷 toast） ----
+
+const compositeEditing = ref(false)
+const compositeSaving = ref(false)
+const compositeDraft = ref('')
+const compositeError = ref<string | null>(null)
+
+function beginCompositeEdit() {
+  compositeDraft.value = compositePronunciation.value?.raw ?? ''
+  compositeError.value = null
+  compositeEditing.value = true
+}
+
+function cancelCompositeEdit() {
+  compositeEditing.value = false
+  compositeError.value = null
+}
+
+async function saveCompositeEdit() {
+  if (!data.value || compositeSaving.value) return
+  const lexeme = data.value.header
+  const before = lexeme.compositePronunciation ?? null
+  const raw = compositeDraft.value
+  compositeSaving.value = true
+  compositeError.value = null
+  try {
+    const response = await $fetch<{ success: boolean; changed: boolean; data: { composite: any } }>(
+      `/api/faanjyut/lexemes/${encodeURIComponent(lexeme.id)}/composite`,
+      { method: 'PUT', body: { raw } }
+    )
+    lexeme.compositePronunciation = response.data.composite ?? undefined
+    compositeEditing.value = false
+    if (response.changed) {
+      const toast = useToast()
+      toast.add({
+        title: '已儲存',
+        description: `綜合音原值：${before?.raw ?? '（無）'}`,
+        duration: 5000,
+        actions: [
+          {
+            label: '撤銷',
+            onClick: () => {
+              void restoreComposite(before?.raw ?? '')
+            }
+          }
+        ]
+      })
+    }
+  } catch (error: any) {
+    compositeError.value = error?.data?.message || error?.message || '儲存失敗'
+  } finally {
+    compositeSaving.value = false
+  }
+}
+
+/** 撤銷：把綜合音恢復為編輯前原值（正常 PUT 寫入，同格編輯撤銷語義） */
+async function restoreComposite(raw: string) {
+  if (!data.value) return
+  const lexeme = data.value.header
+  try {
+    const response = await $fetch<{ success: boolean; data: { composite: any } }>(
+      `/api/faanjyut/lexemes/${encodeURIComponent(lexeme.id)}/composite`,
+      { method: 'PUT', body: { raw } }
+    )
+    lexeme.compositePronunciation = response.data.composite ?? undefined
+  } catch (error: any) {
+    const toast = useToast()
+    toast.add({
+      title: '撤銷失敗',
+      description: error?.data?.message || error?.message || '未知錯誤',
+      color: 'error'
+    })
+  }
+}
 
 // ---- 區塊 2：各方言點方音（僅域內列；域外列歸區塊 3） ----
 
@@ -170,19 +245,59 @@ function authorInitial(author: string | null | undefined): string {
               </div>
               <!-- 綜合音 -->
               <div>
-                <div class="text-xs font-semibold text-[var(--jc-muted)] mb-1">綜合音</div>
-                <div v-if="compositePronunciation" class="flex items-baseline gap-2 flex-wrap">
-                  <span class="jc-mono text-blue-600 dark:text-blue-400 font-semibold text-lg">
-                    {{ compositePronunciation.display || compositePronunciation.raw || '—' }}
-                  </span>
-                  <span
-                    v-if="compositePronunciation.raw && compositePronunciation.raw !== compositePronunciation.display"
-                    class="text-xs text-[var(--jc-muted)]"
-                  >
-                    （原文：<code class="jc-mono">{{ compositePronunciation.raw }}</code>）
-                  </span>
+                <div class="flex items-center gap-2">
+                  <div class="text-xs font-semibold text-[var(--jc-muted)] mb-1">綜合音</div>
+                  <UButton
+                    v-if="canEditComposite && !compositeEditing"
+                    size="2xs"
+                    color="gray"
+                    variant="ghost"
+                    icon="i-heroicons-pencil-square"
+                    aria-label="編輯綜合音"
+                    class="-mt-1"
+                    @click="beginCompositeEdit"
+                  />
                 </div>
-                <span v-else class="text-sm text-[var(--jc-muted)]">—</span>
+                <template v-if="compositeEditing">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <UInput
+                      v-model="compositeDraft"
+                      size="sm"
+                      class="w-40 jc-mono"
+                      placeholder="綜合音（可含 ! ?）"
+                      :disabled="compositeSaving"
+                      @keydown.enter="saveCompositeEdit"
+                      @keydown.esc="cancelCompositeEdit"
+                    />
+                    <UButton
+                      size="xs"
+                      color="primary"
+                      :loading="compositeSaving"
+                      :disabled="compositeSaving"
+                      @click="saveCompositeEdit"
+                    >
+                      儲存
+                    </UButton>
+                    <UButton size="xs" color="gray" variant="ghost" :disabled="compositeSaving" @click="cancelCompositeEdit">
+                      取消
+                    </UButton>
+                  </div>
+                  <p v-if="compositeError" class="text-xs text-red-500 mt-1">{{ compositeError }}</p>
+                </template>
+                <template v-else>
+                  <div v-if="compositePronunciation" class="flex items-baseline gap-2 flex-wrap">
+                    <span class="jc-mono text-blue-600 dark:text-blue-400 font-semibold text-lg">
+                      {{ compositePronunciation.display || compositePronunciation.raw || '—' }}
+                    </span>
+                    <span
+                      v-if="compositePronunciation.raw && compositePronunciation.raw !== compositePronunciation.display"
+                      class="text-xs text-[var(--jc-muted)]"
+                    >
+                      （原文：<code class="jc-mono">{{ compositePronunciation.raw }}</code>）
+                    </span>
+                  </div>
+                  <span v-else class="text-sm text-[var(--jc-muted)]">—</span>
+                </template>
               </div>
               <!-- 標記 -->
               <div>

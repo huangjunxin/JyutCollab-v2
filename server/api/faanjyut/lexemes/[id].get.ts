@@ -6,6 +6,7 @@
  * 批注/歷史查詢先依本詞條的 cell/etymon/entry id 集合收窄，純函數內再做歸屬過濾（自洽可測）。
  */
 import { assembleLexemeDetail } from '../../../utils/faanjyut/lexeme-detail'
+import { checkWriteFlag } from '../../../utils/faanjyut/cells'
 import { Lexeme } from '../../../utils/Lexeme'
 import { Entry } from '../../../utils/Entry'
 import { ExternalEtymon } from '../../../utils/ExternalEtymon'
@@ -111,7 +112,12 @@ export default defineEventHandler(async (event) => {
       histories
     })
 
-    return { success: true, data }
+    // 2026-08-06 方案 A：詳情頁綜合音編輯權限（admin && 寫入 flag），與 cells 同源判定
+    const config = useRuntimeConfig(event)
+    const writeEnabled = !checkWriteFlag(config)
+    const canEditComposite = writeEnabled && event.context.auth?.role === 'admin'
+
+    return { success: true, data, writeEnabled, canEditComposite }
   } catch (error: any) {
     console.error('Get faanjyut lexeme detail error:', error?.message ?? error)
     if (error?.statusCode) throw error
