@@ -77,3 +77,35 @@ export function faanJyutDisplayValue(value: unknown): string {
   const text = String(value)
   return text.length === 0 ? '—' : text
 }
+
+/**
+ * 矩陣行頭「釋義」列的簡要展示（2026-08-06）：
+ * 規則（與 ETL DefinitionSimplifier 同款思路，逐層去除）：
+ *   1. 去 `{n}` 義項編號
+ *   2. 去『』例句、〔〕/[ ] 構詞標記
+ *   3. 取 `$` 義項分隔前的第一義項
+ *   4. 去「：」/「；」後含 ～ 的例詞段（如「：老～｜阿～」）
+ *   5. 去「：」/「；」後純｜串的空例詞佔位（如「：｜｜」「： ｜」，源表例詞留空用｜佔位）
+ *   6. 去「：」/「；」後的括號例詞/例句段（如「：(剮破了衣袖)｜(被釘子劃破了手)」）
+ *   7. 清理殘留分隔標點、收縮空白
+ * 截斷由 CSS（line-clamp）處理，hover 全文由調用方掛 title。
+ */
+export function simplifyDefinitionForMatrix(raw: string | null | undefined): string {
+  if (!raw) return ''
+  let text = raw
+    .replace(/\{\d+\}/g, '')
+    .replace(/『[^』]*』/g, '')
+    .replace(/〔[^〕]*〕/g, '')
+    .replace(/\[[^\]]*\]/g, '')
+  text = text.split('$')[0] ?? text
+  text = text.replace(/[：；][^：；]*～[^：；]*/g, '')
+  text = text.replace(/[：；]\s*｜+/g, '；')
+  text = text.replace(/：[^：；]*(?:（[^）]*）|\([^)]*\))[^：；]*/g, '；')
+  text = text.replace(/；(?:（[^）]*）|\([^)]*\))(?:｜(?:（[^）]*）|\([^)]*\)))*/g, '；')
+  return text
+    .replace(/：；/g, '；')
+    .replace(/；+/g, '；')
+    .replace(/[：；、，,]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}

@@ -32,6 +32,8 @@ export interface FaanjyutMatrixRow {
   id: string
   sourceKey?: string
   representativeChar?: { raw?: string; display?: string; warnings?: string[] }
+  /** 2026-08-06 行頭「釋義」列數據源 */
+  definitionRaw?: string
   compositePronunciation?: {
     raw?: string
     display?: string

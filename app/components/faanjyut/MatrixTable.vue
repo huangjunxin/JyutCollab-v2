@@ -11,9 +11,10 @@
   >
     <table class="fj-matrix">
       <colgroup>
-        <col style="width: 150px">
-        <col style="width: 64px">
-        <col style="width: 96px">
+        <!-- 行頭三列（2026-08-06：釋義 200px | 代表字 72px | 綜合音 120px） -->
+        <col style="width: 200px">
+        <col style="width: 72px">
+        <col style="width: 120px">
         <col v-for="col in columns" :key="col.id" style="width: 140px">
       </colgroup>
       <thead>
@@ -30,13 +31,16 @@
             {{ run.label }}
           </th>
         </tr>
-        <!-- 列頭行 -->
+        <!-- 列頭行（2026-08-06 三列重排：釋義 | 代表字 | 綜合音） -->
         <tr>
           <th class="fj-sk1 px-3 py-2 text-left">
-            鍵
+            釋義
+            <span class="block text-[9px] font-normal text-gray-400 mt-0.5">簡要</span>
+          </th>
+          <th class="fj-sk2 px-2 py-2 text-center">
+            代表字
             <span class="block text-[9px] font-normal text-gray-400 mt-0.5">點擊前往詞條詳情</span>
           </th>
-          <th class="fj-sk2 px-2 py-2 text-center">代表字</th>
           <th class="fj-sk3 px-2 py-2 text-center">綜合音</th>
           <th
             v-for="col in columns"
@@ -83,13 +87,26 @@
           :class="{ 'fj-row-highlight': row.id === highlightLexemeId }"
         >
           <td class="fj-sk1 px-3 py-2">
-            <NuxtLink
-              :to="`/faanjyut/lexemes/${row.id}`"
-              class="jc-mono text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
-            >{{ row.sourceKey || row.id }}</NuxtLink>
+            <UTooltip
+              v-if="row.definitionRaw"
+              :ui="{ content: 'max-w-md' }"
+              :popper="{ placement: 'right-start' }"
+            >
+              <template #content>
+                <div class="max-w-md whitespace-pre-line break-words text-xs">{{ row.definitionRaw }}</div>
+              </template>
+              <span class="block text-xs text-gray-600 dark:text-gray-300 line-clamp-2 break-all leading-snug">
+                {{ rowDefinition(row) }}
+              </span>
+            </UTooltip>
+            <span v-else class="block text-xs text-gray-400">—</span>
           </td>
           <td class="fj-sk2 px-2 py-2 text-center jc-headword-rare-font text-xl font-bold text-[var(--jc-ink-strong)] dark:text-white">
-            {{ row.representativeChar?.display || row.representativeChar?.raw || '—' }}
+            <NuxtLink
+              :to="`/faanjyut/lexemes/${row.id}`"
+              :title="row.sourceKey ? `詞條鍵：${row.sourceKey}` : undefined"
+              class="hover:underline"
+            >{{ row.representativeChar?.display || row.representativeChar?.raw || '—' }}</NuxtLink>
           </td>
           <td class="fj-sk3 px-2 py-2 text-center">
             <span class="jc-mono text-blue-600 dark:text-blue-400 font-semibold text-sm break-all">
@@ -139,6 +156,7 @@
 <script setup lang="ts">
 import type { FaanjyutMatrixColumn, FaanjyutMatrixRow } from '~/composables/useFaanjyutMatrix'
 import type { FaanjyutCellEditController } from '~/composables/useFaanjyutCellEdit'
+import { simplifyDefinitionForMatrix } from '~/utils/faanjyutFormat'
 
 const props = withDefaults(defineProps<{
   columns: FaanjyutMatrixColumn[]
@@ -162,6 +180,11 @@ const props = withDefaults(defineProps<{
 const wrapRef = ref<HTMLElement | null>(null)
 
 /* ---------------- P4 編輯渲染 ---------------- */
+
+/** 行頭「釋義」列：簡化後文本（去 {n} 義項標記 + 收縮空白）；無值返回空串 */
+function rowDefinition(row: FaanjyutMatrixRow): string {
+  return simplifyDefinitionForMatrix(row.definitionRaw)
+}
 
 /** 權限門只看服務端下發的 col.canEdit（§14.3 前端不自行放行），再疊加全局寫入旗標 */
 function isEditableCell(col: FaanjyutMatrixColumn): boolean {
@@ -289,8 +312,8 @@ watch(
 .fj-matrix thead tr:first-child th { top: 0; height: 28px; }
 .fj-matrix thead tr:nth-child(2) th { top: 28px; vertical-align: top; }
 .fj-matrix .fj-sk1 { position: sticky; left: 0; z-index: 8; background: #fff; }
-.fj-matrix .fj-sk2 { position: sticky; left: 150px; z-index: 8; background: #fff; }
-.fj-matrix .fj-sk3 { position: sticky; left: 214px; z-index: 8; background: #fff; }
+.fj-matrix .fj-sk2 { position: sticky; left: 200px; z-index: 8; background: #fff; }
+.fj-matrix .fj-sk3 { position: sticky; left: 272px; z-index: 8; background: #fff; }
 .fj-matrix thead .fj-sk1, .fj-matrix thead .fj-sk2, .fj-matrix thead .fj-sk3 { z-index: 14; background: #FAFAF6; }
 /* 列頭 tint（style.color 弱化），疊在不透明底上 */
 .fj-matrix thead tr:nth-child(2) th[style*="--fj-col-tint"] {

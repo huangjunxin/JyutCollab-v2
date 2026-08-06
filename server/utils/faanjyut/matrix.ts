@@ -95,6 +95,7 @@ export interface MatrixLexemeDoc {
       display?: string
       markers?: { hasQuestion?: boolean; hasBang?: boolean }
     }
+    definitionRaw?: string
   }
   status?: { publicationStatus?: string }
 }
@@ -108,6 +109,8 @@ export interface MatrixRow {
     display?: string
     markers?: { hasQuestion?: boolean; hasBang?: boolean }
   }
+  /** 2026-08-06 行頭「釋義」列：完整釋義原文（前端簡化截斷展示） */
+  definitionRaw?: string
   matrixOrder?: number
   publicationStatus?: string
   cells: Record<string, MatrixCellView>
@@ -265,6 +268,7 @@ export function pivotMatrix(args: {
       sourceKey: lex.meta?.sourceKey,
       representativeChar: lex.meta?.representativeChar,
       compositePronunciation: lex.meta?.compositePronunciation,
+      definitionRaw: lex.meta?.definitionRaw,
       matrixOrder: lex.meta?.matrixOrder,
       publicationStatus: lex.status?.publicationStatus,
       cells: cellViews
