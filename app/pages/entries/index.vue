@@ -660,6 +660,7 @@ import { useEntriesTableEdit } from '~/composables/useEntriesTableEdit'
 import { useEntriesAISuggestions } from '~/composables/useEntriesAISuggestions'
 import { useEntriesRowHints } from '~/composables/useEntriesRowHints'
 import type { DialectId } from '~shared/dialects'
+import { isFaanJyutEntry } from '~shared/faanjyut'
 import { saveEntriesToLocalStorage, restoreEntriesFromLocalStorage, clearEntriesLocalStorage, removeEntryFromLocalStorage } from '~/composables/useEntriesLocalStorage'
 import type { Entry, Register } from '~/types'
 import type { AdvancedFilterFieldKey } from '~/utils/entriesAdvancedFilter'
@@ -896,7 +897,6 @@ const { entries, aggregatedGroups, lexemeGroups, loading, isAllFetched, currentP
 // Handle URL parameters - will be processed in onMounted before fetchEntries
 const route = useRoute()
 const toast = useToast()
-
 /** API 僅支援以下欄位排序 */
 
 // Inline editing state
@@ -1140,13 +1140,14 @@ function findNextEntryTableRow(startIndex: number, direction: -1 | 1): number {
   let nextIndex = startIndex
   while (nextIndex + direction >= 0 && nextIndex + direction < tableRows.value.length) {
     nextIndex += direction
-    if (tableRows.value[nextIndex]?.type === 'entry') return nextIndex
+    // 泛粵詞條整行只讀（§9）：方向鍵導航跳過
+    if (tableRows.value[nextIndex]?.type === 'entry' && !isFaanJyutEntry(tableRows.value[nextIndex].entry)) return nextIndex
   }
   return startIndex
 }
 
 function findFirstEntryTableRow(): number {
-  return tableRows.value.findIndex(row => row.type === 'entry')
+  return tableRows.value.findIndex(row => row.type === 'entry' && !isFaanJyutEntry(row.entry))
 }
 const ruleOverlays = useEntriesRuleOverlays({
   visibleEntries: visibleRuleOverlayEntries,
@@ -1894,6 +1895,19 @@ function handleCellClick(entry: Entry, field: string, event: MouseEvent | Keyboa
     saveCellEdit({ focusWrapper: false })
   }
 
+  // 泛粵字表詞條在普通表格整行只讀（設計 §9）：不進入編輯、不佔焦點，引導去泛粵模組。
+  // 服務端 409 早已兜底（entries PUT/DELETE/submit/lexeme.patch 等），此處是前端體驗閘——
+  // 此前缺失導致「能點進編輯框、保存才報錯」。
+  if (isFaanJyutEntry(entry)) {
+    toast.add({
+      title: '泛粵字表數據',
+      description: '請前往泛粵模組編輯',
+      color: 'neutral',
+      duration: 3000
+    })
+    return
+  }
+
   // 始終更新焦點格
   focusedCell.value = { rowIndex: r, colIndex: c }
 
@@ -2127,14 +2141,15 @@ function moveToNextCell(entry: Entry, currentField: string, direction: number): 
   }
   const rows = tableRows.value
   if (nextRow < 0 || nextRow >= rows.length) return false
-  // 跳過聚合視圖下的組標題行，只停在可編輯的 entry 行
+  // 跳過聚合視圖下的組標題行與泛粵只讀行（§9），只停在可編輯的 entry 行
   let row = rows[nextRow]
-  if (row?.type === 'group') {
-    nextRow += direction > 0 ? 1 : -1
-    while (nextRow >= 0 && nextRow < rows.length && rows[nextRow]?.type !== 'entry') nextRow += direction > 0 ? 1 : -1
-    if (nextRow < 0 || nextRow >= rows.length) return false
-    row = rows[nextRow]
+  while (nextRow >= 0 && nextRow < rows.length) {
+    const candidate = rows[nextRow]
+    if (candidate?.type === 'entry' && !isFaanJyutEntry(candidate.entry)) break
+    nextRow += direction
   }
+  if (nextRow < 0 || nextRow >= rows.length) return false
+  row = rows[nextRow]
   const nextEntry = row?.type === 'entry' ? row.entry : null
   const nextColDef = editableColumns.value[nextCol]
   if (!nextEntry || !nextColDef) return false

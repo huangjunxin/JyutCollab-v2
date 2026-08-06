@@ -237,6 +237,7 @@
             <EntryRowActions
               :entry="row.entry"
               :can-edit="canEditEntry(row.entry)"
+              :read-only="isFaanJyutEntry(row.entry)"
               :show-lexeme-actions="viewMode === 'lexeme' && canEditExternalEtymons"
               :is-morpheme-refs-expanded="expandedMorphemeRefsEntryId === getEntryIdString(row.entry)"
               :is-saving="isEntrySaving(row.entry)"

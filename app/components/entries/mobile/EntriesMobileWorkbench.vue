@@ -358,6 +358,7 @@
 
 <script setup lang="ts">
 import type { Entry } from '~/types'
+import { isFaanJyutEntry } from '~shared/faanjyut'
 import type { SavedViewRecord } from '~/composables/useEntriesSavedViews'
 import { DialogDescription, DialogTitle } from 'reka-ui'
 import { ALL_FILTER_VALUE } from '~/utils/entriesTableConstants'
@@ -811,6 +812,11 @@ function toggleGroup(headwordNormalized: string) {
 }
 
 function handleRowClick(entry: Entry) {
+  // 泛粵字表詞條在普通表格整行只讀（§9）：不打開編輯器（保存會被服務端 409）
+  if (isFaanJyutEntry(entry)) {
+    emit('row-click', entry)
+    return
+  }
   openRowEditor(entry)
   emit('row-click', entry)
 }

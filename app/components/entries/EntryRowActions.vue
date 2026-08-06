@@ -37,7 +37,7 @@
         @click.stop="$emit('duplicate')"
       />
       <UButton
-        v-if="canEdit && !entry._isNew"
+        v-if="canEdit && !readOnly && !entry._isNew"
         color="error"
         variant="ghost"
         size="xs"
@@ -48,7 +48,7 @@
       />
       <!-- 詞語組相關：拆出、加入組、展開詞素引用 -->
       <UButton
-        v-if="canEdit && showLexemeActions && !entry._isNew"
+        v-if="canEdit && !readOnly && showLexemeActions && !entry._isNew"
         color="primary"
         variant="ghost"
         size="xs"
@@ -58,7 +58,7 @@
         @click.stop="$emit('make-new-lexeme')"
       />
       <UButton
-        v-if="canEdit && showLexemeActions && !entry._isNew"
+        v-if="canEdit && !readOnly && showLexemeActions && !entry._isNew"
         color="primary"
         variant="ghost"
         size="xs"
@@ -68,7 +68,7 @@
         @click.stop="$emit('join-lexeme')"
       />
       <UButton
-        v-if="canEdit"
+        v-if="canEdit && !readOnly"
         color="primary"
         variant="ghost"
         size="xs"
@@ -88,6 +88,8 @@ defineProps<{
   entry: Entry
   /** 是否可編輯此詞條（貢獻者僅自己創建的可編輯；審核員/管理員任意） */
   canEdit: boolean
+  /** 泛粵字表詞條（§9 整行只讀）：隱藏刪除/拆出/加入組等寫類操作；複製保留（不改泛粵數據） */
+  readOnly?: boolean
   /** 是否顯示詞語層相關操作（僅在「按詞語聚合」視圖顯示） */
   showLexemeActions?: boolean
   /** 詞素引用是否已展開 */
