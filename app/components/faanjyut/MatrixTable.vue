@@ -39,7 +39,7 @@
           </th>
           <th class="fj-sk2 px-2 py-2 text-center">
             代表字
-            <span class="block text-[9px] font-normal text-gray-400 mt-0.5">點擊前往詞條詳情</span>
+            <span class="block text-[9px] font-normal text-gray-400 mt-0.5">點擊看詳情</span>
           </th>
           <th class="fj-sk3 px-2 py-2 text-center">綜合音</th>
           <th
