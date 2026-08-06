@@ -317,6 +317,19 @@ export function assembleLexemeDetail(input: AssembleLexemeDetailInput): LexemeDe
         (cell?.projection?.entryId ? entryById.get(cell.projection.entryId) : undefined) ??
         null
     }
+    const cellView = cellViewForCellState(cell)
+    // 2026-08-07：與矩陣 pivot 一致——domestic 正常值回退 Entry（導入正常格無 cell_state，
+    // 值在 entry.phonetic.original；有 hasOldNote 的 cell_state 無 raw 同樣回退，用戶實測）
+    const entryOriginal = entry
+      ? String((entry.phonetic as { original?: unknown } | null | undefined)?.original ?? '')
+      : ''
+    const cellNeedsEntryFallback =
+      column.sourceRole === 'domestic' && entryOriginal !== '' &&
+      (cellView.state === 'null' || (cellView.state === 'normal' && !cellView.raw))
+    const effectiveCell: CellView =
+      cellNeedsEntryFallback
+        ? { state: 'normal', raw: entryOriginal }
+        : cellView
     return {
       columnId: column.id,
       label: column.label,
@@ -326,7 +339,7 @@ export function assembleLexemeDetail(input: AssembleLexemeDetailInput): LexemeDe
       sourceRole: column.sourceRole ?? null,
       originalOrder: column.order?.originalOrder ?? null,
       style: column.style ?? null,
-      cell: cellViewForCellState(cell),
+      cell: effectiveCell,
       entry: entry
         ? {
             entryId: entry.id,
