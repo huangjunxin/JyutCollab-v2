@@ -102,6 +102,8 @@ function switchText(flag: boolean): string {
 
 <template>
   <div class="mx-auto max-w-[1400px] p-4 sm:p-6">
+    <!-- 模塊內子導航（矩陣/導入報告/導出三頁互通） -->
+    <FaanjyutModuleNav />
     <!-- ============ 頁頭 ============ -->
     <div class="flex flex-wrap items-start gap-4 mb-4">
       <div class="flex items-start gap-3 flex-1 min-w-[300px]">
@@ -116,13 +118,6 @@ function switchText(flag: boolean): string {
           </p>
         </div>
       </div>
-      <NuxtLink
-        to="/faanjyut"
-        class="inline-flex items-center gap-1.5 px-4 h-9 text-sm border border-[var(--jc-border)] bg-white dark:bg-[var(--jc-dark-surface)] text-[var(--jc-body)] dark:text-slate-300 hover:bg-black/5 dark:hover:bg-black/20 shadow-[var(--jc-shadow-hard)]"
-      >
-        <UIcon name="i-heroicons-arrow-left" class="w-4 h-4" />
-        返回矩陣
-      </NuxtLink>
     </div>
 
     <!-- 說明條 -->

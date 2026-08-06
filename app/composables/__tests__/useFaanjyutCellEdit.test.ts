@@ -103,6 +103,9 @@ describe('isNoopEdit（值未變不發請求）', () => {
     expect(isNoopEdit({ state: 'absent' }, { op: 'absent', raw: '_' })).toBe(true)
     expect(isNoopEdit({ state: 'absent' }, { op: 'set', raw: 'mou5' })).toBe(false)
     expect(isNoopEdit({ state: 'cleared', raw: 'mi3' }, { op: 'clear' })).toBe(true)
+    // 點開「從未填寫」空格再離開（編輯框空 → clear）不應寫出 cleared 態（2026-08-06 用戶反饋）
+    expect(isNoopEdit(undefined, { op: 'clear' })).toBe(true)
+    expect(isNoopEdit({ state: 'null' }, { op: 'clear' })).toBe(true)
     expect(isNoopEdit(undefined, { op: 'set', raw: 'mou5' })).toBe(false)
     expect(isNoopEdit(normalMai1, { op: 'clear' })).toBe(false)
   })

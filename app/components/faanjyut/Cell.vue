@@ -1,6 +1,7 @@
 <template>
   <!-- 格四態（FaanjyutV1Design §6.3）：normal=白底 raw；absent=淺藍灰底灰色 `_`；
-       cleared=淡黃底+刪除線；null=空白。
+       cleared=淡黃底 `∅`（2026-08-06 起；原「空格+刪除線」與下劃線難分辨，見 §6.4 反饋）；
+       null=空白。
        P4 加三種格級狀態：pending=保存中 spinner；error=失敗標紅 + tooltip（點擊重試，
        重進編輯由 MatrixTable @edit 觸發）；editable=本人權限列可點擊進入編輯。 -->
   <td
@@ -21,7 +22,9 @@
         <span class="jc-mono text-gray-400">_</span>
       </template>
       <template v-else-if="cell?.state === 'cleared'">
-        <span class="jc-mono text-gray-400 line-through break-all">{{ cell.raw || '　' }}</span>
+        <!-- 已清空格：原表导入不存在 cleared（平台生成态），clear 时服务端已卸载 raw，
+             统一显示 ∅（2026-08-06 用户反馈：旧「空格+删除线」与下划线难分辨） -->
+        <span class="jc-mono text-gray-400">∅</span>
       </template>
     </template>
   </td>

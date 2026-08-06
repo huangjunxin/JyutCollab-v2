@@ -1,5 +1,7 @@
 <template>
   <div class="max-w-[1400px] mx-auto p-4 sm:p-6">
+    <!-- 模塊內子導航（導入報告/導出收進泛粵模塊，見 AppHeader 註釋） -->
+    <FaanjyutModuleNav />
     <!-- 頁頭（§6.1） -->
     <div class="flex flex-wrap items-start gap-4 mb-4">
       <div
@@ -112,7 +114,7 @@
         <span class="jc-mono">_</span>（確定沒有）
       </span>
       <span class="flex items-center gap-1.5">
-        <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-cleared text-center leading-5 text-gray-400 text-[10px] line-through jc-mono">mi3</span>
+        <span class="inline-block w-10 h-5 border border-gray-300 dark:border-gray-600 fj-legend-cleared text-center leading-5 text-gray-400 text-[10px] jc-mono">∅</span>
         已清空
       </span>
       <span class="flex items-center gap-1.5">

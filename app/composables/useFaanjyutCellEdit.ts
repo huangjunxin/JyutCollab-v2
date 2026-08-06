@@ -86,7 +86,9 @@ export function isNoopEdit(prev: FaanjyutMatrixCell | undefined, edit: { op: Faa
   const state = prev?.state ?? 'null'
   if (edit.op === 'set') return state === 'normal' && prev!.raw === edit.raw
   if (edit.op === 'absent') return state === 'absent'
-  if (edit.op === 'clear') return state === 'cleared'
+  // clear 對「從未填寫（null）」也是 no-op：點開空格再離開（編輯框為空 → clear）不應
+  // 無中生有地寫出 cleared 態（用戶實測反饋：黃底橫線「已清空」很突兀，見 §6.4）
+  if (edit.op === 'clear') return state === 'cleared' || state === 'null'
   return false
 }
 

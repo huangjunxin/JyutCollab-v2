@@ -47,7 +47,7 @@ function cellStateTitle(cell: FaanJyutCellView): string {
       <span class="text-gray-400 dark:text-slate-400 font-semibold">_</span>
     </template>
     <template v-else-if="cell.state === 'cleared'">
-      <span class="text-gray-400 dark:text-slate-400 font-semibold line-through">—</span>
+      <span class="text-gray-400 dark:text-slate-400 font-semibold">∅</span>
     </template>
     <template v-else>
       <span class="text-gray-300 dark:text-slate-600">·</span>
