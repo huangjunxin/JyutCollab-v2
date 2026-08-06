@@ -234,6 +234,10 @@ export interface LexemeDetailData {
     threadedPlaceholder: boolean
     originalTimestamp: string | null
     sourceCell: string | null
+    /** 2026-08-07：源表列名（批注坐标可读化，如 CU4216 → 融列） */
+    sourceColumn: string | null
+    /** 2026-08-07：批注所在格的值（entry phonetic.original / cell_state.raw / _ / ∅），无则 null */
+    cellValue: string | null
   }>
   editHistory: Array<{
     id: string
@@ -389,6 +393,24 @@ export function assembleLexemeDetail(input: AssembleLexemeDetailInput): LexemeDe
   // ---- 6. 批注：targetType ∈ lexeme/cell/externalEtymon 且屬於本詞條 ----
   const cellIds = new Set(cells.map((cell) => cell.id))
   const etymonIds = new Set(etymons.map((etymon) => etymon.id))
+  const cellById = new Map(cells.map((cell) => [cell.id, cell]))
+
+  /** 批注所在格的值：entry 方音原文優先 → cell_state.raw → absent/cleared 符號 → null */
+  function cellValueFor(comment: DetailCommentInput): string | null {
+    if (comment.targetType !== 'cell' || !comment.targetId) return null
+    const cell = cellById.get(comment.targetId)
+    if (!cell) return null
+    const flags = cell.status?.flags ?? {}
+    if (flags.explicitlyAbsent === true) return '_'
+    if (flags.explicitlyCleared === true) return '∅'
+    if (cell.projection?.entryId) {
+      const entry = entryById.get(cell.projection.entryId)
+      const original = (entry?.phonetic as { original?: unknown } | null | undefined)?.original
+      if (typeof original === 'string' && original.trim() !== '') return original
+    }
+    return cell.raw ?? null
+  }
+
   const commentCards: LexemeDetailData['comments'] = comments
     .filter((comment) => {
       if (comment.targetType === 'lexeme') return comment.targetId === lexeme.id
@@ -410,7 +432,9 @@ export function assembleLexemeDetail(input: AssembleLexemeDetailInput): LexemeDe
       content: comment.content ?? '',
       threadedPlaceholder: comment.legacyMeta?.threadedPlaceholder === true,
       originalTimestamp: isoOrNull(comment.legacyMeta?.originalTimestamp),
-      sourceCell: comment.legacyMeta?.sourceCell ?? null
+      sourceCell: comment.legacyMeta?.sourceCell ?? null,
+      sourceColumn: comment.legacyMeta?.sourceColumn ?? null,
+      cellValue: cellValueFor(comment)
     }))
 
   // ---- 7. 編輯歷史：時間倒序；userId 原樣返回 ----

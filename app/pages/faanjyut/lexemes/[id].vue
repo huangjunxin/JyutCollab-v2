@@ -563,8 +563,11 @@ function authorInitial(author: string | null | undefined): string {
                   />
                 </div>
                 <p class="text-sm leading-relaxed dark:text-slate-200">{{ comment.content }}</p>
+                <p v-if="comment.cellValue" class="text-[11px] text-[var(--jc-muted)] mt-1">
+                  格值：<code class="jc-mono">{{ comment.cellValue }}</code>
+                </p>
                 <p v-if="comment.sourceCell" class="text-[11px] text-[var(--jc-muted)] mt-1">
-                  源表座標：<code class="jc-mono">{{ comment.sourceCell }}</code>
+                  源表座標：<template v-if="comment.sourceColumn"><strong>{{ comment.sourceColumn }}</strong>列 · </template><code class="jc-mono">{{ comment.sourceCell }}</code>
                 </p>
               </div>
             </div>
