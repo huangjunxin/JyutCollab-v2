@@ -87,18 +87,19 @@
           :class="{ 'fj-row-highlight': row.id === highlightLexemeId }"
         >
           <td class="fj-sk1 px-3 py-2">
-            <UTooltip
+            <UPopover
               v-if="row.definitionRaw"
-              :ui="{ content: 'max-w-md' }"
-              :popper="{ placement: 'right-start' }"
+              mode="hover"
+              :content="{ side: 'right', sideOffset: 6, align: 'start' }"
+              :ui="{ content: 'bg-default text-highlighted shadow-sm rounded-sm ring ring-default px-2.5 py-1.5 text-xs select-none max-w-md max-h-[50vh] overflow-y-auto whitespace-pre-line break-words' }"
             >
-              <template #content>
-                <div class="max-w-md whitespace-pre-line break-words text-xs">{{ row.definitionRaw }}</div>
-              </template>
               <span class="block text-xs text-gray-600 dark:text-gray-300 line-clamp-2 break-all leading-snug">
                 {{ rowDefinition(row) }}
               </span>
-            </UTooltip>
+              <template #content>
+                <div class="max-w-md whitespace-pre-line break-words">{{ row.definitionRaw }}</div>
+              </template>
+            </UPopover>
             <span v-else class="block text-xs text-gray-400">—</span>
           </td>
           <td class="fj-sk2 px-2 py-2 text-center jc-headword-rare-font text-xl font-bold text-[var(--jc-ink-strong)] dark:text-white">
