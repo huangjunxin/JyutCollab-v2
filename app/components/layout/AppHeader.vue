@@ -26,7 +26,9 @@
         </div>
 
         <!-- Navigation (desktop) -->
-        <nav class="hidden md:flex items-center gap-1 whitespace-nowrap">
+        <!-- min-w-0 + overflow-x-auto：AI 面板打开（-420px）或窄窗口时导航区内滚动，
+             不溢出压到面板/右侧图标区（2026-08-06 用户实测：顶栏与 AI 面板重叠） -->
+        <nav class="hidden md:flex items-center gap-1 whitespace-nowrap min-w-0 overflow-x-auto fj-nav-scroll">
           <UButton
             to="/"
             variant="ghost"
@@ -492,6 +494,12 @@ async function handleLogoutClick() {
 </script>
 
 <style scoped>
+.fj-nav-scroll {
+  scrollbar-width: none; /* Firefox */
+}
+.fj-nav-scroll::-webkit-scrollbar {
+  display: none; /* WebKit/Blink */
+}
 .nav-slide-enter-active,
 .nav-slide-leave-active {
   transition: transform 0.2s ease;
