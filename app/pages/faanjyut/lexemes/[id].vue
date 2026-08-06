@@ -127,6 +127,137 @@ async function restoreComposite(raw: string) {
   }
 }
 
+// ---- 詞條級字段編輯（2026-08-07：釋義/代表字，admin 可改，即改即存 + 撤銷 toast） ----
+
+const definitionEditing = ref(false)
+const definitionSaving = ref(false)
+const definitionDraft = ref('')
+const definitionError = ref<string | null>(null)
+
+const repCharEditing = ref(false)
+const repCharSaving = ref(false)
+const repCharDraft = ref('')
+const repCharError = ref<string | null>(null)
+
+const commonCharEditing = ref(false)
+const commonCharSaving = ref(false)
+const commonCharDraft = ref('')
+const commonCharError = ref<string | null>(null)
+
+function beginDefinitionEdit() {
+  definitionDraft.value = header.value?.definitionRaw ?? ''
+  definitionError.value = null
+  definitionEditing.value = true
+}
+
+function cancelDefinitionEdit() {
+  definitionEditing.value = false
+  definitionError.value = null
+}
+
+function beginRepCharEdit() {
+  repCharDraft.value = header.value?.representativeChar?.raw ?? ''
+  repCharError.value = null
+  repCharEditing.value = true
+}
+
+function cancelRepCharEdit() {
+  repCharEditing.value = false
+  repCharError.value = null
+}
+
+function beginCommonCharEdit() {
+  commonCharDraft.value = header.value?.commonCharCandidates ?? ''
+  commonCharError.value = null
+  commonCharEditing.value = true
+}
+
+function cancelCommonCharEdit() {
+  commonCharEditing.value = false
+  commonCharError.value = null
+}
+
+/** 保存詞條級字段（PUT /fields）；成功後更新本地 header 並出撤銷 toast */
+async function saveLexemeField(
+  field: 'definitionRaw' | 'representativeChar' | 'commonCharCandidates',
+  value: string,
+  state: { editing: Ref<boolean>; saving: Ref<boolean>; error: Ref<string | null> }
+) {
+  if (!data.value || state.saving.value) return
+  const lexeme = data.value.header
+  const before = field === 'definitionRaw'
+    ? lexeme.definitionRaw
+    : field === 'representativeChar'
+      ? lexeme.representativeChar?.raw ?? null
+      : lexeme.commonCharCandidates ?? null
+  state.saving.value = true
+  state.error.value = null
+  try {
+    const response = await $fetch<{ success: boolean; changed: boolean; data: { value: string } }>(
+      `/api/faanjyut/lexemes/${encodeURIComponent(lexeme.id)}/fields`,
+      { method: 'PUT', body: { field, value } }
+    )
+    if (field === 'definitionRaw') {
+      lexeme.definitionRaw = response.data.value
+    } else if (field === 'representativeChar') {
+      lexeme.representativeChar = { raw: response.data.value, display: response.data.value }
+    } else {
+      lexeme.commonCharCandidates = response.data.value || undefined
+    }
+    state.editing.value = false
+    if (response.changed) {
+      const toast = useToast()
+      toast.add({
+        title: '已儲存',
+        description: `${field === 'definitionRaw' ? '釋義' : field === 'representativeChar' ? '代表字' : '常用字候選'}原值：${before ?? '（無）'}`,
+        duration: 5000,
+        actions: [
+          {
+            label: '撤銷',
+            onClick: () => {
+              void restoreLexemeField(field, before ?? '', state)
+            }
+          }
+        ]
+      })
+    }
+  } catch (error: any) {
+    state.error.value = error?.data?.message || error?.message || '儲存失敗'
+  } finally {
+    state.saving.value = false
+  }
+}
+
+async function restoreLexemeField(
+  field: 'definitionRaw' | 'representativeChar' | 'commonCharCandidates',
+  value: string,
+  state: { editing: Ref<boolean>; saving: Ref<boolean>; error: Ref<string | null> }
+) {
+  if (!data.value) return
+  const lexeme = data.value.header
+  try {
+    const response = await $fetch<{ success: boolean; data: { value: string } }>(
+      `/api/faanjyut/lexemes/${encodeURIComponent(lexeme.id)}/fields`,
+      { method: 'PUT', body: { field, value } }
+    )
+    if (field === 'definitionRaw') {
+      lexeme.definitionRaw = response.data.value
+    } else if (field === 'representativeChar') {
+      lexeme.representativeChar = { raw: response.data.value, display: response.data.value }
+    } else {
+      lexeme.commonCharCandidates = response.data.value || undefined
+    }
+  } catch (error: any) {
+    const toast = useToast()
+    toast.add({
+      title: '撤銷失敗',
+      description: error?.data?.message || error?.message || '未知錯誤',
+      color: 'error'
+    })
+  }
+  state.editing.value = false
+}
+
 // ---- 區塊 2：各方言點方音（僅域內列；域外列歸區塊 3） ----
 
 const domesticPronunciations = computed(
@@ -226,12 +357,48 @@ function authorInitial(author: string | null | undefined): string {
             <div
               class="w-28 h-28 lg:w-36 lg:h-36 flex items-center justify-center border border-[var(--jc-border)] bg-[#FAFAF6] dark:bg-[var(--jc-dark-surface)] shadow-[var(--jc-shadow-hard)]"
             >
-              <span class="jc-headword-rare-font font-bold text-6xl lg:text-7xl text-[var(--jc-ink-strong)] dark:text-white">
+              <template v-if="repCharEditing">
+                <UInput
+                  v-model="repCharDraft"
+                  size="sm"
+                  class="w-20 jc-headword-rare-font text-center"
+                  :disabled="repCharSaving"
+                  @keydown.enter="saveLexemeField('representativeChar', repCharDraft, { editing: repCharEditing, saving: repCharSaving, error: repCharError })"
+                  @keydown.esc="cancelRepCharEdit"
+                />
+              </template>
+              <span v-else class="jc-headword-rare-font font-bold text-6xl lg:text-7xl text-[var(--jc-ink-strong)] dark:text-white">
                 {{ repCharDisplay }}
               </span>
             </div>
             <div class="flex flex-col gap-1.5 items-center lg:items-start">
-              <FaanjyutToneChip :tone="publication.tone" :label="publication.label" />
+              <div class="flex items-center gap-2">
+                <FaanjyutToneChip :tone="publication.tone" :label="publication.label" />
+                <UButton
+                  v-if="canEditComposite && !repCharEditing"
+                  size="2xs"
+                  color="gray"
+                  variant="ghost"
+                  icon="i-heroicons-pencil-square"
+                  aria-label="編輯代表字"
+                  @click="beginRepCharEdit"
+                />
+              </div>
+              <span v-if="repCharError" class="text-xs text-red-500">{{ repCharError }}</span>
+              <div v-if="repCharEditing" class="flex items-center gap-1.5">
+                <UButton
+                  size="xs"
+                  color="primary"
+                  :loading="repCharSaving"
+                  :disabled="repCharSaving"
+                  @click="saveLexemeField('representativeChar', repCharDraft, { editing: repCharEditing, saving: repCharSaving, error: repCharError })"
+                >
+                  儲存
+                </UButton>
+                <UButton size="xs" color="gray" variant="ghost" :disabled="repCharSaving" @click="cancelRepCharEdit">
+                  取消
+                </UButton>
+              </div>
             </div>
           </div>
 
@@ -323,8 +490,47 @@ function authorInitial(author: string | null | undefined): string {
               </div>
               <!-- 常用字候選 -->
               <div>
-                <div class="text-xs font-semibold text-[var(--jc-muted)] mb-1">常用字候選</div>
+                <div class="flex items-center gap-2">
+                  <div class="text-xs font-semibold text-[var(--jc-muted)] mb-1">常用字候選</div>
+                  <UButton
+                    v-if="canEditComposite && !commonCharEditing"
+                    size="2xs"
+                    color="gray"
+                    variant="ghost"
+                    icon="i-heroicons-pencil-square"
+                    aria-label="編輯常用字候選"
+                    class="-mt-1"
+                    @click="beginCommonCharEdit"
+                  />
+                </div>
+                <template v-if="commonCharEditing">
+                  <UInput
+                    v-model="commonCharDraft"
+                    size="sm"
+                    class="w-40 jc-headword-rare-font"
+                    placeholder="候選字（可多個）"
+                    :disabled="commonCharSaving"
+                    @keydown.enter="saveLexemeField('commonCharCandidates', commonCharDraft, { editing: commonCharEditing, saving: commonCharSaving, error: commonCharError })"
+                    @keydown.esc="cancelCommonCharEdit"
+                  />
+                  <div class="flex items-center gap-1.5 mt-1.5">
+                    <UButton
+                      size="xs"
+                      color="primary"
+                      :loading="commonCharSaving"
+                      :disabled="commonCharSaving"
+                      @click="saveLexemeField('commonCharCandidates', commonCharDraft, { editing: commonCharEditing, saving: commonCharSaving, error: commonCharError })"
+                    >
+                      儲存
+                    </UButton>
+                    <UButton size="xs" color="gray" variant="ghost" :disabled="commonCharSaving" @click="cancelCommonCharEdit">
+                      取消
+                    </UButton>
+                    <span v-if="commonCharError" class="text-xs text-red-500">{{ commonCharError }}</span>
+                  </div>
+                </template>
                 <div
+                  v-else
                   class="text-sm"
                   :class="header?.commonCharCandidates
                     ? 'text-[var(--jc-ink-strong)] dark:text-slate-100 jc-headword-rare-font'
@@ -337,8 +543,46 @@ function authorInitial(author: string | null | undefined): string {
 
             <!-- 釋義（原表整段） -->
             <div class="mt-5">
-              <div class="text-xs font-semibold text-[var(--jc-muted)] mb-1">釋義（原表整段）</div>
+              <div class="flex items-center gap-2">
+                <div class="text-xs font-semibold text-[var(--jc-muted)] mb-1">釋義（原表整段）</div>
+                <UButton
+                  v-if="canEditComposite && !definitionEditing"
+                  size="2xs"
+                  color="gray"
+                  variant="ghost"
+                  icon="i-heroicons-pencil-square"
+                  aria-label="編輯釋義"
+                  class="-mt-1"
+                  @click="beginDefinitionEdit"
+                />
+              </div>
+              <template v-if="definitionEditing">
+                <UTextarea
+                  v-model="definitionDraft"
+                  size="sm"
+                  class="w-full jc-mono"
+                  rows="5"
+                  placeholder="釋義原文（可含 {1} 義項標記）"
+                  :disabled="definitionSaving"
+                />
+                <div class="flex items-center gap-1.5 mt-1.5">
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    :loading="definitionSaving"
+                    :disabled="definitionSaving"
+                    @click="saveLexemeField('definitionRaw', definitionDraft, { editing: definitionEditing, saving: definitionSaving, error: definitionError })"
+                  >
+                    儲存
+                  </UButton>
+                  <UButton size="xs" color="gray" variant="ghost" :disabled="definitionSaving" @click="cancelDefinitionEdit">
+                    取消
+                  </UButton>
+                  <span v-if="definitionError" class="text-xs text-red-500">{{ definitionError }}</span>
+                </div>
+              </template>
               <div
+                v-else
                 class="border border-[var(--jc-border)] bg-[#FAFAF6] dark:bg-[var(--jc-dark-surface)] dark:text-slate-200 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap"
               >
                 {{ header?.definitionRaw || '—' }}
