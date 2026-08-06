@@ -380,23 +380,23 @@ function authorInitial(author: string | null | undefined): string {
           :subtitle="`共 <strong>${domesticPronunciations.length}</strong> 個方言列視圖 · 本區全部唯讀，編輯請回<a href='/faanjyut' class='underline text-blue-600'>矩陣頁</a>`"
         />
 
-        <!-- 四態圖例 -->
+        <!-- 四態圖例（色塊含 dark 變體，與矩陣頁 fj-legend-* 一致） -->
         <div class="jc-card px-3 py-2 mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--jc-body)] dark:text-slate-300">
           <span class="font-semibold text-[var(--jc-muted)]">圖例：</span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 jc-mono text-[11px] bg-white">mai1</span>
+            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 jc-mono text-[11px] bg-white dark:bg-slate-800">mai1</span>
             normal（有值）
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 jc-mono text-[11px] bg-slate-100 text-gray-400">_</span>
+            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 jc-mono text-[11px] bg-slate-100 dark:bg-[#263242] text-gray-400">_</span>
             <code class="jc-mono">_</code>（確定沒有）
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 jc-mono text-[11px] bg-amber-50 text-gray-400 line-through">mai1</span>
+            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 jc-mono text-[11px] bg-amber-50 dark:bg-[#3A3421] text-gray-400 line-through">mai1</span>
             已清空（曾有內容）
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300"></span>
+            <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1B2530]"></span>
             空白（原表無記錄）
           </span>
         </div>
