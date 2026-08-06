@@ -1,5 +1,6 @@
 <template>
-  <div class="max-w-[1400px] mx-auto p-4 sm:p-6">
+  <!-- 通欄容器（2026-08-06 統一）：與全局其他頁面一致，繼承 default.vue main 的 padding -->
+  <div>
     <!-- 模塊內子導航（導入報告/導出收進泛粵模塊，見 AppHeader 註釋） -->
     <FaanjyutModuleNav />
     <!-- 頁頭（§6.1） -->

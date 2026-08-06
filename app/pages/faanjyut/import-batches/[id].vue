@@ -109,7 +109,8 @@ function findingGroupItemsCount(groups: FaanJyutFindingGroup[]): number {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[1400px] p-4 sm:p-6">
+  <!-- 通欄容器（2026-08-06 統一）：與全局其他頁面一致，繼承 default.vue main 的 padding -->
+  <div>
     <!-- 返回行 -->
     <div class="flex items-center justify-between gap-2 mb-4">
       <NuxtLink
