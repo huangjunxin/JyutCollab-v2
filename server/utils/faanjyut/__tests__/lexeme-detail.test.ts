@@ -273,7 +273,7 @@ describe('faanjyut/lexeme-detail assembleLexemeDetail', () => {
     expect(comments[1]).toMatchObject({
       targetType: 'cell',
       targetId: CELL_GZ,
-      author: '李四', // authorDisplay 缺失 → legacyMeta.originalAuthor
+      author: '李*', // authorDisplay 缺失 → legacyMeta.originalAuthor（2026-08-07 拍板 M45：首尾字脫敏）
       threadedPlaceholder: false
     })
 

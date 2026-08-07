@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..', '..', '..', '..')
@@ -74,6 +76,49 @@ describe('CLI 退出碼契約（不依賴 MongoDB 的分支）', () => {
     const { code, stderr } = runCli(migrateScript, ['--dry-run'], { FAANJYUT_MONGODB_URI: '', MONGODB_URI: '' })
     expect(code).toBe(1)
     expect(stderr).toContain('MONGODB_URI')
+  })
+
+  // ---- 哈希核驗門（2026-08-07 補實現，審計 M48 / Runbook §8）----
+  function withFakeManifest(run: (dir: string) => void): void {
+    const dir = mkdtempSync(join(tmpdir(), 'fj-cli-hash-'))
+    try {
+      writeFileSync(join(dir, 'import_manifest.json'), JSON.stringify({
+        schemaVersion: 1,
+        baselineLevel: 'cutover',
+        sourceBook: 'faanjyut',
+        sourceWorkbook: '泛粵字表.xlsx',
+        sourceFileSha256: 'a'.repeat(64)
+      }))
+      run(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('--confirm-source-sha256 不匹配 → 退出碼 2（blocker，不連接 DB）', () => {
+    withFakeManifest((dir) => {
+      const { code, stderr } = runCli(seedScript, ['--input', dir, '--dry-run', '--confirm-source-sha256', 'b'.repeat(64)])
+      expect(code).toBe(2)
+      expect(stderr).toContain('哈希核驗失敗')
+      expect(stderr).toContain('--confirm-source-sha256')
+    })
+  })
+
+  it('--confirm-manifest-sha256 不匹配 → 退出碼 2', () => {
+    withFakeManifest((dir) => {
+      const { code, stderr } = runCli(seedScript, ['--input', dir, '--dry-run', '--confirm-manifest-sha256', 'b'.repeat(64)])
+      expect(code).toBe(2)
+      expect(stderr).toContain('哈希核驗失敗')
+    })
+  })
+
+  it('哈希核驗通過後繼續後續檢查（無 URI → 退出碼 1 而非 2）', () => {
+    withFakeManifest((dir) => {
+      const { code, stderr } = runCli(seedScript, ['--input', dir, '--dry-run', '--confirm-source-sha256', 'a'.repeat(64)],
+        { FAANJYUT_MONGODB_URI: '', MONGODB_URI: '' })
+      expect(code).toBe(1)
+      expect(stderr).toContain('MONGODB_URI')
+    })
   })
 })
 

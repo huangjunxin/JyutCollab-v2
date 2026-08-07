@@ -58,6 +58,16 @@ export const FaanJyutLexemeDtoSchema = rejectInjectedKeys(z.strictObject({
     }).optional(),
     commonCharCandidates: z.string().optional(),
     definitionRaw: z.string().optional(),
+    // 2026-08-07 拍板（審計 M15）：ETL 詞條級屬性投影（與 entry.meta 同值，全為可選）
+    pos: z.string().optional(),
+    etymology: z.string().optional(),
+    notes: z.string().optional(),
+    register: z.enum(['口語', '書面', '粗俗', '文雅', '中性']).optional(),
+    theme: z.strictObject({
+      level1: z.string().optional(),
+      level2: z.string().optional(),
+      level3: z.string().optional()
+    }).optional(),
     sourceFlags: z.array(z.string()).optional(),
     editedAfterImport: z.literal(false)
   }),

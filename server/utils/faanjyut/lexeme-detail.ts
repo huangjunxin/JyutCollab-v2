@@ -16,6 +16,7 @@ import {
   FAANJYUT_LANGUAGE_CODES,
   getFaanJyutLanguageLabel
 } from '../../../shared/faanjyut-languages'
+import { maskName } from './mask-name'
 
 // ---- 輸入結構（鬆散結構，兼容 mongoose lean 文檔與測試 fixture） ----
 
@@ -441,7 +442,9 @@ export function assembleLexemeDetail(input: AssembleLexemeDetailInput): LexemeDe
       targetType: comment.targetType ?? null,
       targetId: comment.targetId ?? null,
       source: comment.source ?? null,
-      author: comment.authorDisplay ?? comment.legacyMeta?.originalAuthor ?? null,
+      // 2026-08-07 拍板（審計 M45）：原表批注作者脱敏（首尾字+星號）；
+      // authorDisplay（平台用户评论，v1 尚無）為平台自有实名，原樣返回
+      author: comment.authorDisplay ?? maskName(comment.legacyMeta?.originalAuthor ?? null),
       content: comment.content ?? '',
       threadedPlaceholder: comment.legacyMeta?.threadedPlaceholder === true,
       originalTimestamp: isoOrNull(comment.legacyMeta?.originalTimestamp),

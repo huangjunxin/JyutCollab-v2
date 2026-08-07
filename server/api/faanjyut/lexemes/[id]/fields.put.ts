@@ -7,9 +7,11 @@
  * field=definitionRaw：直接存字符串（trim 後非空）。
  * field=representativeChar：更新 {raw, display}（display=輸入值），清空 warnings
  *   （「見/歸」引用等警告在手改代表字後不再適用）。
+ * 空值（trim 後）統一 = 移除字段（2026-08-07 拍板，審計 M28）：與「字頭」留空、
+ *   綜合音 raw 空=清空 一致；支撐前端「撤銷到無值」場景（從無到有填寫後撤銷回寫空串）。
  * 審計：meta.{field}EditedBy/EditedAt + editedAfterImport（group 級歷史 v1 不建）。
  *
- * 狀態碼：401 未登錄 / 403 非 admin / 503 flag 關閉 / 404 詞條不存在 / 400 非法字段或空值。
+ * 狀態碼：401 未登錄 / 403 非 admin / 503 flag 關閉 / 404 詞條不存在 / 400 非法字段或超長。
  */
 import { z } from 'zod'
 import { checkWriteFlag } from '../../../../utils/faanjyut/cells'
@@ -62,10 +64,7 @@ export default defineEventHandler(async (event) => {
 
     const { field, value } = validated.data
     const trimmed = value.trim()
-    // commonCharCandidates 允許清空（= 移除字段，與源表「字頭」留空一致）
-    if (trimmed === '' && field !== 'commonCharCandidates') {
-      throw createError({ statusCode: 400, message: '內容不能為空' })
-    }
+    // 空值統一 = 移除字段（2026-08-07 拍板，審計 M28）：不彈「內容不能為空」
     if (trimmed.length > MAX_FIELD_LENGTH[field]) {
       throw createError({ statusCode: 400, message: `內容過長（最多 ${MAX_FIELD_LENGTH[field]} 字）` })
     }
@@ -97,21 +96,21 @@ export default defineEventHandler(async (event) => {
       [`meta.${auditField}EditedAt`]: now,
       'meta.editedAfterImport': true
     }
-    if (field === 'definitionRaw') {
+    const update: Record<string, unknown> = { $set: audit }
+    // 空值 → 移除字段（$unset）；非空 → 按字段形狀 $set
+    if (trimmed === '') {
+      const unsetKey = field === 'definitionRaw' ? 'meta.definitionRaw'
+        : field === 'representativeChar' ? 'meta.representativeChar'
+          : 'meta.commonCharCandidates'
+      update.$unset = { [unsetKey]: 1 }
+    } else if (field === 'definitionRaw') {
       audit['meta.definitionRaw'] = trimmed
     } else if (field === 'representativeChar') {
       audit['meta.representativeChar'] = { raw: trimmed, display: trimmed }
       // 手改代表字後，導入期的見/歸 警告不再適用
       audit['meta.representativeChar.warnings'] = []
-    } else if (trimmed === '') {
-      // 清空常用字候選 = 移除字段（與源表「字頭」留空一致）
     } else {
       audit['meta.commonCharCandidates'] = trimmed
-    }
-
-    const update: Record<string, unknown> = { $set: audit }
-    if (field === 'commonCharCandidates' && trimmed === '') {
-      update.$unset = { 'meta.commonCharCandidates': 1 }
     }
 
     await Lexeme.updateOne({ id }, update)

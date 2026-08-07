@@ -24,6 +24,16 @@ export interface ILexemeMeta {
   }
   commonCharCandidates?: string
   definitionRaw?: string
+  // 2026-08-07 拍板（審計 M15）：ETL 詞條級屬性投影（與 entry.meta 同值）
+  pos?: string
+  etymology?: string
+  notes?: string
+  register?: '口語' | '書面' | '粗俗' | '文雅' | '中性'
+  theme?: {
+    level1?: string
+    level2?: string
+    level3?: string
+  }
   sourceFlags?: string[]
   importBatchId?: string
   editedAfterImport?: boolean

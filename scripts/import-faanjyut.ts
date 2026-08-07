@@ -17,6 +17,7 @@
  *
  * 退出碼（契約 §8）：0 通過 / 1 運行錯誤（含寫入失敗）/ 2 blocker > 0。
  */
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -55,6 +56,8 @@ interface CliArgs {
   mode: string | null
   environment: string
   confirmWrite: string | null
+  confirmSourceSha256: string | null
+  confirmManifestSha256: string | null
   reportDir: string
   help: boolean
 }
@@ -66,6 +69,8 @@ function parseArgs(argv: string[]): CliArgs {
     mode: null,
     environment: 'staging',
     confirmWrite: null,
+    confirmSourceSha256: null,
+    confirmManifestSha256: null,
     reportDir: resolve(root, '.artifacts/faanjyut/dry-run'),
     help: false
   }
@@ -82,6 +87,8 @@ function parseArgs(argv: string[]): CliArgs {
       case '--mode': args.mode = next() ?? null; break
       case '--environment': args.environment = next() ?? 'staging'; break
       case '--confirm-write': args.confirmWrite = next() ?? null; break
+      case '--confirm-source-sha256': args.confirmSourceSha256 = next() ?? null; break
+      case '--confirm-manifest-sha256': args.confirmManifestSha256 = next() ?? null; break
       case '--report-dir': args.reportDir = next() ?? args.reportDir; break
       default:
         if (arg.startsWith('--')) {
@@ -93,6 +100,52 @@ function parseArgs(argv: string[]): CliArgs {
   return args
 }
 
+/**
+ * 哈希核驗門（Runbook §8，2026-08-07 補實現，審計 M48）：
+ *  - --confirm-source-sha256：對比 import_manifest.json 的 sourceFileSha256（源表 Excel 哈希）
+ *  - --confirm-manifest-sha256：對比 import_manifest.json 文件本身 SHA-256
+ * 任一一項不匹配 → 打印明確錯誤並退出碼 2（數據完整性 blocker，不連接 DB）。
+ */
+function verifyConfirmHashes(input: string, confirmSourceSha256: string | null, confirmManifestSha256: string | null): void {
+  const manifestPath = resolve(input, 'import_manifest.json')
+  if (!existsSync(manifestPath)) {
+    console.error(`錯誤：找不到 ${manifestPath}，無法執行哈希核驗`)
+    process.exit(2)
+  }
+  const manifestRaw = readFileSync(manifestPath, 'utf8')
+  let manifest: Record<string, unknown>
+  try {
+    manifest = JSON.parse(manifestRaw) as Record<string, unknown>
+  } catch {
+    console.error(`錯誤：${manifestPath} 不是合法 JSON，無法執行哈希核驗`)
+    process.exit(2)
+  }
+
+  if (confirmSourceSha256 !== null) {
+    const actual = manifest.sourceFileSha256
+    if (typeof actual !== 'string' || actual !== confirmSourceSha256) {
+      console.error(
+        `哈希核驗失敗（--confirm-source-sha256）：期望 ${confirmSourceSha256}，` +
+        `manifest.sourceFileSha256 實際 ${typeof actual === 'string' ? actual : '（缺失）'}`
+      )
+      process.exit(2)
+    }
+    console.log(`✓ --confirm-source-sha256 核驗通過（${actual}）`)
+  }
+
+  if (confirmManifestSha256 !== null) {
+    const actual = createHash('sha256').update(manifestRaw).digest('hex')
+    if (actual !== confirmManifestSha256) {
+      console.error(
+        `哈希核驗失敗（--confirm-manifest-sha256）：期望 ${confirmManifestSha256}，` +
+        `${manifestPath} 實際 ${actual}`
+      )
+      process.exit(2)
+    }
+    console.log(`✓ --confirm-manifest-sha256 核驗通過（${actual}）`)
+  }
+}
+
 function usage(): string {
   return [
     '用法：npm run seed:faanjyut -- [options]',
@@ -102,6 +155,8 @@ function usage(): string {
     '  --mode <dry-run|initial|final_cutover>  寫入模式需搭配 --confirm-write',
     '  --environment <local|staging|production>  默認 staging',
     '  --confirm-write <db>   寫入模式必填：必須等於實際連接的 db 名（防誤寫）',
+    '  --confirm-source-sha256 <hash>  核驗 manifest.sourceFileSha256 與此值一致（Runbook §8，不匹配退出碼 2）',
+    '  --confirm-manifest-sha256 <hash>  核驗 import_manifest.json 文件本身 SHA-256 與此值一致（不匹配退出碼 2）',
     '  --report-dir <dir>     產物目錄，默認 .artifacts/faanjyut/dry-run',
     '  --help',
     '',
@@ -146,6 +201,11 @@ function main(): void {
   if (!writeMode && args.confirmWrite !== null) {
     console.error('錯誤：--confirm-write 僅寫入模式使用；dry-run 不接受')
     process.exit(1)
+  }
+
+  // 哈希核驗門（Runbook §8）：連接 DB 之前先做純文件校驗；不匹配 = 數據完整性 blocker → 退出碼 2
+  if (args.confirmSourceSha256 !== null || args.confirmManifestSha256 !== null) {
+    verifyConfirmHashes(args.input, args.confirmSourceSha256, args.confirmManifestSha256)
   }
 
   const mongoUri = process.env.FAANJYUT_MONGODB_URI || process.env.MONGODB_URI
