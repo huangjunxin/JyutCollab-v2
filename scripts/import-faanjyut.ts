@@ -45,7 +45,7 @@ function loadDotEnv() {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
     const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
-    if (!match || process.env[match[1]]) continue
+    if (!match || process.env[match[1]] !== undefined) continue  // 显式空值（如测试传 ''）不被 .env 覆盖
     process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '')
   }
 }
@@ -173,6 +173,7 @@ function usage(): string {
 }
 
 function main(): void {
+  loadDotEnv()  // 审计 H3：.env 与 shell 环境同等生效（防误连平台默认库）
   const args = parseArgs(process.argv.slice(2))
   if (args.help) {
     process.stdout.write(usage())

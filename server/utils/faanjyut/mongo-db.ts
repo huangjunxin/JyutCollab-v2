@@ -10,6 +10,7 @@ import type { RollbackDb } from './rollback'
 import type { CellsDb, CellsTx, CellStateUpsertArgs } from './cells'
 import type { LexemeCreateDb, LexemeCreateTx } from './lexeme-create'
 import type { ExportSource, ExportFileName } from './export-backup'
+import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import { cellStateId } from './stable-id'
 import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import { Lexeme } from '../Lexeme'
@@ -292,6 +293,16 @@ const EXPORT_FILE_TO_COLLECTION: Record<string, string> = {
 }
 
 /**
+ * 審計 H1：共用集合只取泛粵文檔的 DB 過濾條件（與 export-backup.ts SOURCE_BOOK_FIELD 同規則）。
+ * lexemes/external_etymons 在 meta.sourceBook；entries 在頂層 sourceBook；專用表不過濾。
+ */
+const SOURCE_BOOK_DB_FILTER: Record<string, Record<string, unknown>> = {
+  'lexemes.ndjson': { 'meta.sourceBook': FAANJYUT_SOURCE_BOOK },
+  'entries.ndjson': { sourceBook: FAANJYUT_SOURCE_BOOK },
+  'external_etymons.ndjson': { 'meta.sourceBook': FAANJYUT_SOURCE_BOOK }
+}
+
+/**
  * mongoose 連接 → ExportSource 適配器（P5 backup 導出用）。
  * 每集合用 lean 游標分批迭代（entries 8 萬條流式，不整表 load 進內存）；
  * 泛粵 Entry._id 亦走游標（分塊收集，約 2MB）。
@@ -307,8 +318,10 @@ export function adaptMongooseExportDb(connection: mongoose.Connection): ExportSo
       if (!collection) {
         throw new Error(`無導出對應的 collection：${name}`)
       }
+      // 審計 H1：共用集合只取泛粵文檔（純邏輯層另有同規則過濾，雙保險 + 減少掃描）
+      const filter = SOURCE_BOOK_DB_FILTER[name]
       // 原生 driver 游標分批（batchSize 2000），8 萬條 entries 流式讀取，不整表 load 進內存
-      const cursor = db.collection(collection).find({}).batchSize(2000)
+      const cursor = db.collection(collection).find(filter).batchSize(2000)
       for await (const doc of cursor) {
         yield doc as Record<string, unknown>
       }

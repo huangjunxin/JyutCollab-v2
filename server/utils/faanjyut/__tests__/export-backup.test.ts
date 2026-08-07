@@ -263,6 +263,37 @@ function expectManifestMatchesContent(manifest: ExportManifest, output: FakeExpo
 }
 
 describe('faanjyut/export-backup 默認（includeDrafts=false, includeAudit=false, includeStyles=false）', () => {
+  it('審計 H1：共用集合只導出泛粵文檔——普通平台 lexeme/entry/external_etymon 被過濾', async () => {
+    const source = makeSource()
+    // 注入普通平台文檔（無泛粵 sourceBook）到三個共用集合
+    source.docsByFile['lexemes.ndjson'] = [
+      ...source.docsByFile['lexemes.ndjson']!,
+      { _id: 'oid_platform_lex', id: 'lex_platform_1', meta: { sourceKey: 'abc' }, status: { publicationStatus: 'published' } }
+    ]
+    source.docsByFile['entries.ndjson'] = [
+      ...source.docsByFile['entries.ndjson']!,
+      { _id: 'oid_platform_entry', id: 'entry_platform_1', lexemeId: 'lex_platform_1', sourceBook: 'platform', headword: { display: '普通' }, phonetic: { original: 'x' }, meta: {} }
+    ]
+    source.docsByFile['external_etymons.ndjson'] = [
+      ...source.docsByFile['external_etymons.ndjson']!,
+      { _id: 'oid_platform_etymon', id: 'etymon_platform_1', lexemeId: 'lex_platform_1', languageCode: 'en', meta: {}, scriptForm: 'word', raw: 'w' }
+    ]
+    const { output } = await run({ includeDrafts: true })
+
+    const lexemeIds = output.files.get('lexemes.ndjson')!.trim().split('\n').map((l) => JSON.parse(l).id)
+    expect(lexemeIds).not.toContain('lex_platform_1')
+    expect(lexemeIds).toEqual([L1, L2])
+
+    const entryIds = output.files.get('entries.ndjson')!.trim().split('\n').map((l) => JSON.parse(l).id)
+    expect(entryIds).not.toContain('entry_platform_1')
+
+    const etymonIds = output.files.get('external_etymons.ndjson')!.trim().split('\n').map((l) => JSON.parse(l).id)
+    expect(etymonIds).not.toContain('etymon_platform_1')
+
+    // 泛粵專用表（columns/cell_states/comments/links）不過濾
+    expect(output.files.get('columns.ndjson')!.trim().split('\n')).toHaveLength(2)
+  })
+
   it('7 類 NDJSON 全生成，manifest 字段完整，records/SHA-256 可復算', async () => {
     const { output, result } = await run({})
     const { manifest } = result

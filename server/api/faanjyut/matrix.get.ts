@@ -7,8 +7,47 @@ import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import {
   MATRIX_COLUMN_SOURCE_ROLES,
   buildColumnSelection,
-  pivotMatrix
+  pivotMatrix,
+  type MatrixCellStateName
 } from '../../utils/faanjyut/matrix'
+
+/**
+ * 審計 M25：cellFilter 的 DB 層選擇器（與 pivotMatrix 的內存 filter 同語義，後者保留作兜底）。
+ * 返回 { match } 表示「命中該狀態的 lexemeId 集合」；{ exclude } 表示「其餘全部」（null 態 =
+ * 全集 − 有值集合，故返回有值集合供 $nin）。0 列時無格可匹配 → match=[]（與原內存 filter
+ * 空列全 false 行為一致）。
+ */
+async function cellFilterLexemeSelector(
+  cellFilter: MatrixCellStateName,
+  columnIds: string[]
+): Promise<{ match: string[] | null; exclude: string[] | null }> {
+  if (columnIds.length === 0) return { match: [], exclude: null }
+  const colFilter = { columnId: { $in: columnIds } }
+
+  if (cellFilter === 'absent') {
+    return { match: await FaanJyutCellState.distinct('lexemeId', { ...colFilter, 'status.flags.explicitlyAbsent': true }), exclude: null }
+  }
+  if (cellFilter === 'cleared') {
+    return { match: await FaanJyutCellState.distinct('lexemeId', { ...colFilter, 'status.flags.explicitlyCleared': true }), exclude: null }
+  }
+
+  // normal / null：有值集合 = cell raw 非空（非 absent/cleared）∪ hasOldNote 格 ∪ domestic entry 有值
+  const [fromCells, fromEntries] = await Promise.all([
+    FaanJyutCellState.distinct('lexemeId', {
+      ...colFilter,
+      'status.flags.explicitlyAbsent': { $ne: true },
+      'status.flags.explicitlyCleared': { $ne: true },
+      $or: [{ raw: { $exists: true, $ne: '' } }, { 'status.flags.hasOldNote': true }]
+    }),
+    Entry.distinct('lexemeId', {
+      sourceBook: FAANJYUT_SOURCE_BOOK,
+      'phonetic.original': { $exists: true, $ne: '' }
+    })
+  ])
+  const hasValue = [...new Set([...fromCells, ...fromEntries])]
+  if (cellFilter === 'normal') return { match: hasValue, exclude: null }
+  return { match: null, exclude: hasValue }
+}
 
 /**
  * GET /api/faanjyut/matrix（見 FaanjyutV1Design.md §6/§12，P3 子任務 A）
@@ -65,7 +104,14 @@ export default defineEventHandler(async (event) => {
   const columnIds = selectedColumns.map((c) => c.id)
 
   // ② Lexeme 分頁（按 meta.matrixOrder 升序）
-  const lexemeFilter = { 'meta.sourceBook': FAANJYUT_SOURCE_BOOK }
+  // 審計 M25：cellFilter 下沉 DB 層——total/分頁按「滿足狀態篩選的詞條」計算，
+  // 不再先取全量頁內 50 行再內存過濾（原實現翻頁大部分頁為空）。
+  const lexemeFilter: Record<string, unknown> = { 'meta.sourceBook': FAANJYUT_SOURCE_BOOK }
+  if (cellFilter) {
+    const selector = await cellFilterLexemeSelector(cellFilter, columnIds)
+    if (selector.match !== null) lexemeFilter.id = { $in: selector.match }
+    else if (selector.exclude !== null) lexemeFilter.id = { $nin: selector.exclude }
+  }
   const [total, lexemeDocs] = await Promise.all([
     Lexeme.countDocuments(lexemeFilter),
     Lexeme.find(lexemeFilter)

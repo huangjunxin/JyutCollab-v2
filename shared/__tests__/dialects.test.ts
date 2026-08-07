@@ -59,4 +59,12 @@ describe('shared/dialects 泛粵新增 DialectId', () => {
     expect(getDialectColor('jiangmen_baisha')).not.toBe('')
     expect(getDialectColor('other')).toBe('gray')
   })
+
+  it('審計 M35：混合大小寫 regionCode 亦可查（高州 GZhou / 廉州 LZhou / 賀州 HZhou / 儋州 DZhou）', () => {
+    expect(getDialectLabelByRegionCode('GZhou')).toBe('高州')
+    expect(getDialectLabelByRegionCode('LZhou')).toBe('廉州')
+    expect(getDialectLabelByRegionCode('HZhou')).toBe('賀州')
+    expect(getDialectLabelByRegionCode('DZhou')).toBe('儋州')
+    expect(getDialectLabelByRegionCode('gzhou')).toBe('高州')
+  })
 })

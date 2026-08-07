@@ -249,15 +249,19 @@ export function pivotMatrix(args: {
   const rows: MatrixRow[] = lexemes.map((lex) => {
     const cellViews: Record<string, MatrixCellView> = {}
     for (const col of columns) {
+      const entry = entryByLexemeDialect.get(`${lex.id}::${col.dialectId}`)
       const cell = cellByKey.get(`${lex.id}::${col.id}`)
       if (cell) {
         // ① cell_state 優先
-        cellViews[col.id] = computeCellState(cell)
+        const view = computeCellState(cell)
+        // 審計 M26：normal 但無 raw 的 cell_state（hasOldNote 批注格等）→ domestic 回退 Entry，
+        // 與詳情頁 cellNeedsEntryFallback 條件一致（P5 修復只做了一半，此處補齊）
+        const entryView = col.sourceRole === 'domestic' && col.dialectId ? entryCellView(entry) : null
+        const needEntryFallback = view.state === 'null' || (view.state === 'normal' && !view.raw)
+        cellViews[col.id] = needEntryFallback && entryView?.raw ? entryView : view
       } else if (col.sourceRole === 'domestic' && col.dialectId) {
         // ② domestic 正常值回退 Entry
-        cellViews[col.id] = entryCellView(
-          entryByLexemeDialect.get(`${lex.id}::${col.dialectId}`)
-        )
+        cellViews[col.id] = entryCellView(entry)
       } else {
         // ③ external 值一律在 cell_states；無 cell_state → null
         cellViews[col.id] = { state: 'null' }

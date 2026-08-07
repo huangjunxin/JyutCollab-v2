@@ -8,6 +8,7 @@ import { connectDB } from '../../utils/db'
 import { convertToHongKongTraditional } from '../../utils/textConversion'
 import { EditHistory } from '../../utils/EditHistory'
 import { Entry } from '../../utils/Entry'
+import { assertNotFaanJyutEntry } from '../../utils/faanjyut/intercept'
 import { User } from '../../utils/User'
 import { createNotificationSafely, getEntryNotificationRecipients } from '../../utils/Notification'
 
@@ -204,6 +205,8 @@ async function submitEntry(entryId: string, actor: any) {
   await connectDB()
   const entry = await findEntryByAgentId(entryId)
   if (!entry) throw createError({ statusCode: 404, message: '詞條不存在' })
+  // 審計 H2：AI Agent 寫入口不得繞過泛粵 409 攔截（泛粵詞條狀態不可經 agent 變更）
+  assertNotFaanJyutEntry(entry)
   const isOwner = entry.createdBy === actor.id
   const canSubmit = isOwner || actor.role === 'admin' || actor.role === 'reviewer'
   if (!canSubmit) throw createError({ statusCode: 403, message: '無權提交此詞條' })
@@ -233,6 +236,8 @@ async function reviewEntry(entryId: string, actor: any, approved: boolean, reaso
   await connectDB()
   const entry = await findEntryByAgentId(entryId)
   if (!entry) throw createError({ statusCode: 404, message: '詞條不存在' })
+  // 審計 H2：AI Agent 寫入口不得繞過泛粵 409 攔截（泛粵詞條狀態不可經 agent 變更）
+  assertNotFaanJyutEntry(entry)
   if (entry.status !== 'pending_review') {
     throw createError({ statusCode: 400, message: '只有待審核詞條可以執行此操作' })
   }

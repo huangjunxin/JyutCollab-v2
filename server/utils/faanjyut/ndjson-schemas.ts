@@ -65,10 +65,12 @@ export const FaanJyutColumnDtoSchema = rejectInjectedKeys(z.strictObject({
     originalOrder: z.number().int().min(1),
     regionOrder: z.number().int().optional()
   }),
+  // 審計 M31：style 為可選（NewTablesDesign §3.2 style?），ETL 只在有填充色時輸出——
+  // 無顏色列不應成為整批導入 blocker
   style: z.strictObject({
     color: z.string().optional(),
     defaultTextColor: z.string().optional()
-  }),
+  }).optional(),
   sourceMeta: z.strictObject({
     mark: z.string().optional(),
     rawMark: z.unknown().optional(),

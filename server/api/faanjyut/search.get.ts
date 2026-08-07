@@ -24,6 +24,7 @@ import { Lexeme } from '../../utils/Lexeme'
 import { Entry } from '../../utils/Entry'
 import { ExternalEtymon } from '../../utils/ExternalEtymon'
 import { getFaanJyutLanguageLabel } from '../../../shared/faanjyut-languages'
+import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 
 const QuerySchema = z.object({
   q: z.string().trim().min(1, '請輸入搜尋字詞').max(100, '搜尋字詞過長（最多 100 字）'),
@@ -147,8 +148,9 @@ export default defineEventHandler(async (event) => {
       }
     })
 
-    // 6. 域外材料：ExternalEtymon 命中回帶 lexemeId（排除 softDeleted）
+    // 6. 域外材料：ExternalEtymon 命中回帶 lexemeId（排除 softDeleted；審計 M24：只搜泛粵——平台普通詞條 etymon 無 meta.sourceBook）
     const etymonDocs = await ExternalEtymon.find({
+      'meta.sourceBook': FAANJYUT_SOURCE_BOOK,
       'meta.softDeleted': { $ne: true },
       $or: [
         { scriptForm: { $regex: containsRegex } },

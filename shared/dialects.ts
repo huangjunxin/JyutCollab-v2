@@ -564,9 +564,9 @@ export const DIALECT_REGION_CODES: Record<DialectId, string> = {
   other: 'OT'
 }
 
-/** Jyutjyu 地區代碼（region_code） → 方言代碼 */
+/** Jyutjyu 地區代碼（region_code） → 方言代碼；key 統一為大寫（審計 M35：混合大小寫如 'GZhou' 亦命中） */
 export const REGION_CODE_TO_DIALECT_ID: Record<string, DialectId> = Object.fromEntries(
-  Object.entries(DIALECT_REGION_CODES).map(([id, code]) => [code, id as DialectId])
+  Object.entries(DIALECT_REGION_CODES).map(([id, code]) => [String(code).toUpperCase(), id as DialectId])
 ) as Record<string, DialectId>
 
 /** 根據 Jyutjyu 的 region_code 取顯示名稱（香港繁體）；未知則回傳原值 */

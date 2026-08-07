@@ -13,6 +13,31 @@
  * _id/createdAt/updatedAt/importBatchId 等運行期字段——**不用導入 DTO 反向校驗**。
  */
 import { createHash } from 'node:crypto'
+import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
+
+/**
+ * 2026-08-07 拍板（審計 H1）：共用集合（lexemes/entries/external_etymons）在純邏輯層
+ * 按 sourceBook 過濾，只導出泛粵數據；泛粵專用表為 null 不過濾。
+ * 字段位置：lexemes/external_etymons 在 meta.sourceBook，entries 在頂層 sourceBook。
+ */
+export const SOURCE_BOOK_FIELD: Record<string, 'sourceBook' | 'meta.sourceBook' | null> = {
+  'columns.ndjson': null,
+  'lexemes.ndjson': 'meta.sourceBook',
+  'entries.ndjson': 'sourceBook',
+  'external_etymons.ndjson': 'meta.sourceBook',
+  'cell_states.ndjson': null,
+  'comments.ndjson': null,
+  'links.ndjson': null
+}
+
+/** 依字段位置取文檔的 sourceBook 值（純邏輯，供測試直接調用） */
+export function docSourceBook(doc: Record<string, unknown>, field: 'sourceBook' | 'meta.sourceBook' | null): unknown {
+  if (field === 'meta.sourceBook') {
+    return (doc.meta as Record<string, unknown> | undefined)?.sourceBook
+  }
+  if (field === 'sourceBook') return doc.sourceBook
+  return undefined
+}
 
 /** 7 類 NDJSON 文件與其 DB 集合（文件名/鍵名對齊導入契約，見 import-contract.ts FILE_TO_COLLECTION） */
 export const EXPORT_FILES: Array<{
@@ -236,6 +261,9 @@ export async function runBackupExport(input: {
   for (const file of EXPORT_FILES) {
     const skipDraft = file.draftFiltered && !options.includeDrafts ? draftSkipPredicate(file.name) : null
     const transform = (doc: Record<string, unknown>): Record<string, unknown> | null => {
+      // 審計 H1：共用集合只導出泛粵數據（普通平台詞條/詞源不得混入 backup 包）
+      const sourceField = SOURCE_BOOK_FIELD[file.name]
+      if (sourceField !== null && docSourceBook(doc, sourceField) !== FAANJYUT_SOURCE_BOOK) return null
       if (skipDraft && skipDraft(doc, draftLexemeIds)) return null
       if (file.stripStyle && !options.includeStyles && doc.style !== undefined) {
         const { style: _dropped, ...rest } = doc

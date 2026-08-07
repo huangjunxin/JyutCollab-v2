@@ -341,6 +341,37 @@ describe('faanjyut/matrix pivotMatrix entries 回退（domestic 格無 cell_stat
     expect(rows2[0].cells.c1?.state).toBe('absent')
   })
 
+  it('審計 M26：normal 無 raw 的 cell_state（hasOldNote 批注格）→ domestic 回退 entry，與詳情頁一致', () => {
+    // hasOldNote 格：cell_state 存在但無 raw → 回退 entry 值
+    const rows = pivotMatrix({
+      lexemes: [lexeme('l1')],
+      cells: [cell('l1', 'c1', { status: { flags: { hasOldNote: true } } })],
+      columns: [domesticCol],
+      entries: [entry('l1', 'guangzhou', { phonetic: { original: 'jyut6' } })]
+    })
+    expect(rows[0].cells.c1).toMatchObject({ state: 'normal', raw: 'jyut6' })
+
+    // 無 entry 值時保持原 view（normal 無 raw，不無中生有）
+    const rowsNoEntry = pivotMatrix({
+      lexemes: [lexeme('l1')],
+      cells: [cell('l1', 'c1', { status: { flags: { hasOldNote: true } } })],
+      columns: [domesticCol],
+      entries: []
+    })
+    expect(rowsNoEntry[0].cells.c1).toMatchObject({ state: 'normal' })
+    expect(rowsNoEntry[0].cells.c1?.raw).toBeUndefined()
+
+    // external 列不回退（域外值一律在 cell_state）
+    const rowsExternal = pivotMatrix({
+      lexemes: [lexeme('l1')],
+      cells: [cell('l1', 'ext1', { status: { flags: { hasOldNote: true } } })],
+      columns: [externalCol],
+      entries: [entry('l1', 'guangzhou', { phonetic: { original: 'jyut6' } })]
+    })
+    expect(rowsExternal[0].cells.ext1).toMatchObject({ state: 'normal' })
+    expect(rowsExternal[0].cells.ext1?.raw).toBeUndefined()
+  })
+
   it('domestic 無 cell_state 無 entry → null；external 無 cell_state → null（同名 entry 也不匹配）', () => {
     const rows = pivotMatrix({
       lexemes: [lexeme('l1'), lexeme('l2')],
