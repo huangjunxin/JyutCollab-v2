@@ -1,19 +1,19 @@
 <template>
-  <!-- 矩陣格編輯態（FaanjyutV1Design §6.4）：單行輸入，Enter/Tab/Esc/blur 由
-       useFaanjyutCellEdit 統一處理（本組件只透傳原生事件）。格值多為單行，
-       input 比 textarea 更貼 Sheet 手感；Enter 即保存、無 Shift+Enter 換行需求。 -->
+  <!-- 矩陣格編輯態（FaanjyutV1Design §6.4）：textarea 自動換行 + 自適應高度，
+       與顯示態 break-all 一致，避免長音值編輯時跳動。
+       Enter/Tab/Esc/blur 由 useFaanjyutCellEdit 統一處理（本組件只透傳原生事件）。 -->
   <td
-    class="fj-cell fj-cell-editing text-center align-middle px-2 h-14 text-[13px]"
+    class="fj-cell fj-cell-editing text-center align-middle px-2 text-[13px]"
     :title="error"
   >
     <template v-if="pending">
       <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 text-gray-400 animate-spin" />
     </template>
-    <input
+    <textarea
       v-else
-      ref="inputRef"
-      type="text"
-      class="w-full h-9 px-2 text-[13px] jc-mono bg-white dark:bg-slate-900 rounded-sm border focus:outline-none focus:ring-2"
+      ref="textareaRef"
+      rows="1"
+      class="w-full px-2 py-1 text-[13px] jc-mono bg-white dark:bg-slate-900 rounded-sm border focus:outline-none focus:ring-2 resize-none break-all leading-tight max-h-24 overflow-y-auto"
       :class="error
         ? 'border-red-500 focus:ring-red-500/40'
         : 'border-[var(--jc-accent)] focus:ring-[var(--jc-accent)]/40'"
@@ -21,7 +21,7 @@
       @input="onInput"
       @keydown="$emit('keydown', $event)"
       @blur="$emit('blur')"
-    >
+    />
   </td>
 </template>
 
@@ -46,20 +46,28 @@ const emit = defineEmits<{
   blur: []
 }>()
 
-const inputRef = ref<HTMLInputElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+function autoResize() {
+  const el = textareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
 
 onMounted(() => {
-  const input = inputRef.value
-  if (!input) return
-  input.focus()
-  // 鍵盤進入（Tab 移格 / Enter / 直接打字）時游標置末，避免首鍵誤觸清空整格
+  const el = textareaRef.value
+  if (!el) return
+  el.focus()
+  autoResize()
   if (props.cursorToEnd) {
-    input.setSelectionRange(input.value.length, input.value.length)
+    el.setSelectionRange(el.value.length, el.value.length)
   }
 })
 
 function onInput(event: Event) {
-  emit('update:modelValue', (event.target as HTMLInputElement).value)
+  emit('update:modelValue', (event.target as HTMLTextAreaElement).value)
+  autoResize()
 }
 </script>
 

@@ -37,8 +37,9 @@ export default defineEventHandler(async (event) => {
     }
 
     const [columns, cells, entries, etymons, links] = await Promise.all([
-      FaanJyutColumn.find({ sourceBook: 'faanjyut', status: 'active' })
-        .select('id label shortLabel sourceRole dialectId languageCode order style status')
+      // 詳情頁「各方言點方音」只展示域內列；域外列/meta/boundary 由 externalMaterials 等獨立區塊承載
+      FaanJyutColumn.find({ sourceBook: 'faanjyut', status: 'active', sourceRole: { $in: ['domestic'] } })
+        .select('id label shortLabel sourceRole dialectId languageCode regionCode order style status')
         .lean(),
       FaanJyutCellState.find({ lexemeId: id })
         .select('id columnId raw status projection source')

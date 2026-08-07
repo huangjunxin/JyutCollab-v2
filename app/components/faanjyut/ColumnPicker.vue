@@ -1,16 +1,16 @@
 <template>
-  <!-- 列選擇器（§6.2）：勾選列 → 套用後重新請求 columns 參數；每次最多 30 列。
+  <!-- 列選擇器（§6.2）：勾選列 -> 套用後重新請求 columns 參數。
        「重設為預設」= 服務端默認列集（本人可編輯列＋穗港）。 -->
   <div ref="rootRef" class="relative">
     <button
       type="button"
       class="h-9 px-3 text-sm border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] bg-white dark:bg-slate-800 text-[var(--jc-body)] dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1"
-      :title="`多選方言列，每次最多 ${maxColumns} 列`"
+      title="多選方言列"
       @click="toggleOpen"
     >
       <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4" />
       方言列
-      <span class="jc-mono text-xs">{{ selectedCountLabel }}/{{ maxColumns }}</span>
+      <span class="jc-mono text-xs">{{ selectedCountLabel }}</span>
       <UIcon name="i-heroicons-chevron-down" class="w-3.5 h-3.5 text-gray-400" />
     </button>
 
@@ -31,14 +31,12 @@
               v-for="col in group.columns"
               :key="col.id"
               class="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              :class="{ 'opacity-40 cursor-not-allowed': isDisabled(col.id) }"
               :title="col.canEdit ? undefined : '你沒有此列的編輯權限（唯讀可見）'"
             >
               <input
                 type="checkbox"
                 class="accent-[var(--jc-accent)]"
                 :checked="draft.includes(col.id)"
-                :disabled="isDisabled(col.id)"
                 @change="toggleColumn(col.id)"
               >
               <span class="flex-1 truncate text-[var(--jc-body)] dark:text-gray-300">{{ col.label }}</span>
@@ -54,14 +52,23 @@
       </div>
       <div class="border-t border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] px-3 py-2 flex items-center gap-2">
         <span class="text-[11px] text-gray-400">
-          已選 <strong>{{ draft.length }}</strong>/{{ maxColumns }}
-          <template v-if="limitReached"> · 每次最多 {{ maxColumns }} 列</template>
+          已選 <strong>{{ draft.length }}</strong>
         </span>
         <button
           type="button"
           class="ml-auto text-xs text-gray-500 dark:text-gray-400 hover:underline"
+          @click="selectAll"
+        >全選</button>
+        <button
+          type="button"
+          class="text-xs text-gray-500 dark:text-gray-400 hover:underline"
+          @click="clearAll"
+        >清空</button>
+        <button
+          type="button"
+          class="text-xs text-gray-500 dark:text-gray-400 hover:underline"
           @click="resetToDefault"
-        >重設為預設</button>
+        >預設</button>
         <UButton size="xs" :disabled="loading" @click="apply">套用</UButton>
       </div>
     </div>
@@ -69,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { FAANJYUT_MATRIX_MAX_COLUMNS, type FaanjyutMatrixColumn } from '~/composables/useFaanjyutMatrix'
+import { type FaanjyutMatrixColumn } from '~/composables/useFaanjyutMatrix'
 
 const props = withDefaults(defineProps<{
   allColumns: FaanjyutMatrixColumn[]
@@ -78,11 +85,9 @@ const props = withDefaults(defineProps<{
   /** 目前表格實際顯示的列數（默認列集時按鈕計數用） */
   displayedCount?: number
   loading?: boolean
-  maxColumns?: number
 }>(), {
   displayedCount: 0,
-  loading: false,
-  maxColumns: FAANJYUT_MATRIX_MAX_COLUMNS
+  loading: false
 })
 
 const emit = defineEmits<{
@@ -106,17 +111,11 @@ const groupedColumns = computed(() => {
   ].filter((g) => g.columns.length > 0)
 })
 
-const limitReached = computed(() => draft.value.length >= props.maxColumns)
-
-function isDisabled(id: string): boolean {
-  return limitReached.value && !draft.value.includes(id)
-}
-
 function toggleColumn(id: string) {
   const index = draft.value.indexOf(id)
   if (index >= 0) {
     draft.value.splice(index, 1)
-  } else if (draft.value.length < props.maxColumns) {
+  } else {
     draft.value.push(id)
   }
 }
@@ -131,6 +130,14 @@ function toggleOpen() {
 function apply() {
   emit('update:modelValue', [...draft.value])
   open.value = false
+}
+
+function selectAll() {
+  draft.value = props.allColumns.map((c) => c.id)
+}
+
+function clearAll() {
+  draft.value = []
 }
 
 function resetToDefault() {

@@ -1,15 +1,14 @@
 /**
  * PUT /api/faanjyut/preferences（審計 M52，2026-08-07）
- * 保存泛粵矩陣頁列選擇偏好（§6.2）：body { matrixColumns: string[]（≤30，逐項校驗非空）}。
+ * 保存泛粵矩陣頁列選擇偏好（§6.2）：body { matrixColumns: string[]（逐項校驗非空）}。
  * 普通 user preference，非 SavedView 命名空間；越界/超長 400。
  */
 import { z } from 'zod'
 import { User } from '../../utils/User'
 import { connectDB } from '../../utils/db'
-import { MATRIX_MAX_COLUMNS } from '../../utils/faanjyut/matrix'
 
 const BodySchema = z.object({
-  matrixColumns: z.array(z.string().trim().min(1)).max(MATRIX_MAX_COLUMNS)
+  matrixColumns: z.array(z.string().trim().min(1))
 })
 
 export default defineEventHandler(async (event) => {

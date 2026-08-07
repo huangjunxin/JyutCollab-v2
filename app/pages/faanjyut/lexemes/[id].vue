@@ -261,8 +261,114 @@ async function restoreLexemeField(
 // ---- 區塊 2：各方言點方音（僅域內列；域外列歸區塊 3） ----
 
 const domesticPronunciations = computed(
-  () => (data.value?.pronunciations ?? []).filter((item) => item.sourceRole !== 'external')
+  () => (data.value?.pronunciations ?? []).filter((item) => item.sourceRole === 'domestic')
 )
+
+/** 空白卡（cell 四態為 null）默認隱藏，可切換顯示 */
+const showEmpty = ref(false)
+
+/**
+ * 方言點 regionCode → 地理區域中文名（香港繁體）。
+ * regionCode 為方言級代碼（同 shared/dialects.ts DIALECT_REGION_CODES，如 GZ/TS/JMBS）；
+ * 分區依 dialects.ts 的方言分區註釋整理，2026-08-07 對照 77 個 domestic active 列全量收錄；
+ * 未收錄或缺省 regionCode 的列歸「其他」組。
+ */
+const REGION_CODE_LABELS: Record<string, string> = {
+  // 廣東·珠三角／粵中
+  GZ: '廣東·珠三角／粵中', HK: '廣東·珠三角／粵中', MO: '廣東·珠三角／粵中',
+  CHLT: '廣東·珠三角／粵中', PYNS: '廣東·珠三角／粵中', SD: '廣東·珠三角／粵中',
+  ZSXL: '廣東·珠三角／粵中', ZCXSXW: '廣東·珠三角／粵中', BYBHZH: '廣東·珠三角／粵中',
+  // 廣東·肇慶一帶
+  DZ: '廣東·肇慶一帶', DHPC: '廣東·肇慶一帶', FKKJ: '廣東·肇慶一帶',
+  // 廣東·江門五邑
+  JM: '廣東·江門五邑', JMSN: '廣東·江門五邑', JMHT: '廣東·江門五邑',
+  JMBS: '廣東·江門五邑', JMJT: '廣東·江門五邑',
+  XH: '廣東·江門五邑', XHTH: '廣東·江門五邑',
+  TS: '廣東·江門五邑', TSDJ: '廣東·江門五邑', TSDS: '廣東·江門五邑',
+  KPCS: '廣東·江門五邑', KPST: '廣東·江門五邑',
+  // 廣東·粵西／雲浮
+  LD: '廣東·粵西／雲浮', YCSB: '廣東·粵西／雲浮',
+  // 廣東·粵西（陽江、茂名、湛江）
+  MM: '廣東·粵西（陽江、茂名、湛江）', GZXJ: '廣東·粵西（陽江、茂名、湛江）',
+  GZhou: '廣東·粵西（陽江、茂名、湛江）', SXSC: '廣東·粵西（陽江、茂名、湛江）',
+  SXCT: '廣東·粵西（陽江、茂名、湛江）', ZJ: '廣東·粵西（陽江、茂名、湛江）',
+  HZXJ: '廣東·粵西（陽江、茂名、湛江）',
+  // 廣東·珠三角周邊（東莞等）
+  DGTJ: '廣東·珠三角周邊', DGHM: '廣東·珠三角周邊',
+  // 廣東·粵北
+  SG: '廣東·粵北',
+  // 廣西·梧州一帶
+  CWSQ: '廣西·梧州一帶', WZ: '廣西·梧州一帶', WZRX: '廣西·梧州一帶', WZFD: '廣西·梧州一帶',
+  MS: '廣西·梧州一帶', MSCT: '廣西·梧州一帶',
+  TXLJ: '廣西·梧州一帶', TXTDZH: '廣西·梧州一帶',
+  // 廣西·桂東南
+  GP: '廣西·桂東南', GPMG: '廣西·桂東南', GPXW: '廣西·桂東南',
+  PN: '廣西·桂東南', GG: '廣西·桂東南', GGSK: '廣西·桂東南',
+  XYSX: '廣西·桂東南', BBSM: '廣西·桂東南', YL: '廣西·桂東南',
+  LCMP: '廣西·桂東南', BL: '廣西·桂東南', BLLM: '廣西·桂東南',
+  RX: '廣西·桂東南', RXZL: '廣西·桂東南',
+  // 廣西·南寧一帶
+  NN: '廣西·南寧一帶', NNTZ: '廣西·南寧一帶', HX: '廣西·南寧一帶',
+  // 廣西·桂北／柳州
+  YZ: '廣西·桂北／柳州', RACA: '廣西·桂北／柳州', SJGY: '廣西·桂北／柳州',
+  YSXP: '廣西·桂北／柳州', LGYN: '廣西·桂北／柳州',
+  // 廣西·桂南（北海、欽州、防城）
+  BH: '廣西·桂南', QZ: '廣西·桂南', XL: '廣西·桂南', FCG: '廣西·桂南',
+  HNHH: '廣西·桂南', LS: '廣西·桂南', XJFW: '廣西·桂南', PBFW: '廣西·桂南',
+  LZhou: '廣西·桂南', SYMH: '廣西·桂南', DZhou: '廣西·桂南'
+}
+
+/** 區域組顯示順序（「其他」恆排最後） */
+const REGION_ORDER = [
+  '廣東·珠三角／粵中',
+  '廣東·珠三角周邊',
+  '廣東·肇慶一帶',
+  '廣東·江門五邑',
+  '廣東·粵西／雲浮',
+  '廣東·粵西（陽江、茂名、湛江）',
+  '廣東·粵北',
+  '廣西·梧州一帶',
+  '廣西·桂東南',
+  '廣西·南寧一帶',
+  '廣西·桂北／柳州',
+  '廣西·桂南',
+  '其他'
+]
+
+interface PronunciationGroup {
+  region: string
+  items: FaanJyutLexemeDetail['pronunciations'][number][]
+  /** 有值卡數（normal/absent/cleared；null 為空白卡） */
+  hasValueCount: number
+  /** 當前實際顯示的卡（隱藏空白時過濾 null 態） */
+  visibleItems: FaanJyutLexemeDetail['pronunciations'][number][]
+}
+
+const pronunciationGroups = computed<PronunciationGroup[]>(() => {
+  const byRegion = new Map<string, FaanJyutLexemeDetail['pronunciations'][number][]>()
+  for (const item of domesticPronunciations.value) {
+    const region = REGION_CODE_LABELS[item.regionCode ?? ''] ?? '其他'
+    const list = byRegion.get(region)
+    if (list) list.push(item)
+    else byRegion.set(region, [item])
+  }
+  return [...byRegion.entries()]
+    .map(([region, items]) => {
+      const valued = items.filter((item) => item.cell.state !== 'null')
+      return {
+        region,
+        items,
+        hasValueCount: valued.length,
+        visibleItems: showEmpty.value ? items : valued
+      }
+    })
+    .filter((group) => group.visibleItems.length > 0)
+    .sort((a, b) => {
+      const indexA = REGION_ORDER.indexOf(a.region)
+      const indexB = REGION_ORDER.indexOf(b.region)
+      return (indexA === -1 ? REGION_ORDER.length : indexA) - (indexB === -1 ? REGION_ORDER.length : indexB)
+    })
+})
 
 // ---- 區塊 3：域外材料 ----
 
@@ -643,16 +749,46 @@ function authorInitial(author: string | null | undefined): string {
             <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1B2530]"></span>
             空白（原表無記錄）
           </span>
+          <UButton
+            size="xs"
+            color="gray"
+            variant="soft"
+            class="ml-auto"
+            @click="showEmpty = !showEmpty"
+          >
+            <UIcon :name="showEmpty ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'" class="w-3.5 h-3.5" />
+            {{ showEmpty ? '隱藏空白' : '顯示空白' }}
+          </UButton>
         </div>
 
-        <div v-if="domesticPronunciations.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <FaanjyutPronunciationCard
-            v-for="item in domesticPronunciations"
-            :key="item.columnId"
-            :item="item"
-          />
+        <div v-if="pronunciationGroups.length" class="space-y-2.5">
+          <details
+            v-for="group in pronunciationGroups"
+            :key="group.region"
+            class="jc-card group"
+            :open="group.hasValueCount > 0"
+          >
+            <summary class="px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-black/[.02] dark:hover:bg-black/20 select-none">
+              <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-[var(--jc-muted)] transition-transform group-open:rotate-90" />
+              <span class="text-sm font-semibold text-[var(--jc-ink-strong)] dark:text-slate-100">{{ group.region }}</span>
+              <span class="text-[11px] text-[var(--jc-muted)]">{{ group.hasValueCount }}/{{ group.items.length }} 有值</span>
+            </summary>
+            <div class="border-t border-gray-200 dark:border-slate-700 p-3">
+              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <FaanjyutPronunciationCard
+                  v-for="item in group.visibleItems"
+                  :key="item.columnId"
+                  :item="item"
+                />
+              </div>
+            </div>
+          </details>
         </div>
-        <p v-else class="text-sm text-[var(--jc-muted)]">本詞條無方言點方音記錄。</p>
+        <p v-else class="text-sm text-[var(--jc-muted)]">
+          {{ domesticPronunciations.length
+            ? '本詞條各方言點皆無記錄，按「顯示空白」可查看全部。'
+            : '本詞條無方言點方音記錄。' }}
+        </p>
       </section>
 
       <!-- ============ 區塊 3：域外材料 ============ -->

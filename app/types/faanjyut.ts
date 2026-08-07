@@ -40,6 +40,7 @@ export interface FaanJyutLexemeDetail {
     shortLabel: string | null
     dialectId: string | null
     languageCode: string | null
+    regionCode: string | null
     sourceRole: string | null
     originalOrder: number | null
     style: Record<string, unknown> | null

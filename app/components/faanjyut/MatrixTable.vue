@@ -9,13 +9,13 @@
     class="fj-matrix-wrap overflow-auto bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard-lg)]"
     @keydown="onWrapKeydown"
   >
-    <table class="fj-matrix">
+    <table class="fj-matrix" :style="{ width: `${282 + columns.length * 96}px` }">
       <colgroup>
-        <!-- 行頭三列（2026-08-06：釋義 200px | 代表字 72px | 綜合音 120px） -->
-        <col style="width: 200px">
-        <col style="width: 72px">
-        <col style="width: 120px">
-        <col v-for="col in columns" :key="col.id" style="width: 140px">
+        <!-- 行頭三列（2026-08-07 密度優化：釋義 140px | 代表字 52px | 綜合音 90px） -->
+        <col style="width: 140px">
+        <col style="width: 52px">
+        <col style="width: 90px">
+        <col v-for="col in columns" :key="col.id" style="width: 96px">
       </colgroup>
       <thead>
         <!-- 列分組帶（簡化版：按 sourceRole 連續段分組） -->
@@ -39,38 +39,25 @@
           </th>
           <th class="fj-sk2 px-2 py-2 text-center">
             代表字
-            <span class="block text-[9px] font-normal text-gray-400 mt-0.5">點擊看詳情</span>
+            <span class="block text-[9px] font-normal text-gray-400 mt-0.5">詳情</span>
           </th>
           <th class="fj-sk3 px-2 py-2 text-center">綜合音</th>
           <th
             v-for="col in columns"
             :key="col.id"
-            class="px-3 py-2 text-left"
+            class="px-2 py-2 text-left"
             :style="columnHeaderStyle(col)"
-            :title="col.canEdit ? undefined : '你沒有此列的編輯權限'"
+            :title="columnHeaderTitle(col)"
           >
             <span
-              class="text-[13px] font-bold"
+              class="text-[13px] font-bold block truncate"
               :class="col.canEdit ? 'text-[var(--jc-ink-strong)] dark:text-white' : 'text-gray-500 dark:text-gray-400'"
             >{{ col.label }}</span>
             <span
               v-if="columnBadge(col)"
-              class="jc-mono text-[9px] px-1 ml-1 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 bg-white/60 dark:bg-slate-700/60 rounded-full"
+              class="jc-mono text-[9px] px-1 mt-0.5 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 bg-white/60 dark:bg-slate-700/60 rounded-full inline-block max-w-full truncate"
+              :title="columnBadge(col)"
             >{{ columnBadge(col) }}</span>
-            <span
-              v-if="col.canEdit && writeEnabled"
-              class="block text-[9px] font-normal mt-0.5 flex items-center gap-0.5 text-[var(--jc-accent)]"
-            >
-              <UIcon name="i-heroicons-pencil-square" class="w-3 h-3" />
-              可編輯
-            </span>
-            <span
-              v-else
-              class="block text-[9px] font-normal mt-0.5 flex items-center gap-0.5 text-gray-400"
-            >
-              <UIcon name="i-heroicons-lock-closed" class="w-3 h-3" />
-              唯讀
-            </span>
           </th>
         </tr>
       </thead>
@@ -262,6 +249,17 @@ function columnBadge(col: FaanjyutMatrixColumn): string | null {
   return null
 }
 
+/** 列頭 hover 提示：完整標籤 + languageCode/shortLabel + 權限（2026-08-07：badge 超長用省略號截斷，
+ *  完整代碼放 title 不丟信息；域外列如 proto_austroasiatic 在 96px 列寬下必然截斷） */
+function columnHeaderTitle(col: FaanjyutMatrixColumn): string {
+  const badge = columnBadge(col)
+  const idPart = badge ? `（${badge}）` : ''
+  const perm = col.canEdit
+    ? (props.writeEnabled ? '✏ 可編輯（點擊格即可編輯）' : '✏ 可編輯（當前為只讀模式）')
+    : '🔒 唯讀：你沒有此列的編輯權限'
+  return `${col.label}${idPart} · ${perm}`
+}
+
 /** 列頭底色：style.color 透明度弱化，疊在不透明底上保證吸頂遮蓋（§6 頁面規格） */
 function columnHeaderStyle(col: FaanjyutMatrixColumn): Record<string, string> | undefined {
   const rgba = hexToRgba(col.style?.color, 0.16)
@@ -309,15 +307,15 @@ watch(
 
 <style>
 /* 矩陣表格骨架（吸頂列頭 + 吸左行頭）；非 scoped，需覆蓋 FaanjyutCell 的 td。 */
-.fj-matrix-wrap { max-height: 72vh; }
-.fj-matrix { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: max-content; }
+.fj-matrix-wrap { max-height: 72vh; max-width: fit-content; }
+.fj-matrix { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .fj-matrix th, .fj-matrix td { border-right: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; }
 .fj-matrix thead th { position: sticky; z-index: 12; background: #FAFAF6; font-size: 11px; font-weight: 600; color: #4B5563; }
 .fj-matrix thead tr:first-child th { top: 0; height: 28px; }
 .fj-matrix thead tr:nth-child(2) th { top: 28px; vertical-align: top; }
 .fj-matrix .fj-sk1 { position: sticky; left: 0; z-index: 8; background: #fff; }
-.fj-matrix .fj-sk2 { position: sticky; left: 200px; z-index: 8; background: #fff; }
-.fj-matrix .fj-sk3 { position: sticky; left: 272px; z-index: 8; background: #fff; }
+.fj-matrix .fj-sk2 { position: sticky; left: 140px; z-index: 8; background: #fff; }
+.fj-matrix .fj-sk3 { position: sticky; left: 192px; z-index: 8; background: #fff; }
 .fj-matrix thead .fj-sk1, .fj-matrix thead .fj-sk2, .fj-matrix thead .fj-sk3 { z-index: 14; background: #FAFAF6; }
 /* 列頭 tint（style.color 弱化），疊在不透明底上 */
 .fj-matrix thead tr:nth-child(2) th[style*="--fj-col-tint"] {

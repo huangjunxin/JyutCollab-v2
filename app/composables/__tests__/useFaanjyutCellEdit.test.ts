@@ -67,6 +67,12 @@ function makeHarness(opts: {
   const ctrl = useFaanjyutCellEdit({ matrixData, writeCells, toast: { add: toastAdd } })
   return { matrixData, writeCells, toastAdd, ctrl }
 }
+/** 兩段式點擊：首次點擊聚焦，再次點擊同一格進入編輯 */
+function clickToEdit(ctrl: ReturnType<typeof makeHarness>['ctrl'], lexemeId: string, columnId: string) {
+  ctrl.handleCellClick(lexemeId, columnId)
+  ctrl.handleCellClick(lexemeId, columnId)
+}
+
 
 const enterEvent = (key = 'Enter') =>
   ({ key, isComposing: false, preventDefault: vi.fn(), stopPropagation: vi.fn() }) as unknown as KeyboardEvent
@@ -162,8 +168,13 @@ describe('移格列掃描（跳過 canEdit=false 的列）', () => {
 /* ---------------- 狀態機 ---------------- */
 
 describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
-  it('click enters edit prefilling the current display value', () => {
+  it('first click only focuses; second click on the same cell enters edit', () => {
     const { ctrl } = makeHarness()
+    // 第一次點擊：僅聚焦，不進入編輯
+    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    expect(ctrl.editingCell.value).toBeNull()
+    expect(ctrl.focusedCell.value).toEqual({ lexemeId: 'lex-1', columnId: 'col-guangzhou' })
+    // 第二次點擊同一格：進入編輯
     ctrl.handleCellClick('lex-1', 'col-guangzhou')
     expect(ctrl.editingCell.value).toEqual({ lexemeId: 'lex-1', columnId: 'col-guangzhou' })
     expect(ctrl.editValue.value).toBe('mai1')
@@ -183,7 +194,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('Enter saves a set op, patches the cell locally and shows an undo toast', async () => {
     const { matrixData, writeCells, toastAdd, ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     await flushAsync()
@@ -206,7 +217,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
   it('`_` maps to absent, empty input maps to clear; both patch the four-state view', async () => {
     // absent
     const a = makeHarness()
-    a.ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(a.ctrl, 'lex-1', 'col-guangzhou')
     a.ctrl.setEditValue('_')
     a.ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     await flushAsync()
@@ -215,7 +226,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
     // clear（服務端卸載 raw → 本地視圖同步無 raw，顯示佔位）
     const c = makeHarness()
-    c.ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(c.ctrl, 'lex-1', 'col-guangzhou')
     c.ctrl.setEditValue('')
     c.ctrl.handleEditorBlur('lex-1', 'col-guangzhou')
     await new Promise((r) => setTimeout(r, 250))
@@ -226,7 +237,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('unchanged value exits edit silently without any write or toast', async () => {
     const { writeCells, toastAdd, ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mai1')
     ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     await flushAsync()
@@ -240,7 +251,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
     const { ctrl } = makeHarness({
       writeCells: () => new Promise<FaanjyutCellWriteData>((res) => { resolveWrite = res })
     })
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     await flushAsync()
@@ -258,7 +269,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
         return okResult(edits)
       }
     })
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorBlur('lex-1', 'col-guangzhou')
     await new Promise((r) => setTimeout(r, 250))
@@ -280,7 +291,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('undo toast action sends the reverse op and patches back to the previous state', async () => {
     const { matrixData, writeCells, toastAdd, ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     await flushAsync()
@@ -298,7 +309,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
   it('undo of a set on a previously-null cell degrades to clear（v1 簡化，§6.4）', async () => {
     const { matrixData, writeCells, toastAdd, ctrl } = makeHarness()
     // lex-2 的 col-guangzhou 從未有數據（null）
-    ctrl.handleCellClick('lex-2', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-2', 'col-guangzhou')
     expect(ctrl.editValue.value).toBe('')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorKeydown(enterEvent(), 'lex-2', 'col-guangzhou')
@@ -315,7 +326,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('Tab moves to the next editable column skipping read-only ones, and wraps to the next row', () => {
     const { ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.handleEditorKeydown({ ...enterEvent('Tab'), shiftKey: false } as unknown as KeyboardEvent, 'lex-1', 'col-guangzhou')
     expect(ctrl.editingCell.value).toEqual({ lexemeId: 'lex-1', columnId: 'col-hongkong' })
     // col-jiangmen / col-external 均唯讀 → 跳過並換行到 lex-2 的第一個可編輯列
@@ -325,7 +336,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('Enter on an IME composing event is not intercepted (composition stays intact)', () => {
     const { writeCells, ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou')
     ctrl.handleEditorKeydown({ key: 'Enter', isComposing: true, preventDefault: vi.fn() } as unknown as KeyboardEvent, 'lex-1', 'col-guangzhou')
     expect(writeCells).not.toHaveBeenCalled()
@@ -334,7 +345,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('Esc cancels editing without writing', () => {
     const { writeCells, ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorKeydown(enterEvent('Escape'), 'lex-1', 'col-guangzhou')
     expect(ctrl.editingCell.value).toBeNull()
@@ -343,12 +354,13 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('blur saves with a 200ms debounce; clicking another editable cell flushes the previous one first', async () => {
     const { writeCells, ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
-    // 200ms 內點擊下一格 → 上一格先 flush（立即保存）再進入新格
+    // 200ms 內點擊下一格 -> 上一格先 flush，新格僅聚焦（兩段式）
     ctrl.handleCellClick('lex-1', 'col-hongkong')
     await flushAsync()
-    expect(ctrl.editingCell.value).toEqual({ lexemeId: 'lex-1', columnId: 'col-hongkong' })
+    expect(ctrl.editingCell.value).toBeNull()
+    expect(ctrl.focusedCell.value).toEqual({ lexemeId: 'lex-1', columnId: 'col-hongkong' })
     expect(writeCells).toHaveBeenCalledTimes(1)
     expect(writeCells.mock.calls[0][0][0]).toMatchObject({
       lexemeId: 'lex-1',
@@ -385,7 +397,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
   it('resetAll clears all transient edit state (page/filter/locate reload)', () => {
     const { ctrl } = makeHarness()
-    ctrl.handleCellClick('lex-1', 'col-guangzhou')
+    clickToEdit(ctrl, 'lex-1', 'col-guangzhou')
     ctrl.setEditValue('mou5')
     ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     // 不等保存完成即 reset（模擬翻頁）

@@ -138,9 +138,6 @@ export interface FetchMatrixParams {
   cellFilter?: FaanjyutCellState | null
 }
 
-/** 每次最多可選列數（與服務端 MATRIX_MAX_COLUMNS 一致） */
-export const FAANJYUT_MATRIX_MAX_COLUMNS = 30
-
 export function useFaanjyutMatrix() {
   async function fetchMatrix(params: FetchMatrixParams): Promise<FaanjyutMatrixData> {
     const query: Record<string, string | number> = {

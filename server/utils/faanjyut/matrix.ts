@@ -4,9 +4,6 @@
  * 本模塊不觸庫，供 handler 薄殼與 vitest 直接測試。
  */
 
-/** 每次矩陣請求最多列數（§6.2：響應體 500 KB 上限） */
-export const MATRIX_MAX_COLUMNS = 30
-
 /** 未指定列時的默認常用列集（本人可編輯列 + 廣州、香港） */
 export const MATRIX_DEFAULT_DIALECT_IDS = ['guangzhou', 'hongkong'] as const
 
@@ -131,10 +128,9 @@ export function canEditColumn(column: MatrixColumnDoc, user: MatrixUser): boolea
 
 /**
  * 列選擇（§6.2）：
- * - 指定 requestedColumnIds：去重後超過 30 列返回錯誤標記（handler 轉 400）；
- *   未命中（不存在/非矩陣列）的 id 靜默略過，結果按 order.originalOrder 排序。
- * - 未指定：默認列集 = 本人 canEdit 列 + 廣州/香港列（去重、按 originalOrder 排序），
- *   超過 30 列截斷。
+ * - 指定 requestedColumnIds：去重後按 order.originalOrder 排序；
+ *   未命中（不存在/非矩陣列）的 id 靜默略過。
+ * - 未指定：默認列集 = 本人 canEdit 列 + 廣州/香港列（去重、按 originalOrder 排序），不截斷。
  */
 export function buildColumnSelection(args: {
   allColumns: MatrixColumnDoc[]
@@ -159,9 +155,6 @@ export function buildColumnSelection(args: {
     })
   } else {
     const uniqueIds = [...new Set(requestedColumnIds)]
-    if (uniqueIds.length > MATRIX_MAX_COLUMNS) {
-      return { ok: false, error: `一次最多選擇 ${MATRIX_MAX_COLUMNS} 列` }
-    }
     picked = uniqueIds
       .map((id) => byId.get(id))
       .filter((c): c is MatrixColumnDoc => !!c)
@@ -170,9 +163,6 @@ export function buildColumnSelection(args: {
   picked = [...picked].sort(
     (a, b) => (a.order?.originalOrder ?? 0) - (b.order?.originalOrder ?? 0)
   )
-  if (isDefault && picked.length > MATRIX_MAX_COLUMNS) {
-    picked = picked.slice(0, MATRIX_MAX_COLUMNS)
-  }
 
   return {
     ok: true,
@@ -300,7 +290,7 @@ export function listMatrixColumns(args: {
     .map((c) => ({ ...c, canEdit: canEditColumn(c, user) }))
 }
 
-/** 響應體積估算（§6.6 性能預算守衛：50 行 × 30 列 < 500 KB） */
+/** 響應體積估算（§6.6 性能預算守衛：50 行 × N 列；選列多時需留意 payload 增長） */
 export function estimatePayloadBytes(data: unknown): number {
   return Buffer.byteLength(JSON.stringify(data), 'utf8')
 }

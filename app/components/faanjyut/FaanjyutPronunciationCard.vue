@@ -38,7 +38,7 @@ function cellTitle(cell: FaanJyutCellView): string {
 </script>
 
 <template>
-  <div class="jc-card p-3" :title="cellTitle(item.cell)">
+  <div class="jc-card p-2" :title="cellTitle(item.cell)">
     <div class="flex items-center justify-between gap-1 mb-2">
       <span class="text-sm font-medium text-[var(--jc-ink-strong)] dark:text-slate-100 truncate">
         {{ item.label }}
@@ -49,8 +49,8 @@ function cellTitle(cell: FaanJyutCellView): string {
         :label="item.shortLabel"
       />
     </div>
-    <FaanjyutCellBadge :cell="item.cell" large />
-    <div class="text-[11px] text-center mt-1.5 text-[var(--jc-muted)] dark:text-slate-400">
+    <FaanjyutCellBadge :cell="item.cell" />
+    <div class="text-[10px] text-center mt-1 text-[var(--jc-muted)] dark:text-slate-400">
       {{ stateHint(item.cell) }}
     </div>
   </div>

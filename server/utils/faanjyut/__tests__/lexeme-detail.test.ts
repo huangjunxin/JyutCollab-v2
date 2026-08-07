@@ -52,9 +52,9 @@ function buildInput(overrides: Partial<AssembleLexemeDetailInput> = {}): Assembl
       status: { publicationStatus: 'published', qualityStatus: 'unreviewed_import' }
     },
     columns: [
-      { id: COL_TS, label: '台山', shortLabel: '台', sourceRole: 'domestic', dialectId: 'taishan', order: { originalOrder: 17 }, status: 'active' },
-      { id: COL_HK, label: '香港', shortLabel: '港', sourceRole: 'domestic', dialectId: 'hongkong', order: { originalOrder: 24 }, status: 'active' },
-      { id: COL_GZ, label: '廣州', shortLabel: '穗', sourceRole: 'domestic', dialectId: 'guangzhou', order: { originalOrder: 35 }, status: 'active' },
+      { id: COL_TS, label: '台山', shortLabel: '台', sourceRole: 'domestic', dialectId: 'taishan', regionCode: 'TS', order: { originalOrder: 17 }, status: 'active' },
+      { id: COL_HK, label: '香港', shortLabel: '港', sourceRole: 'domestic', dialectId: 'hongkong', regionCode: 'HK', order: { originalOrder: 24 }, status: 'active' },
+      { id: COL_GZ, label: '廣州', shortLabel: '穗', sourceRole: 'domestic', dialectId: 'guangzhou', regionCode: 'GZ', order: { originalOrder: 35 }, status: 'active' },
       { id: COL_OCH, label: '上古漢', shortLabel: '上古', sourceRole: 'external', languageCode: 'och', order: { originalOrder: 126 }, status: 'active' },
       { id: COL_INACTIVE, label: '廢列', sourceRole: 'domestic', dialectId: 'yizhang', order: { originalOrder: 99 }, status: 'inactive' }
     ],
@@ -206,25 +206,29 @@ describe('faanjyut/lexeme-detail assembleLexemeDetail', () => {
     ])
   })
 
-  it('pronunciations：僅 active 列、按 originalOrder 升序、四態正確、域內列附 Entry', () => {
+  it('pronunciations：僅 active 列、按 originalOrder 升序、四態正確、域內列附 Entry、regionCode 透傳', () => {
     const { pronunciations } = assembleLexemeDetail(buildInput())
     expect(pronunciations.map((p) => p.columnId)).toEqual([COL_TS, COL_HK, COL_GZ, COL_OCH]) // 99 的 inactive 列被過濾
 
     const ts = pronunciations.find((p) => p.columnId === COL_TS)!
     expect(ts.cell).toEqual({ state: 'absent' })
+    expect(ts.regionCode).toBe('TS')
     expect(ts.entry).toEqual({ entryId: ENTRY_TS, headword: { display: '粵', normalized: '粵', isPlaceholder: false }, phonetic: { original: 'juot9' } })
 
     const hk = pronunciations.find((p) => p.columnId === COL_HK)!
     expect(hk.cell).toEqual({ state: 'cleared' })
+    expect(hk.regionCode).toBe('HK')
     expect(hk.entry).toBeNull() // 無對應 Entry
 
     const gz = pronunciations.find((p) => p.columnId === COL_GZ)!
     expect(gz.cell).toEqual({ state: 'normal', raw: 'jyut6' })
+    expect(gz.regionCode).toBe('GZ')
     expect(gz.entry?.entryId).toBe(ENTRY_GZ)
     expect(gz.entry?.phonetic).toEqual({ original: 'jyut6' })
 
     const och = pronunciations.find((p) => p.columnId === COL_OCH)!
     expect(och.cell).toEqual({ state: 'normal', raw: '[ɢ]ʷat' })
+    expect(och.regionCode).toBeNull() // 域外列無 regionCode
     expect(och.entry).toBeNull() // 域外列不附 Entry
     expect(och.languageCode).toBe('och')
   })

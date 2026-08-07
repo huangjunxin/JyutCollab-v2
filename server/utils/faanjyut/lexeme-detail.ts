@@ -33,6 +33,7 @@ export interface DetailColumnInput {
   sourceRole?: string
   dialectId?: string
   languageCode?: string
+  regionCode?: string
   order?: { originalOrder?: number }
   style?: Record<string, unknown> | null
   status?: string
@@ -182,6 +183,8 @@ export interface LexemeDetailData {
     shortLabel: string | null
     dialectId: string | null
     languageCode: string | null
+    /** 方言級地區代碼（如 GZ/TS），前端用於地理區域分組 */
+    regionCode: string | null
     sourceRole: string | null
     originalOrder: number | null
     style: Record<string, unknown> | null
@@ -337,6 +340,7 @@ export function assembleLexemeDetail(input: AssembleLexemeDetailInput): LexemeDe
       shortLabel: column.shortLabel ?? null,
       dialectId: column.dialectId ?? null,
       languageCode: column.languageCode ?? null,
+      regionCode: column.regionCode ?? null,
       sourceRole: column.sourceRole ?? null,
       originalOrder: column.order?.originalOrder ?? null,
       style: column.style ?? null,

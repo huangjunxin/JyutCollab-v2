@@ -1,11 +1,10 @@
 /**
  * matrix 純邏輯單元測試（FaanjyutV1Design.md §6/§12）：
- * 默認列集、30 列上限、canEdit、格四態推導、無 cell_state 的 domestic 格 Entry 回退、
+ * 默認列集、canEdit、格四態推導、無 cell_state 的 domestic 格 Entry 回退、
  * 內存 pivot、cellFilter、性能預算守衛（50 行 × 30 列 < 500 KB）。不連真庫、不測 handler。
  */
 import { describe, expect, it } from 'vitest'
 import {
-  MATRIX_MAX_COLUMNS,
   buildColumnSelection,
   canEditColumn,
   computeCellState,
@@ -89,27 +88,27 @@ describe('faanjyut/matrix buildColumnSelection', () => {
     expect(result.columns.every((c) => !c.canEdit)).toBe(true)
   })
 
-  it('默認列集超過 30 列時截斷為 30（admin 全部 domestic 可編輯）', () => {
+  it('默認列集不截斷：admin 全部 domestic 可編輯時 40 列全部返回', () => {
     const columns = Array.from({ length: 40 }, (_, i) =>
       col(`d${i}`, { order: { originalOrder: i + 1 } })
     )
     const result = buildColumnSelection({ allColumns: columns, user: admin })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.columns).toHaveLength(MATRIX_MAX_COLUMNS)
+    expect(result.columns).toHaveLength(40)
     expect(result.columns.map((c) => c.id)).toEqual(
-      Array.from({ length: MATRIX_MAX_COLUMNS }, (_, i) => `d${i}`)
+      Array.from({ length: 40 }, (_, i) => `d${i}`)
     )
     expect(result.columns.every((c) => c.canEdit)).toBe(true)
   })
 
-  it('指定列：requested 超過 30 列返回錯誤標記', () => {
+  it('指定列：超過 30 列也正常返回（無上限）', () => {
     const columns = Array.from({ length: 35 }, (_, i) => col(`d${i}`))
     const requested = columns.map((c) => c.id)
     const result = buildColumnSelection({ allColumns: columns, requestedColumnIds: requested, user: admin })
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toContain(String(MATRIX_MAX_COLUMNS))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.columns).toHaveLength(35)
   })
 
   it('指定列：未命中 id 靜默略過，結果按 originalOrder 排序並附 canEdit', () => {
@@ -402,7 +401,7 @@ describe('faanjyut/matrix pivotMatrix entries 回退（domestic 格無 cell_stat
 
 describe('faanjyut/matrix estimatePayloadBytes 性能預算守衛', () => {
   it('50 行 × 30 列構造數據 < 500 KB（§6.6；含 raw 值的 join 回退形態）', () => {
-    const columns = Array.from({ length: MATRIX_MAX_COLUMNS }, (_, i) => ({
+    const columns = Array.from({ length: 30 }, (_, i) => ({
       id: `fjcol_${String(i).padStart(24, '0')}`,
       label: `方言點${i}`,
       shortLabel: `點${i}`,

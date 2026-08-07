@@ -166,7 +166,7 @@
         :disabled="loading"
         @update:page="onPageChange"
       />
-      <p class="text-[11px] text-gray-400">每頁 {{ PER_PAGE }} 行 × 最多 {{ FAANJYUT_MATRIX_MAX_COLUMNS }} 列</p>
+      <p class="text-[11px] text-gray-400">每頁 {{ PER_PAGE }} 行</p>
     </div>
 
     <!-- P5 新建詞條彈窗（§8：至少一列編輯權限 + 寫入旗標開啟時顯示按鈕） -->
@@ -179,7 +179,6 @@
 // 「返回矩陣」恢復頁碼與列集（§7 導航承諾），不再重新掛載回第 1 頁
 defineOptions({ name: 'faanjyut-matrix' })
 import {
-  FAANJYUT_MATRIX_MAX_COLUMNS,
   type FaanjyutCellState,
   type FaanjyutMatrixColumn,
   type FaanjyutMatrixData

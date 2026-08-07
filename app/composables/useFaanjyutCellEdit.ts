@@ -47,7 +47,7 @@ export interface FaanjyutCellEditController {
   isFocusedCell(lexemeId: string, columnId: string): boolean
   pendingFor(lexemeId: string, columnId: string): boolean
   errorFor(lexemeId: string, columnId: string): string | undefined
-  /** 鼠標點擊格（MatrixTable 的 Cell @edit）→ 進入編輯（失敗格重新進入時預填失敗內容） */
+  /** 鼠標點擊格：首次聚焦，再次點擊同一格進入編輯 */
   handleCellClick(lexemeId: string, columnId: string): void
   /** 編輯框鍵盤事件（Enter 保存 / Tab 保存並移格 / Esc 取消） */
   handleEditorKeydown(event: KeyboardEvent, lexemeId: string, columnId: string): void
@@ -383,10 +383,19 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
     return errorCells.value.get(cellKey(lexemeId, columnId))
   }
 
+  /** 鼠標點擊格（MatrixTable 的 Cell @edit）。
+   *  兩段式：首次點擊僅聚焦（與方向鍵移格一致），再次點擊同一格才進入編輯。
+   *  編輯中點擊其他格：先保存當前格再聚焦目標格。 */
   function handleCellClick(lexemeId: string, columnId: string) {
-    // 失敗格點擊重試（§6.4）：重新進入編輯並預填失敗內容（內容不丟，見 initialValueFor），
-    // 用戶按 Enter/blur 重發——不自動重發，保留先修改失敗內容的機會。
-    beginEdit(lexemeId, columnId, false)
+    if (editingCell.value) {
+      flushCurrentEdit()
+    }
+    const f = focusedCell.value
+    if (f && f.lexemeId === lexemeId && f.columnId === columnId) {
+      beginEdit(lexemeId, columnId, false)
+    } else {
+      focusedCell.value = { lexemeId, columnId }
+    }
   }
 
   function handleEditorKeydown(event: KeyboardEvent, lexemeId: string, columnId: string) {
