@@ -58,7 +58,7 @@
               class="jc-mono text-[9px] px-1 ml-1 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 bg-white/60 dark:bg-slate-700/60 rounded-full"
             >{{ columnBadge(col) }}</span>
             <span
-              v-if="col.canEdit"
+              v-if="col.canEdit && writeEnabled"
               class="block text-[9px] font-normal mt-0.5 flex items-center gap-0.5 text-[var(--jc-accent)]"
             >
               <UIcon name="i-heroicons-pencil-square" class="w-3 h-3" />
@@ -158,6 +158,7 @@
 import type { FaanjyutMatrixColumn, FaanjyutMatrixRow } from '~/composables/useFaanjyutMatrix'
 import type { FaanjyutCellEditController } from '~/composables/useFaanjyutCellEdit'
 import { simplifyDefinitionForMatrix } from '~/utils/faanjyutFormat'
+import { useMobileBreakpoint } from '~/composables/useMobileBreakpoint'
 
 const props = withDefaults(defineProps<{
   columns: FaanjyutMatrixColumn[]
@@ -187,9 +188,11 @@ function rowDefinition(row: FaanjyutMatrixRow): string {
   return simplifyDefinitionForMatrix(row.definitionRaw)
 }
 
-/** 權限門只看服務端下發的 col.canEdit（§14.3 前端不自行放行），再疊加全局寫入旗標 */
+/** 權限門只看服務端下發的 col.canEdit（§14.3 前端不自行放行），再疊加全局寫入旗標；
+ *  審計 M54：移動端一律只讀（§13.1「v1 移動端只讀」決策） */
+const { isMobile } = useMobileBreakpoint()
 function isEditableCell(col: FaanjyutMatrixColumn): boolean {
-  return col.canEdit && props.writeEnabled
+  return !isMobile.value && col.canEdit && props.writeEnabled
 }
 
 /** 唯讀格 hover 提示：僅在寫入旗標開啟時提示（關閉時整頁唯讀，頁面已有「唯讀」badge） */

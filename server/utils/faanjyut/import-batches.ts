@@ -15,6 +15,8 @@ export interface BatchDocLike {
   mode?: string
   environment?: string
   status?: string
+  baselineLevel?: string
+  createdBy?: string
   source?: { sourceWorkbook?: string }
   counts?: { written?: Record<string, number> }
   error?: string | null
@@ -30,6 +32,9 @@ export interface BatchSummary {
   mode: string
   environment: string
   status: string
+  // 審計 M32：§10.1 要求的基線與創建者
+  baselineLevel: string | null
+  createdBy: string | null
   sourceWorkbook: string
   /** counts.written 各 collection 計數合計 */
   countsWrittenTotal: number
@@ -57,6 +62,9 @@ export function summarizeBatch(doc: BatchDocLike): BatchSummary {
     mode: doc.mode ?? 'unknown',
     environment: doc.environment ?? 'unknown',
     status: doc.status ?? 'unknown',
+    // 審計 M32：§10.1 要求的基線與創建者（舊批次缺省 → null，前端顯示 —）
+    baselineLevel: typeof doc.baselineLevel === 'string' && doc.baselineLevel ? doc.baselineLevel : null,
+    createdBy: typeof doc.createdBy === 'string' && doc.createdBy ? doc.createdBy : null,
     sourceWorkbook: doc.source?.sourceWorkbook ?? '',
     countsWrittenTotal,
     startedAt: toIsoOrNull(doc.startedAt),

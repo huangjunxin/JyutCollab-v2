@@ -44,6 +44,8 @@ interface CliArgs {
   dryRun: boolean
   apply: boolean
   confirmWrite: string | null
+  environment: string
+  confirmProduction: boolean
   reportDir: string
   help: boolean
 }
@@ -53,6 +55,8 @@ function parseArgs(argv: string[]): CliArgs {
     dryRun: false,
     apply: false,
     confirmWrite: null,
+    environment: 'staging',
+    confirmProduction: false,
     reportDir: resolve(root, '.artifacts/faanjyut/index-plan'),
     help: false
   }
@@ -67,6 +71,9 @@ function parseArgs(argv: string[]): CliArgs {
       case '--dry-run': args.dryRun = true; break
       case '--apply': args.apply = true; break
       case '--confirm-write': args.confirmWrite = next() ?? null; break
+      case '--environment': args.environment = next() ?? 'staging'; break
+      // 審計 M49：生產環境應用索引計劃（含 drop）需顯式雙確認
+      case '--confirm-production': args.confirmProduction = true; break
       case '--report-dir': args.reportDir = next() ?? args.reportDir; break
       default:
         if (arg.startsWith('--')) {
@@ -118,6 +125,16 @@ function main(): void {
   }
   if (!args.apply && args.confirmWrite !== null) {
     console.error('錯誤：--confirm-write 僅 --apply 模式使用')
+    process.exit(1)
+  }
+  if (!['local', 'staging', 'production'].includes(args.environment)) {
+    console.error(`錯誤：--environment 只接受 local|staging|production，實際 '${args.environment}'`)
+    process.exit(1)
+  }
+  // 審計 M49：生產 apply 會 create/drop 真實索引（如 headword.search 殘留），
+  // 必須顯式 --confirm-production（契約 §10：production 僅在 P6 備份完成後才 drop）
+  if (args.apply && args.environment === 'production' && !args.confirmProduction) {
+    console.error('錯誤：--environment production 且 --apply 會 drop 生產索引（headword.search 殘留等）；必須額外提供 --confirm-production')
     process.exit(1)
   }
 

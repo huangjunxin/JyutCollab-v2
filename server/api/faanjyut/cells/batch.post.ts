@@ -16,7 +16,8 @@ const CellEditSchema = z.object({
   lexemeId: z.string().min(1),
   dialectId: z.string().min(1),
   op: z.enum(['set', 'clear', 'absent']),
-  raw: z.string().optional(),
+  // 審計 M37：raw 加長度上限（防單格超長觸發 16MB 單文檔上限；源表方音值遠小於此）
+  raw: z.string().max(500).optional(),
   baseVersion: z.number().int().optional()
 }).superRefine((edit, ctx) => {
   if (edit.op === 'set') {

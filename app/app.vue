@@ -15,7 +15,9 @@ const cacheablePages = [
   'index',
   'entries-index',
   'review-index',
-  'histories-index'
+  'histories-index',
+  // 審計 M53：泛粵矩陣頁緩存（返回時恢復頁碼與列集）
+  'faanjyut-matrix'
 ]
 
 onMounted(() => {

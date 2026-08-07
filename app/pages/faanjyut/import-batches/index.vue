@@ -84,6 +84,8 @@ function envTone(environment: string): 'green' | 'amber' | 'gray' {
               <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">batchId</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">mode</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">environment</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">基線</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">創建者</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">status</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">來源工作簿</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-[var(--jc-muted)]">寫入總數</th>
@@ -111,6 +113,8 @@ function envTone(environment: string): 'green' | 'amber' | 'gray' {
               <td class="px-3 py-2">
                 <FaanjyutToneChip :tone="envTone(batch.environment)" :label="batch.environment" />
               </td>
+              <td class="px-3 py-2 jc-mono text-xs">{{ batch.baselineLevel || '—' }}</td>
+              <td class="px-3 py-2 jc-mono text-xs" :title="batch.createdBy ?? ''">{{ batch.createdBy || '—' }}</td>
               <td class="px-3 py-2">
                 <FaanjyutStatusBadge :status="batch.status" />
               </td>
@@ -128,7 +132,7 @@ function envTone(environment: string): 'green' | 'amber' | 'gray' {
               </td>
             </tr>
             <tr v-if="batches.length === 0">
-              <td colspan="9" class="px-3 py-6 text-center text-sm text-[var(--jc-muted)]">暫無導入批次記錄。</td>
+              <td colspan="11" class="px-3 py-6 text-center text-sm text-[var(--jc-muted)]">暫無導入批次記錄。</td>
             </tr>
           </tbody>
         </table>

@@ -149,4 +149,20 @@ describe('CLI 集成（需真實 MongoDB；默認跳過）', () => {
     const rollback = runCli(rollbackScript, ['--batch-id', match![1], '--confirm-write', 'faanjyut_integration'], env, 900_000)
     expect(rollback.code).toBe(0)
   })
+
+  // 審計 M51：final_cutover（P6 正式切換唯一入口）補 CLI 全路徑集成回歸——
+  // 與 initial 同構（兩 mode 共享 runWrite 路徑），但 P6 只用 final_cutover，
+  // 此用例防止該 mode 的參數解析/批次創建回歸無自動化覆蓋。
+  it('寫入模式 CLI 全路徑（final_cutover 寫入 → rollback 歸零）', { skip: !runIntegration, timeout: 900_000 }, () => {
+    const input = process.env.FAANJYUT_FIXTURE_INPUT ?? resolve(root, '..', 'FaanJyutZibiu2Database', 'out', 'faanjyut-mongodb')
+    const reportDir = resolve(root, '.artifacts', 'faanjyut', 'write-cli-final-cutover-test')
+    const env = { FAANJYUT_DB_NAME: 'faanjyut_integration' }
+    const write = runCli(seedScript, ['--input', input, '--mode', 'final_cutover', '--environment', 'staging', '--confirm-write', 'faanjyut_integration', '--report-dir', reportDir], env, 900_000)
+    expect(write.stderr).not.toContain('ReferenceError')
+    expect(write.code).toBe(0)
+    const match = write.stdout.match(/batchId=(fjb_\w+)/)
+    expect(match, `stdout 無 batchId：\n${write.stdout}\n${write.stderr}`).toBeTruthy()
+    const rollback = runCli(rollbackScript, ['--batch-id', match![1], '--confirm-write', 'faanjyut_integration'], env, 900_000)
+    expect(rollback.code).toBe(0)
+  })
 })

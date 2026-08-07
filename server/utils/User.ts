@@ -18,6 +18,8 @@ export interface IUser {
   role: 'contributor' | 'reviewer' | 'admin'
   bio?: string
   dialectPermissions: IUserDialectPermission[]
+  /** 審計 M52：泛粵矩陣頁列選擇偏好（§6.2 服務端記住該用戶上次列選擇） */
+  faanjyutMatrixColumns?: string[]
   contributionCount: number
   reviewCount: number
   isActive: boolean
@@ -78,6 +80,11 @@ const UserSchema = new mongoose.Schema<IUser>({
     dialectName: { type: String, required: true },
     role: { type: String, enum: ['contributor', 'reviewer'] }
   }],
+  // 審計 M52：泛粵矩陣列選擇偏好（普通 user preference，非 SavedView）
+  faanjyutMatrixColumns: {
+    type: [String],
+    default: undefined
+  },
   contributionCount: {
     type: Number,
     default: 0

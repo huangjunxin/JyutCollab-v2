@@ -77,15 +77,16 @@ export interface LexemeCreateTx extends CellsTx {
 /** 新建詞條批次級 DB 訪問面（事務外等值查詢） */
 export interface LexemeCreateDb {
   findColumnsByDialectIds(dialectIds: string[]): Promise<CellsColumnDoc[]>
-  /** 當前泛粵最大 matrixOrder（新建詞條排最後）；無詞條時返回 0 */
-  findMaxMatrixOrder(): Promise<number>
   withTransaction<T>(fn: (tx: LexemeCreateTx) => Promise<T>): Promise<T>
 }
 
-/** 請求 Zod schema（handler 與單測共用；zod v4 `.trim()` 先 trim 再 min） */
+/** 請求 Zod schema（handler 與單測共用；zod v4 `.trim()` 先 trim 再 min）
+ *  審計 M56：初始格支持 op='absent'——raw 為 '_' 時前端以 op='absent' 提交，
+ *  服務端只寫 CellState（explicitlyAbsent，與矩陣編輯「_」語義一致），不建 Entry。 */
 const InitialCellSchema = z.object({
   dialectId: z.string().trim().min(1, '方言為必填'),
-  raw: z.string().trim().min(1, '方音為必填')
+  raw: z.string().trim().min(1, '方音為必填'),
+  op: z.enum(['set', 'absent']).default('set')
 })
 
 export const CreateLexemeBodySchema = z.object({
@@ -180,10 +181,10 @@ export async function createLexeme(
   }
 
   const dialectIds = input.initialCells.map((cell) => cell.dialectId)
-  const [columnDocs, maxMatrixOrder] = await Promise.all([
-    db.findColumnsByDialectIds(dialectIds),
-    db.findMaxMatrixOrder()
-  ])
+  // 審計 M38：matrixOrder 改為 Date.now()（對齊契約 §1「平台新建對象使用 Date.now()」）——
+  // 原 max+1 在事務外讀取，並發新建會得到相同 matrixOrder；Date.now() 天然排在導入行之後
+  // （導入行 1..N），同毫秒並發僅排序並列（id 次排序），無唯一性要求。
+  const columnDocs = await db.findColumnsByDialectIds(dialectIds)
   const columnByDialect = new Map<string, CellsColumnDoc>()
   for (const column of columnDocs) {
     if (column.dialectId) columnByDialect.set(column.dialectId, column)
@@ -203,7 +204,7 @@ export async function createLexeme(
   return db.withTransaction(async (tx) => {
     const seq = await tx.nextSourceKeySeq()
     const sourceKey = SOURCE_KEY_PREFIX + String(seq).padStart(SOURCE_KEY_SEQ_DIGITS, '0')
-    const matrixOrder = maxMatrixOrder + 1
+    const matrixOrder = Date.now()
     const lexemeId = LEXEME_ID_PREFIX + nanoid(LEXEME_ID_RANDOM_LENGTH)
 
     await tx.createLexeme(buildLexemeDoc({
@@ -236,6 +237,18 @@ export async function createLexeme(
     for (const cell of input.initialCells) {
       const column = columnByDialect.get(cell.dialectId)!
       const raw = cell.raw.trim()
+      // 審計 M56：op='absent'（raw 為 '_'）→ 只寫 CellState explicitAbsent，不建 Entry/歷史
+      if (cell.op === 'absent') {
+        await tx.upsertCellState({
+          lexemeId,
+          columnId: column.id,
+          userId: user.id,
+          raw: '_',
+          projectionEntryId: null,
+          flags: { modifiedPendingReview: true, explicitlyAbsent: true }
+        })
+        continue
+      }
       const created = await tx.createEntry(
         buildNewEntryDoc({ lexeme: lexemeRef, column, dialectId: cell.dialectId, raw, userId: user.id, sourceKey })
       )

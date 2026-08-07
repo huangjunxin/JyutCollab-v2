@@ -1,7 +1,7 @@
 /**
  * lexeme-create 新建詞條測試（FaanjyutV1Design §8、§12 `POST /api/faanjyut/lexemes`、§13 P5）：
  * 沿用 cells.test.ts 的內存 fake 基建——LexemeCreateDb 注入、不連真庫、不測 handler。
- * 覆蓋：四件套落庫 + JC- 序號遞增 + matrixOrder max+1 + sourceBook、Zod 拒（釋義空/空陣列/
+ * 覆蓋：四件套落庫 + JC- 序號遞增 + matrixOrder Date.now() + sourceBook、Zod 拒（釋義空/空陣列/
  * 重複方言/超 30 格）、無權限列 403、列不存在 400、事務回滾、撞 sourceKey unique → 409 語義。
  */
 import { describe, expect, it } from 'vitest'
@@ -82,23 +82,12 @@ class FakeLexemeCreateDb implements LexemeCreateDb {
   histories: Array<Record<string, unknown>> = []
   /** createEditHistory 拋錯（事務回滾測試） */
   failHistoryCreate = false
-  /** findMaxMatrixOrder 返回值（測試 matrixOrder max+1） */
-  maxMatrixOrder = 0
   /** JC- 計數器起點（測試序號遞增 / 撞號） */
   counterSeq = 0
   private seq = 0
 
   async findColumnsByDialectIds(dialectIds: string[]): Promise<CellsColumnDoc[]> {
     return this.columns.filter((c) => c.dialectId && dialectIds.includes(c.dialectId))
-  }
-
-  async findMaxMatrixOrder(): Promise<number> {
-    // 模擬真實查詢：max(matrixOrder)（含既有 lexemes 與測試預設的 maxMatrixOrder）
-    const max = this.lexemes.reduce((acc, lexeme) => {
-      const order = (lexeme.meta as any)?.matrixOrder
-      return typeof order === 'number' && Number.isFinite(order) ? Math.max(acc, order) : acc
-    }, this.maxMatrixOrder)
-    return max
   }
 
   async withTransaction<T>(fn: (tx: LexemeCreateTx) => Promise<T>): Promise<T> {
@@ -208,9 +197,8 @@ function makeDb(over: { columns?: CellsColumnDoc[] } = {}): FakeLexemeCreateDb {
 }
 
 describe('faanjyut/lexeme-create 建立成功', () => {
-  it('四件套落庫：Lexeme（JC- 鍵/草案/sourceBook）+ Entry + CellState + EditHistory，matrixOrder = max+1', async () => {
+  it('四件套落庫：Lexeme（JC- 鍵/草案/sourceBook）+ Entry + CellState + EditHistory，matrixOrder = Date.now()（審計 M38）', async () => {
     const db = makeDb()
-    db.maxMatrixOrder = 7
     const result = await createLexeme(db, input({
       definitionRaw: '  佢  ',
       compositePronunciation: ' keoi5 ',
@@ -236,7 +224,7 @@ describe('faanjyut/lexeme-create 建立成功', () => {
       sourceBook: 'faanjyut',
       sourceKey: 'JC-00000001',
       definitionRaw: '佢',
-      matrixOrder: 8,
+      matrixOrder: expect.any(Number),
       editedAfterImport: true,
       createdBy: 'admin_1',
       updatedBy: 'admin_1',
@@ -296,15 +284,18 @@ describe('faanjyut/lexeme-create 建立成功', () => {
     expect((db.histories[0].afterSnapshot as any).id).toBe(entry.id)
   })
 
-  it('JC- 序號遞增 + matrixOrder 遞增：連續兩次建立 → JC-00000001 / JC-00000002', async () => {
-    const db = makeDb() // maxMatrixOrder = 0
+  it('JC- 序號遞增：連續兩次建立 → JC-00000001 / JC-00000002；matrixOrder = Date.now()（審計 M38，排在導入行之後且無並發同值問題）', async () => {
+    const db = makeDb()
     const first = await createLexeme(db, input(), userGz)
     const second = await createLexeme(db, input({ initialCells: [{ dialectId: 'taishan', raw: 'kui5' }] }), admin)
 
     expect(first.sourceKey).toBe('JC-00000001')
     expect(second.sourceKey).toBe('JC-00000002')
-    expect((db.lexemes[0] as any).meta.matrixOrder).toBe(1)
-    expect((db.lexemes[1] as any).meta.matrixOrder).toBe(2)
+    // Date.now() 遠大於導入行 matrixOrder（1..N），且兩次之間單調不減
+    const order1 = (db.lexemes[0] as any).meta.matrixOrder as number
+    const order2 = (db.lexemes[1] as any).meta.matrixOrder as number
+    expect(order1).toBeGreaterThan(1e12)
+    expect(order2).toBeGreaterThanOrEqual(order1)
     expect(db.entries).toHaveLength(2)
     expect(db.cellStates).toHaveLength(2)
     expect(db.histories).toHaveLength(2)

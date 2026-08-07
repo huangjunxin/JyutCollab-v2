@@ -9,11 +9,31 @@
  *
  * 通過 WriteDb 抽象訪問數據庫（真實實現見 mongo-db.ts；單元測試用 fake）。
  */
-import { createReadStream } from 'node:fs'
+import { createReadStream, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import type { Environment, ValidatedExport } from './import-contract'
 import { NDJSON_SCHEMAS } from './ndjson-schemas'
+
+/**
+ * 審計 M32：從 ETL 報告讀取域內/域外列數（dialect_mapping_report.summary.domesticColumns、
+ * external_mapping_report.summary.externalColumns）。報告缺失/解析失敗不阻塞寫入（返回空）。
+ */
+export function readColumnCountsFromReports(inputDir: string): { domesticColumns?: number; externalColumns?: number } {
+  const readSummary = (fileName: string): Record<string, unknown> | null => {
+    try {
+      const report = JSON.parse(readFileSync(join(inputDir, 'reports', fileName), 'utf8')) as { summary?: Record<string, unknown> }
+      return report.summary ?? null
+    } catch {
+      return null
+    }
+  }
+  const dialect = readSummary('dialect_mapping_report.json')
+  const external = readSummary('external_mapping_report.json')
+  const domesticColumns = typeof dialect?.domesticColumns === 'number' ? dialect.domesticColumns : undefined
+  const externalColumns = typeof external?.externalColumns === 'number' ? external.externalColumns : undefined
+  return { ...(domesticColumns !== undefined ? { domesticColumns } : {}), ...(externalColumns !== undefined ? { externalColumns } : {}) }
+}
 
 /** 寫入階段所需的 DB 接口（真實/測試可注入） */
 export interface WriteDb {
@@ -132,6 +152,13 @@ export async function runWriteImport(
 
   await db.createImportBatch({
     batchId: options.batchId,
+    // 審計 M32：填充設計 §3.1 字段（schemaVersion/baselineLevel/createdBy/sourceBook/sourceSheet/sourceExportedAt）
+    schemaVersion: 1,
+    baselineLevel: validated.manifest.baselineLevel,
+    createdBy: 'system:faanjyut_seed',
+    sourceBook: validated.manifest.sourceBook,
+    sourceSheet: validated.manifest.sourceSheet,
+    sourceExportedAt: validated.manifest.sourceExportedAt ? new Date(validated.manifest.sourceExportedAt) : undefined,
     mode: options.mode,
     environment: options.environment,
     status: 'running',
@@ -143,7 +170,21 @@ export async function runWriteImport(
     precheckRunId: options.precheckRunId,
     reportDir: options.reportDir,
     bulkSize,
-    counts: { written: {} },
+    counts: {
+      written: {},
+      // 審計 M32：manifest 計數 + ETL 報告的域內/域外列數（讀取失敗不阻塞寫入）
+      sourceRows: validated.manifest.counts.sourceRows,
+      validRows: validated.manifest.counts.validRows,
+      skippedRows: validated.manifest.counts.skippedRows,
+      columns: validated.manifest.counts.columns,
+      lexemes: validated.manifest.counts.lexemes,
+      entries: validated.manifest.counts.entries,
+      externalEtymons: validated.manifest.counts.externalEtymons,
+      cellStates: validated.manifest.counts.cellStates,
+      comments: validated.manifest.counts.comments,
+      links: validated.manifest.counts.links,
+      ...readColumnCountsFromReports(inputDir)
+    },
     startedAt
   })
 

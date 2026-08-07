@@ -38,6 +38,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: '未綁定詞語，暫不支援域外方音' })
   }
 
+  // 審計 M29：泛粵詞條（meta.sourceBook='faanjyut'）的域外材料一律 409，
+  // 泛粵數據只能經泛粵模塊管理（普通寫入口攔截，與 §9 一致）
+  const targetLexeme = await Lexeme.findOne({ id: lexemeId }).select('meta.sourceBook').lean()
+  if (targetLexeme?.meta?.sourceBook === 'faanjyut') {
+    throw createError({ statusCode: 409, message: '泛粵字表數據請前往泛粵模塊編輯' })
+  }
+
   const body = await readBody(event)
   const parsedBody = BodySchema.safeParse(body)
   if (!parsedBody.success) {

@@ -16,6 +16,7 @@ import { nanoid } from 'nanoid'
 import { FaanJyutExportBatch } from '../../../utils/FaanJyutExportBatch'
 import { connectDB } from '../../../utils/db'
 import { formatZodErrorToMessage } from '../../../utils/validation'
+import { checkWriteFlag } from '../../../utils/faanjyut/cells'
 import { adaptMongooseExportDb } from '../../../utils/faanjyut/mongo-db'
 import { createArchiverExportOutput } from '../../../utils/faanjyut/export-archiver'
 import {
@@ -83,6 +84,12 @@ export default defineEventHandler(async (event) => {
     }
     if (event.context.auth.role !== 'admin') {
       throw createError({ statusCode: 403, message: '無權執行導出' })
+    }
+
+    // 審計 M30：寫 flag 關閉（維護/切換窗口）時禁止產生導出產物與批次記錄
+    const flagError = checkWriteFlag(useRuntimeConfig(event))
+    if (flagError) {
+      throw createError({ statusCode: 503, message: flagError })
     }
 
     const body = await readBody(event)

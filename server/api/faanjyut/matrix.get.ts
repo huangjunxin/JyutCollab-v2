@@ -8,7 +8,8 @@ import {
   MATRIX_COLUMN_SOURCE_ROLES,
   buildColumnSelection,
   pivotMatrix,
-  type MatrixCellStateName
+  type MatrixCellStateName,
+  type MatrixSelectedColumn
 } from '../../utils/faanjyut/matrix'
 
 /**
@@ -19,8 +20,9 @@ import {
  */
 async function cellFilterLexemeSelector(
   cellFilter: MatrixCellStateName,
-  columnIds: string[]
+  selectedColumns: MatrixSelectedColumn[]
 ): Promise<{ match: string[] | null; exclude: string[] | null }> {
+  const columnIds = selectedColumns.map((c) => c.id)
   if (columnIds.length === 0) return { match: [], exclude: null }
   const colFilter = { columnId: { $in: columnIds } }
 
@@ -32,6 +34,11 @@ async function cellFilterLexemeSelector(
   }
 
   // normal / null：有值集合 = cell raw 非空（非 absent/cleared）∪ hasOldNote 格 ∪ domestic entry 有值
+  // fromEntries 須按選中列的方言過濾，否則非選中方言有值的詞條會污染 null 篩選（BUG #2 修復）
+  const domesticDialectIds = selectedColumns
+    .filter((c) => c.sourceRole === 'domestic' && c.dialectId)
+    .map((c) => c.dialectId!)
+
   const [fromCells, fromEntries] = await Promise.all([
     FaanJyutCellState.distinct('lexemeId', {
       ...colFilter,
@@ -39,10 +46,13 @@ async function cellFilterLexemeSelector(
       'status.flags.explicitlyCleared': { $ne: true },
       $or: [{ raw: { $exists: true, $ne: '' } }, { 'status.flags.hasOldNote': true }]
     }),
-    Entry.distinct('lexemeId', {
-      sourceBook: FAANJYUT_SOURCE_BOOK,
-      'phonetic.original': { $exists: true, $ne: '' }
-    })
+    domesticDialectIds.length > 0
+      ? Entry.distinct('lexemeId', {
+          sourceBook: FAANJYUT_SOURCE_BOOK,
+          'dialect.name': { $in: domesticDialectIds },
+          'phonetic.original': { $exists: true, $ne: '' }
+        })
+      : Promise.resolve([] as string[])
   ])
   const hasValue = [...new Set([...fromCells, ...fromEntries])]
   if (cellFilter === 'normal') return { match: hasValue, exclude: null }
@@ -108,7 +118,7 @@ export default defineEventHandler(async (event) => {
   // 不再先取全量頁內 50 行再內存過濾（原實現翻頁大部分頁為空）。
   const lexemeFilter: Record<string, unknown> = { 'meta.sourceBook': FAANJYUT_SOURCE_BOOK }
   if (cellFilter) {
-    const selector = await cellFilterLexemeSelector(cellFilter, columnIds)
+    const selector = await cellFilterLexemeSelector(cellFilter, selectedColumns)
     if (selector.match !== null) lexemeFilter.id = { $in: selector.match }
     else if (selector.exclude !== null) lexemeFilter.id = { $nin: selector.exclude }
   }

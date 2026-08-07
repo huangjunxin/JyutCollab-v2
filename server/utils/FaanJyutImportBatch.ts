@@ -7,6 +7,13 @@ import mongoose from 'mongoose'
  */
 export interface IFaanJyutImportBatch {
   batchId: string
+  // 審計 M32（2026-08-07）：補齊 NewTablesDesign §3.1 字段
+  schemaVersion: number
+  baselineLevel: 'diagnostic' | 'regression' | 'cutover' | 'fixture'
+  createdBy: string
+  sourceBook: string
+  sourceSheet: string
+  sourceExportedAt?: Date
   mode: 'initial' | 'final_cutover'
   environment: 'local' | 'staging' | 'production'
   status: 'running' | 'completed' | 'failed' | 'rolled_back'
@@ -22,7 +29,21 @@ export interface IFaanJyutImportBatch {
   bulkSize: number
   counts: {
     written: Record<string, number>
+    // 審計 M32：設計 §3.1 的 12 字段（寫入時從 manifest/ETL 報告填充）
+    sourceRows?: number
+    validRows?: number
+    skippedRows?: number
+    columns?: number
+    domesticColumns?: number
+    externalColumns?: number
+    lexemes?: number
+    entries?: number
+    externalEtymons?: number
+    cellStates?: number
+    comments?: number
+    links?: number
   }
+  warnings?: string[]
   error?: string
   startedAt: Date
   completedAt?: Date
@@ -38,6 +59,12 @@ export interface IFaanJyutImportBatch {
 
 const FaanJyutImportBatchSchema = new mongoose.Schema<IFaanJyutImportBatch>({
   batchId: { type: String, required: true },
+  schemaVersion: { type: Number, required: true, default: 1 },
+  baselineLevel: { type: String, enum: ['diagnostic', 'regression', 'cutover', 'fixture'], required: true },
+  createdBy: { type: String, required: true },
+  sourceBook: { type: String, required: true },
+  sourceSheet: { type: String, required: true },
+  sourceExportedAt: { type: Date },
   mode: { type: String, enum: ['initial', 'final_cutover'], required: true },
   environment: { type: String, enum: ['local', 'staging', 'production'], required: true },
   status: { type: String, enum: ['running', 'completed', 'failed', 'rolled_back'], required: true },
@@ -50,8 +77,21 @@ const FaanJyutImportBatchSchema = new mongoose.Schema<IFaanJyutImportBatch>({
   reportDir: { type: String },
   bulkSize: { type: Number, required: true },
   counts: {
-    written: { type: mongoose.Schema.Types.Mixed, default: {} }
+    written: { type: mongoose.Schema.Types.Mixed, default: {} },
+    sourceRows: { type: Number },
+    validRows: { type: Number },
+    skippedRows: { type: Number },
+    columns: { type: Number },
+    domesticColumns: { type: Number },
+    externalColumns: { type: Number },
+    lexemes: { type: Number },
+    entries: { type: Number },
+    externalEtymons: { type: Number },
+    cellStates: { type: Number },
+    comments: { type: Number },
+    links: { type: Number }
   },
+  warnings: [{ type: String }],
   error: { type: String },
   startedAt: { type: Date, required: true },
   completedAt: { type: Date },
@@ -67,8 +107,10 @@ const FaanJyutImportBatchSchema = new mongoose.Schema<IFaanJyutImportBatch>({
 })
 
 // 批次查詢索引（由 scripts/migrate-faanjyut-indexes.ts 管理）
+// 審計 M33（2026-08-07）：補齊設計 §3.1 的 4 個索引
 FaanJyutImportBatchSchema.index({ batchId: 1 }, { unique: true })
-FaanJyutImportBatchSchema.index({ status: 1 })
-FaanJyutImportBatchSchema.index({ startedAt: -1 })
+FaanJyutImportBatchSchema.index({ sourceBook: 1, sourceFileSha256: 1 })
+FaanJyutImportBatchSchema.index({ status: 1, startedAt: -1 })
+FaanJyutImportBatchSchema.index({ mode: 1, startedAt: -1 })
 
 export const FaanJyutImportBatch = mongoose.models.FaanJyutImportBatch || mongoose.model<IFaanJyutImportBatch>('FaanJyutImportBatch', FaanJyutImportBatchSchema)

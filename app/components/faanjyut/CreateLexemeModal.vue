@@ -212,7 +212,12 @@ async function submit() {
       compositePronunciation: compositePronunciation.value.trim() || undefined,
       representativeChar: representativeChar.value.trim() || undefined,
       note: note.value.trim() || undefined,
-      initialCells: cells.map((cell) => ({ dialectId: cell.dialectId!, raw: cell.raw }))
+      initialCells: cells.map((cell) => {
+        // 審計 M56：字面 `_` 按 absent 提交（與矩陣編輯「_」= absent 語義一致），
+        // 不作為 normal 方音值寫入
+        const raw = cell.raw
+        return raw === '_' ? { dialectId: cell.dialectId!, raw, op: 'absent' } : { dialectId: cell.dialectId!, raw }
+      })
     })
     toast.add({ title: '已建立詞條', description: `已建立詞條 ${data.sourceKey}`, color: 'success' })
     emit('update:open', false)

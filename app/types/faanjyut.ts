@@ -122,6 +122,9 @@ export interface FaanJyutImportBatchSummary {
   mode: string
   environment: string
   status: 'running' | 'completed' | 'failed' | 'rolled_back' | string
+  // 審計 M32：基線與創建者（舊批次缺省 → null）
+  baselineLevel: string | null
+  createdBy: string | null
   sourceWorkbook: string
   countsWrittenTotal: number
   startedAt: string | null

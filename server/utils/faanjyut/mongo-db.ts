@@ -12,7 +12,6 @@ import type { LexemeCreateDb, LexemeCreateTx } from './lexeme-create'
 import type { ExportSource, ExportFileName } from './export-backup'
 import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import { cellStateId } from './stable-id'
-import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import { Lexeme } from '../Lexeme'
 import { Entry } from '../Entry'
 import { FaanJyutColumn } from '../FaanJyutColumn'
@@ -86,7 +85,9 @@ export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb &
       return result.insertedCount
     },
     async createImportBatch(doc) {
-      await db.collection(IMPORT_BATCH_COLLECTION).insertOne(doc)
+      // 審計 M34：原生 insertOne 繞過 mongoose timestamps——顯式注入 createdAt/updatedAt
+      const now = new Date()
+      await db.collection(IMPORT_BATCH_COLLECTION).insertOne({ ...doc, createdAt: now, updatedAt: now })
     },
     async updateImportBatch(batchId, set) {
       await db.collection(IMPORT_BATCH_COLLECTION).updateOne({ batchId }, { $set: set })
@@ -261,15 +262,6 @@ export function adaptMongooseLexemeCreateDb(connection: mongoose.Connection): Le
       return FaanJyutColumn.find({ sourceBook: FAANJYUT_SOURCE_BOOK, dialectId: { $in: dialectIds } })
         .select('id sourceRole status dialectId sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
         .lean()
-    },
-    async findMaxMatrixOrder() {
-      const top = await Lexeme.findOne({ 'meta.sourceBook': FAANJYUT_SOURCE_BOOK })
-        .sort({ 'meta.matrixOrder': -1 })
-        .limit(1)
-        .select({ 'meta.matrixOrder': 1 })
-        .lean()
-      const value = (top as { meta?: { matrixOrder?: unknown } } | null)?.meta?.matrixOrder
-      return typeof value === 'number' && Number.isFinite(value) ? value : 0
     },
     withTransaction<T>(fn: (tx: LexemeCreateTx) => Promise<T>) {
       // withMongoTransaction 傳入的 tx 即 adaptMongooseCellsTx 全量（CellsTx & LexemeCreateTx），

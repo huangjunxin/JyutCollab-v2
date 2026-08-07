@@ -175,6 +175,9 @@
 </template>
 
 <script setup lang="ts">
+// 審計 M53：keepalive 緩存矩陣頁（app.vue cacheablePages 含 faanjyut-matrix）——
+// 「返回矩陣」恢復頁碼與列集（§7 導航承諾），不再重新掛載回第 1 頁
+defineOptions({ name: 'faanjyut-matrix' })
 import {
   FAANJYUT_MATRIX_MAX_COLUMNS,
   type FaanjyutCellState,
@@ -278,12 +281,27 @@ function toggleCellFilter(value: FaanjyutCellState) {
   fetchMatrixData()
 }
 
-/** 列選擇持久化（本機；§6.2 服務端偏好屬後續階段） */
+/** 列選擇持久化（審計 M52：服務端偏好 §6.2 + 本機 localStorage 兜底） */
 function persistColumnSelection(ids: string[]) {
   if (!import.meta.client) return
   try {
     localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(ids))
   } catch { /* 忽略存儲失敗 */ }
+  // 服務端記住（普通 user preference）；失敗靜默（下次仍可用本機/默認列集）
+  $fetch('/api/faanjyut/preferences', { method: 'PUT', body: { matrixColumns: ids } })
+    .catch(() => { /* 偏好保存失敗不阻塞使用 */ })
+}
+
+/** 服務端列偏好（§6.2）；無偏好/失敗 → null（前端回退 localStorage） */
+async function fetchServerColumnPreferences(): Promise<string[] | null> {
+  if (!import.meta.client) return null
+  try {
+    const res = await $fetch<{ success: boolean; data: { matrixColumns: string[] } }>('/api/faanjyut/preferences')
+    const cols = res?.data?.matrixColumns
+    return Array.isArray(cols) && cols.length > 0 ? cols.filter((x): x is string => typeof x === 'string') : null
+  } catch {
+    return null
+  }
 }
 
 function restoreColumnSelection(): string[] {
@@ -355,21 +373,38 @@ async function locateByQuery(q: string) {
 }
 
 /**
- * ?cell=<sourceCell> 定位（導入報告跳轉用）：目前無 sourceCell → 詞條的查詢 API，
- * 只能在已載入頁內掃描高亮；不在本頁時給出說明（§6 頁面規格 3 允許的降級）。
+ * ?cell=<sourceCell> 定位（導入報告跳轉用，審計 M64）：頁內掃描優先；
+ * 未命中 → locate-cell API 查所在頁並翻頁高亮（不再降級為「不在目前頁」）。
  */
-function applyCellHighlight(sourceCell: string) {
+async function applyCellHighlight(sourceCell: string) {
   highlightSourceCell.value = sourceCell
   const found = (matrixData.value?.rows ?? []).some((row) =>
     Object.values(row.cells).some((cell) => cell.sourceCell === sourceCell)
   )
-  locateNote.value = found
-    ? `已高亮原表格 ${sourceCell}。`
-    : `原表格 ${sourceCell} 不在目前頁；目前只支援頁內高亮，請配合 ?q=<詞條鍵> 定位所在頁。`
+  if (found) {
+    locateNote.value = `已高亮原表格 ${sourceCell}。`
+    return
+  }
+  try {
+    const res = await $fetch<{ success: boolean; data: { page: number; sourceKey: string | null } }>(
+      `/api/faanjyut/locate-cell?cell=${encodeURIComponent(sourceCell)}&perPage=${PER_PAGE}`
+    )
+    page.value = res.data.page
+    await fetchMatrixData()
+    const nowFound = (matrixData.value?.rows ?? []).some((row) =>
+      Object.values(row.cells).some((cell) => cell.sourceCell === sourceCell)
+    )
+    locateNote.value = nowFound
+      ? `已定位原表格 ${sourceCell}：第 ${page.value} 頁，目標格已高亮。`
+      : `已定位到第 ${page.value} 頁附近（${res.data.sourceKey ?? '未知詞條'}），目標格未在本頁顯示。`
+  } catch {
+    locateNote.value = `原表格 ${sourceCell} 定位失敗（找不到對應格或詞條），請配合 ?q=<詞條鍵> 定位。`
+  }
 }
 
 onMounted(async () => {
-  selectedColumnIds.value = restoreColumnSelection()
+  // 審計 M52：服務端偏好優先，無則回退本機
+  selectedColumnIds.value = (await fetchServerColumnPreferences()) ?? restoreColumnSelection()
 
   columnsLoading.value = true
   fetchColumns()
@@ -390,7 +425,7 @@ onMounted(async () => {
     await fetchMatrixData()
   }
   if (cell) {
-    applyCellHighlight(cell)
+    await applyCellHighlight(cell)
   }
 })
 </script>

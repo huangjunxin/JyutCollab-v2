@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
       Entry.find({ lexemeId: id, sourceBook: 'faanjyut' })
         .select('_id id dialect headword phonetic senses')
         .lean(),
-      ExternalEtymon.find({ lexemeId: id, 'meta.softDeleted': { $ne: true } })
+      ExternalEtymon.find({ lexemeId: id, 'meta.sourceBook': 'faanjyut', 'meta.softDeleted': { $ne: true } })
         .select('id languageCode scriptForm raw phonetic gloss sourceType sourceDetail note meta')
         .lean(),
       FaanJyutLink.find({ fromLexemeId: id })
