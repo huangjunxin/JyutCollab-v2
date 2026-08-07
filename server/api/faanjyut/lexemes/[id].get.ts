@@ -84,6 +84,7 @@ export default defineEventHandler(async (event) => {
     const cellIds = cells.map((cell: any) => cell.id)
     const etymonIds = etymons.map((etymon: any) => etymon.id)
     const comments = await FaanJyutComment.find({
+      deletedAt: null,  // 审计 L10：软删批注不展示
       $or: [
         { targetType: 'lexeme', targetId: id },
         ...(cellIds.length ? [{ targetType: 'cell', targetId: { $in: cellIds } }] : []),

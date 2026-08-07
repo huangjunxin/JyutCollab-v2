@@ -93,6 +93,12 @@ async function main(): Promise<number> {
     process.stderr.write(usage())
     return 1
   }
+  // 审计 L14：批次 ID 必须是 fjb_ 前缀（防手误传任意字符串）
+  if (!args.batchId.startsWith('fjb_')) {
+    console.error(`錯誤：--batch-id 應為 fjb_ 前綴的批次 ID，實際 '${args.batchId}'`)
+    process.stderr.write(usage())
+    return 1
+  }
   if (!args.confirmWrite) {
     console.error('錯誤：缺少 --confirm-write <精確 db 名>（防誤寫）')
     return 1

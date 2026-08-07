@@ -40,8 +40,8 @@ export const FaanJyutLexemeDtoSchema = rejectInjectedKeys(z.strictObject({
     sourceWorkbook: z.string().min(1),
     sourceSheet: z.string().min(1),
     sourceRow: z.number().int().min(1),
-    matrixOrder: z.number(),
-    sourceKey: z.string().min(1),
+    matrixOrder: z.number().int(),  // 审计 L6：契约 §5.1 matrixOrder = sourceRow 整数
+    sourceKey: z.string().trim().min(1),  // 审计 L6：契约 §1 sourceKey 保留原值并 trim()
     keyAliases: z.array(z.string()).optional(),
     compositePronunciation: z.strictObject({
       raw: z.string().optional(),
@@ -123,7 +123,7 @@ export const FaanJyutEntryDtoSchema = rejectInjectedKeys(z.strictObject({
     sourceColumn: z.string().min(1),
     sourceColumnIndex: z.number().int().min(1),
     sourceCell: z.string().min(1),
-    sourceKey: z.string().min(1),
+    sourceKey: z.string().trim().min(1),  // 审计 L6：契约 §1 sourceKey 保留原值并 trim()
     combinedSound: z.string().optional(),
     searchSound: z.string().optional(),
     importReviewStatus: z.literal('unreviewed_import'),

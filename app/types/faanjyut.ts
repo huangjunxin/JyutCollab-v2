@@ -135,12 +135,15 @@ export interface FaanJyutImportBatchSummary {
 
 // ---- 導入批次詳情（GET /api/faanjyut/import-batches/:id） ----
 
-export interface FaanJyutFindingItem {  sourceKey?: string
+export interface FaanJyutFindingItem {
+  sourceKey?: string
   sourceCell?: string
   message: string
   file?: string
   line?: number
   objectId?: string
+  // 審計 L5/M46：干預衝突類 finding 的結構化示例（前 5 條）
+  examples?: Array<{ sourceKey?: string; sourceCell?: string; objectId?: string }>
 }
 
 export interface FaanJyutFindingGroup {

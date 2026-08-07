@@ -58,7 +58,7 @@ interface CliArgs {
   confirmWrite: string | null
   confirmSourceSha256: string | null
   confirmManifestSha256: string | null
-  reportDir: string
+  reportDir: string | null
   help: boolean
 }
 
@@ -71,7 +71,7 @@ function parseArgs(argv: string[]): CliArgs {
     confirmWrite: null,
     confirmSourceSha256: null,
     confirmManifestSha256: null,
-    reportDir: resolve(root, '.artifacts/faanjyut/dry-run'),
+    reportDir: null,
     help: false
   }
   for (let i = 0; i < argv.length; i += 1) {
@@ -215,13 +215,18 @@ function main(): void {
     process.exit(1)
   }
 
+  // 审计 L15：默认产物目录按模式分离（写模式 → write/，dry-run → dry-run/，防报告混放）
+  const reportDir = args.reportDir ?? (writeMode
+    ? resolve(root, '.artifacts/faanjyut/write')
+    : resolve(root, '.artifacts/faanjyut/dry-run'))
+
   const runId = `fjdr_${nanoid(16)}`
   const startedAt = new Date().toISOString()
   const environment = args.environment as Environment
 
   const run = writeMode
-    ? runWrite(args.input, args.mode as 'initial' | 'final_cutover', environment, args.confirmWrite as string, args.reportDir, runId, startedAt, mongoUri)
-    : runDryRun(args.input, environment, args.reportDir, runId, startedAt, mongoUri)
+    ? runWrite(args.input, args.mode as 'initial' | 'final_cutover', environment, args.confirmWrite as string, reportDir, runId, startedAt, mongoUri)
+    : runDryRun(args.input, environment, reportDir, runId, startedAt, mongoUri)
 
   run
     .then((exitCode) => process.exit(exitCode))

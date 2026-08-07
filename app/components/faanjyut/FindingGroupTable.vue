@@ -51,6 +51,29 @@ function sourceCellLink(sourceCell: string): string {
           </td>
           <td class="px-3 py-2 jc-mono text-[12px] dark:text-slate-300">{{ item.objectId || '—' }}</td>
         </tr>
+        <!-- 審計 L5/M46：干預衝突類 finding 的結構化示例（前 5 條，可跳轉） -->
+        <tr v-for="(example, exIdx) in (item?.examples ?? [])" :key="`ex-${exIdx}`" class="bg-black/[.015] dark:bg-white/[.02]">
+          <td class="px-3 py-1.5 text-[12px] text-gray-500 dark:text-slate-400">
+            示例 #{{ exIdx + 1 }}{{ example.objectId ? `（${example.objectId}）` : '' }}
+          </td>
+          <td class="px-3 py-1.5">
+            <NuxtLink
+              v-if="example.sourceKey"
+              :to="sourceKeyLink(example.sourceKey)"
+              class="jc-mono text-[12px] text-blue-600 dark:text-blue-400 underline"
+            >{{ example.sourceKey }}</NuxtLink>
+            <span v-else class="jc-mono text-[12px] text-gray-400">—</span>
+          </td>
+          <td class="px-3 py-1.5">
+            <NuxtLink
+              v-if="example.sourceCell"
+              :to="sourceCellLink(example.sourceCell)"
+              class="jc-mono text-[12px] text-blue-600 dark:text-blue-400 underline"
+            >{{ example.sourceCell }}</NuxtLink>
+            <span v-else class="jc-mono text-[12px] text-gray-400">—</span>
+          </td>
+          <td class="px-3 py-1.5 jc-mono text-[12px] text-gray-400">{{ example.objectId || '—' }}</td>
+        </tr>
         <tr v-if="group.items.length === 0">
           <td colspan="4" class="px-3 py-4 text-xs text-gray-500 dark:text-slate-400">
             無記錄——任何一條 blocker 都會中止導入。
