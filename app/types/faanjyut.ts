@@ -143,7 +143,7 @@ export interface FaanJyutFindingItem {
   line?: number
   objectId?: string
   // 審計 L5/M46：干預衝突類 finding 的結構化示例（前 5 條）
-  examples?: Array<{ sourceKey?: string; sourceCell?: string; objectId?: string }>
+  examples?: Array<{ sourceKey?: string; sourceCell?: string; objectId?: string; text?: string }>
 }
 
 export interface FaanJyutFindingGroup {

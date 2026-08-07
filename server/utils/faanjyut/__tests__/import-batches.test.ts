@@ -129,4 +129,36 @@ describe('faanjyut/import-batches groupFindings', () => {
   it('空數組：返回空數組', () => {
     expect(groupFindings([])).toEqual([])
   })
+
+  it('審計 L5/M46：details.examples 字符串保留為 text，sourceKey 格式可跳轉', () => {
+    const findingsWithExamples: Finding[] = [
+      {
+        code: 'TARGET_SOURCE_KEY_CONFLICT',
+        severity: 'blocker',
+        objectType: 'lexemes',
+        objectId: 'lx_a',
+        sourceKey: '>1',
+        message: '衝突（2 條）',
+        details: {
+          total: 2,
+          examples: ['>416461483360343', 'fjl_1|廣州', '>B']
+        }
+      },
+    ]
+    const groups = groupFindings(findingsWithExamples)
+    const items = groups[0].items
+    expect(items).toHaveLength(1)
+    expect(items[0].examples).toEqual([
+      { text: '>416461483360343', sourceKey: '>416461483360343' },
+      { text: 'fjl_1|廣州' },
+      { text: '>B', sourceKey: '>B' },
+    ])
+  })
+
+  it('無 details.examples 時 examples 為 undefined', () => {
+    const groups = groupFindings([
+      { code: 'X', severity: 'blocker', objectType: 'lexemes', message: 'm' }
+    ])
+    expect(groups[0].items[0].examples).toBeUndefined()
+  })
 })

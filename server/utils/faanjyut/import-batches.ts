@@ -110,7 +110,7 @@ export interface GroupedFindingItem {
   objectId?: string
   /** 審計 L5/M46：干預衝突類 finding 的 details.examples（前 5 條）結構化保留，
    *  供前端逐條展示/跳轉（原被 groupFindings 丟棄，只有總數） */
-  examples?: Array<{ sourceKey?: string; sourceCell?: string; objectId?: string }>
+  examples?: Array<{ sourceKey?: string; sourceCell?: string; objectId?: string; text?: string }>
 }
 
 /** blocker/warning 按 code 分組的結果（count = 該 code 出現次數） */
@@ -125,12 +125,17 @@ function extractExamples(finding: Finding): GroupedFindingItem['examples'] {
   const raw = finding.details?.examples
   if (!Array.isArray(raw)) return undefined
   return raw.slice(0, 5).map((item) => {
-    if (typeof item === 'string') return { sourceKey: undefined, sourceCell: undefined, objectId: undefined }
+    if (typeof item === 'string') {
+      const result: NonNullable<GroupedFindingItem['examples']>[number] = { text: item }
+      if (item.startsWith('>')) result.sourceKey = item
+      return result
+    }
     const rec = item as Record<string, unknown>
     return {
       sourceKey: typeof rec.sourceKey === 'string' ? rec.sourceKey : undefined,
       sourceCell: typeof rec.sourceCell === 'string' ? rec.sourceCell : undefined,
-      objectId: typeof rec.objectId === 'string' ? rec.objectId : undefined
+      objectId: typeof rec.objectId === 'string' ? rec.objectId : undefined,
+      text: typeof rec.text === 'string' ? rec.text : undefined,
     }
   })
 }
