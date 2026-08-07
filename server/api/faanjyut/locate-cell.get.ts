@@ -5,9 +5,9 @@
  * 找不到 → 404。要求登錄。
  */
 import { z } from 'zod'
-import { Lexeme } from '../../../utils/Lexeme'
-import { FaanJyutCellState } from '../../../utils/FaanJyutCellState'
-import { connectDB } from '../../../utils/db'
+import { Lexeme } from '../../utils/Lexeme'
+import { FaanJyutCellState } from '../../utils/FaanJyutCellState'
+import { connectDB } from '../../utils/db'
 import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 
 const QuerySchema = z.object({

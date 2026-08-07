@@ -4,9 +4,9 @@
  * 普通 user preference，非 SavedView 命名空間；越界/超長 400。
  */
 import { z } from 'zod'
-import { User } from '../../../utils/User'
-import { connectDB } from '../../../utils/db'
-import { MATRIX_MAX_COLUMNS } from '../../../utils/faanjyut/matrix'
+import { User } from '../../utils/User'
+import { connectDB } from '../../utils/db'
+import { MATRIX_MAX_COLUMNS } from '../../utils/faanjyut/matrix'
 
 const BodySchema = z.object({
   matrixColumns: z.array(z.string().trim().min(1)).max(MATRIX_MAX_COLUMNS)

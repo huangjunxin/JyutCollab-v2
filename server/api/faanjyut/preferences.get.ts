@@ -4,8 +4,8 @@
  * 返回 { matrixColumns: string[] }；用戶無偏好時為空數組（前端回退 localStorage/默認列集）。
  * 要求登錄（全局 auth middleware 已強制）。
  */
-import { User } from '../../../utils/User'
-import { connectDB } from '../../../utils/db'
+import { User } from '../../utils/User'
+import { connectDB } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const user = event.context.auth

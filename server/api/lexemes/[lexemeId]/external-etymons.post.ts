@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import { ExternalEtymon } from '../../../utils/ExternalEtymon'
 import { Lexeme } from '../../../utils/Lexeme'
 import { convertToHongKongTraditional } from '../../../utils/textConversion'
-import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
+import { FAANJYUT_SOURCE_BOOK } from '../../../../shared/faanjyut'
 
 const ParamsSchema = z.object({
   lexemeId: z.string().min(1)
