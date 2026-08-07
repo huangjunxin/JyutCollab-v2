@@ -2,7 +2,11 @@
   <div class="jc-paper-shell flex h-screen overflow-hidden">
     <div class="flex min-w-0 flex-1 flex-col">
       <LayoutAppHeader />
-      <main class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
+      <main
+        class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6"
+        :class="isFaanjyutMatrix ? 'overflow-x-auto' : 'overflow-x-hidden'"
+        :style="isFaanjyutMatrix ? { containerType: 'inline-size' } : undefined"
+      >
         <slot />
       </main>
     </div>
@@ -31,6 +35,8 @@ import { useMobileBreakpoint } from '../composables/useMobileBreakpoint'
 
 const { open: agentOpen } = useAgentChat()
 const { isMobile } = useMobileBreakpoint()
+const route = useRoute()
+const isFaanjyutMatrix = computed(() => route.name === 'faanjyut-matrix')
 </script>
 
 <style scoped>

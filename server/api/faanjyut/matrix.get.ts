@@ -66,7 +66,8 @@ async function cellFilterLexemeSelector(
  */
 const QuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  perPage: z.coerce.number().int().min(1).max(100).default(50),
+  // 2026-08-07 無限滾動（方案 A）：前端每塊 200 行，上限隨之放寬
+  perPage: z.coerce.number().int().min(1).max(200).default(50),
   columns: z.string().optional(),
   cellFilter: z.enum(['null', 'normal', 'absent', 'cleared']).optional()
 })

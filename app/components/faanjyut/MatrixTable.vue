@@ -6,7 +6,7 @@
   <div
     ref="wrapRef"
     tabindex="0"
-    class="fj-matrix-wrap overflow-auto bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard-lg)]"
+    class="fj-matrix-wrap bg-white dark:bg-slate-800 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] shadow-[var(--jc-shadow-hard-lg)]"
     @keydown="onWrapKeydown"
   >
     <table class="fj-matrix" :style="{ width: `${282 + columns.length * 96}px` }">
@@ -306,16 +306,20 @@ watch(
 </script>
 
 <style>
-/* 矩陣表格骨架（吸頂列頭 + 吸左行頭）；非 scoped，需覆蓋 FaanjyutCell 的 td。 */
-.fj-matrix-wrap { max-height: 72vh; max-width: fit-content; }
+/* 矩陣表格骨架（吸頂列頭 + 吸左行頭）；非 scoped，需覆蓋 FaanjyutCell 的 td。
+   2026-08-07 無限滾動（方案 A·頁面級滾動版）：容器不滾動（無 overflow），表格自然高度，
+   縱向滾動由頁面 main 承擔（main overflow-x-auto 橫向亦由頁面承擔）；
+   列頭 sticky top 相對 main，吸在篩選欄（sticky top-0）下方——高度由 index.vue 的
+   ResizeObserver 寫入 --fj-filterbar-h（篩選欄換行時自動適配）。 */
+.fj-matrix-wrap { width: fit-content; }
 .fj-matrix { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .fj-matrix th, .fj-matrix td { border-right: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; }
 .fj-matrix thead th { position: sticky; z-index: 12; background: #FAFAF6; font-size: 11px; font-weight: 600; color: #4B5563; }
-.fj-matrix thead tr:first-child th { top: 0; height: 28px; }
-.fj-matrix thead tr:nth-child(2) th { top: 28px; vertical-align: top; }
-.fj-matrix .fj-sk1 { position: sticky; left: 0; z-index: 8; background: #fff; }
-.fj-matrix .fj-sk2 { position: sticky; left: 140px; z-index: 8; background: #fff; }
-.fj-matrix .fj-sk3 { position: sticky; left: 192px; z-index: 8; background: #fff; }
+.fj-matrix thead tr:first-child th { top: calc(var(--fj-filterbar-h, 0px) - var(--fj-main-gutter, 0px)); height: 28px; }
+.fj-matrix thead tr:nth-child(2) th { top: calc(var(--fj-filterbar-h, 0px) + 28px - var(--fj-main-gutter, 0px)); vertical-align: top; }
+.fj-matrix .fj-sk1 { position: sticky; left: calc(var(--fj-main-gutter, 0px) * -1); z-index: 8; background: #fff; }
+.fj-matrix .fj-sk2 { position: sticky; left: calc(140px - var(--fj-main-gutter, 0px)); z-index: 8; background: #fff; }
+.fj-matrix .fj-sk3 { position: sticky; left: calc(192px - var(--fj-main-gutter, 0px)); z-index: 8; background: #fff; }
 .fj-matrix thead .fj-sk1, .fj-matrix thead .fj-sk2, .fj-matrix thead .fj-sk3 { z-index: 14; background: #FAFAF6; }
 /* 列頭 tint（style.color 弱化），疊在不透明底上 */
 .fj-matrix thead tr:nth-child(2) th[style*="--fj-col-tint"] {

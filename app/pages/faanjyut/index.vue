@@ -1,10 +1,14 @@
 <template>
-  <!-- 通欄容器（2026-08-06 統一）：與全局其他頁面一致，繼承 default.vue main 的 padding -->
-  <div>
+  <!-- 通欄容器（2026-08-06 統一）：繼承 default.vue main 的 padding。
+       2026-08-07 無限滾動（方案 A·頁面級滾動版）：內容自然高度，main 縱向滾動；
+       篩選欄 + 矩陣列頭 sticky 吸頂，表格全頁展開不再有內部滾動框 -->
+  <div class="fj-matrix-page" :style="{ '--fj-filterbar-h': `${filterBarHeight}px` }">
     <!-- 模塊內子導航（導入報告/導出收進泛粵模塊，見 AppHeader 註釋） -->
-    <FaanjyutModuleNav />
+    <div class="fj-viewport-layer">
+      <FaanjyutModuleNav />
+    </div>
     <!-- 頁頭（§6.1） -->
-    <div class="flex flex-wrap items-start gap-4 mb-4">
+    <div class="fj-viewport-layer flex flex-wrap items-start gap-4 mb-4">
       <div
         class="w-10 h-10 flex items-center justify-center shrink-0"
         style="background: var(--jc-accent-soft-strong); border: 1px solid var(--jc-accent)"
@@ -54,7 +58,11 @@
     </div>
 
     <!-- 篩選欄（§6.1/6.5） -->
-    <div class="jc-card p-3 mb-3 flex flex-wrap items-center gap-2">
+    <div
+      ref="filterBarRef"
+      class="fj-filter-dock dark:bg-[var(--jc-dark-bg)]"
+    >
+      <div class="jc-card p-3 flex flex-wrap items-center gap-2">
       <!-- 圖例入口（§6.3）：hover 彈出完整四態說明，不常駐佔位 -->
       <UPopover
         mode="hover"
@@ -120,15 +128,15 @@
         >{{ chip.label }}</button>
       </div>
       <span v-if="matrixData" class="ml-auto text-xs text-gray-500 dark:text-gray-400">
-        共 <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 條 · 第
-        <strong>{{ matrixData.pagination.page }}/{{ matrixData.pagination.totalPages || 1 }}</strong> 頁
+        已顯示 <strong>{{ matrixData.rows.length.toLocaleString() }}</strong> / <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 行
       </span>
+      </div>
     </div>
 
     <!-- ?q= / ?cell= 定位提示 -->
     <div
       v-if="locateNote"
-      class="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-4 py-2.5 mb-3 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2"
+      class="fj-viewport-layer border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950 px-4 py-2.5 mb-3 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2"
     >
       <UIcon name="i-heroicons-map-pin" class="w-4 h-4 shrink-0" />
       <span>{{ locateNote }}</span>
@@ -136,12 +144,12 @@
     </div>
 
     <!-- 錯誤態 -->
-    <div v-if="errorMessage" class="jc-card p-6 mb-3 text-center">
+    <div v-if="errorMessage" class="fj-viewport-layer jc-card p-6 mb-3 text-center">
       <p class="text-sm text-red-600 dark:text-red-400 mb-3">{{ errorMessage }}</p>
       <UButton size="sm" color="neutral" variant="soft" @click="fetchMatrixData">重試</UButton>
     </div>
 
-    <!-- 矩陣表 -->
+    <!-- 矩陣表（頁面級滾動：表格自然高度，main 縱向滾動；列頭吸頂見篩選欄註釋） -->
     <FaanjyutMatrixTable
       v-else
       :columns="displayedColumns"
@@ -152,21 +160,40 @@
       :write-enabled="matrixData?.writeEnabled ?? false"
       :cell-edit="cellEdit"
     />
-    <p class="text-[10px] text-gray-400 mt-2 mb-4">
-      篩選 chip 只影響本頁顯示的行（在所選列中至少一格命中該態才顯示），總數仍為全表詞條數。
+    <p class="fj-viewport-layer text-[10px] text-gray-400 mt-2 mb-4">
+      篩選 chip 只影響當前顯示的行（在所選列中至少一格命中該態才顯示），總數仍為全表詞條數。
     </p>
 
-    <!-- 分頁器（底部居中；翻頁保持列集與篩選） -->
-    <div v-if="matrixData && matrixData.pagination.totalPages > 1" class="flex flex-col items-center gap-3 mt-2 mb-6">
-      <UPagination
-        :page="page"
-        :total="matrixData.pagination.total"
-        :items-per-page="PER_PAGE"
-        size="sm"
-        :disabled="loading"
-        @update:page="onPageChange"
-      />
-      <p class="text-[11px] text-gray-400">每頁 {{ PER_PAGE }} 行</p>
+    <!-- 2026-08-07 無限滾動（方案 A）：底部「載入更多」塊追加，替代分頁跳頁；
+         已顯示行數 + 軟上限提示（全表 8 千+ 行 × 最多 101 列，全量渲染不可行）。
+         定位（?q=/?cell=）單塊跳轉後 page 可能已在末塊：按「可追加 / 達上限 / 末塊」三態展示 -->
+    <div v-if="matrixData && !loading" class="fj-viewport-layer flex flex-col items-center gap-2 py-4">
+      <template v-if="canLoadMore">
+        <UButton
+          size="sm"
+          color="neutral"
+          variant="soft"
+          :loading="loadingMore"
+          @click="loadMore"
+        >
+          載入更多（已顯示 {{ matrixData.rows.length.toLocaleString() }} / {{ matrixData.pagination.total.toLocaleString() }} 行）
+        </UButton>
+        <p class="text-[11px] text-gray-400">
+          每塊 {{ PER_PAGE }} 行；連續瀏覽大表請使用搜索定位（{{ matrixData.pagination.total.toLocaleString() }} 行全表）
+        </p>
+      </template>
+      <template v-else-if="matrixData.rows.length > 0">
+        <p v-if="matrixData.rows.length >= MAX_ROWS" class="text-xs text-amber-600 dark:text-amber-400">
+          已載入 {{ matrixData.rows.length.toLocaleString() }} 行（達到 {{ MAX_ROWS.toLocaleString() }} 行性能上限）。
+        </p>
+        <p v-else-if="page >= matrixData.pagination.totalPages" class="text-xs text-gray-500 dark:text-gray-400">
+          已載入至末塊（第 {{ page }} 塊，共 {{ matrixData.rows.length.toLocaleString() }} 行）。
+        </p>
+        <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+          已載入 {{ matrixData.rows.length.toLocaleString() }} 行。
+        </p>
+        <p class="text-[11px] text-gray-400">如需查閱其他行，請使用上方搜索或 ?q= 詞條鍵定位。</p>
+      </template>
     </div>
 
     <!-- P5 新建詞條彈窗（§8：至少一列編輯權限 + 寫入旗標開啟時顯示按鈕） -->
@@ -197,13 +224,35 @@ useHead({
   ]
 })
 
-const PER_PAGE = 50
+/** 2026-08-07 無限滾動（方案 A）：每塊追加行數 + DOM 軟上限（全表 8 千+ 行 × 101 列全量渲染不可行） */
+const PER_PAGE = 200
+const MAX_ROWS = 3000
 const COLUMNS_STORAGE_KEY = 'faanjyut:matrix:columns'
 
 const route = useRoute()
 const { fetchMatrix, fetchColumns, search, writeCells, locatePageByMatrixOrder } = useFaanjyutMatrix()
+/** loadMore 追加失敗用 toast（不替換已有視圖） */
+const toast = useToast()
 
+const filterBarRef = ref<HTMLElement | null>(null)
+const filterBarHeight = ref(0)
+let filterBarObserver: ResizeObserver | null = null
+
+function syncFilterBarHeight() {
+  const el = filterBarRef.value
+  if (el) filterBarHeight.value = el.offsetHeight
+}
+
+/** 已加載的頁數（1-based，每塊 PER_PAGE 行）；翻頁語義改為「載入下一塊追加」 */
 const page = ref(1)
+const loadingMore = ref(false)
+
+/** 是否還能追加：未到末頁且未達 DOM 軟上限 */
+const canLoadMore = computed(() => {
+  const m = matrixData.value
+  if (!m || loading.value) return false
+  return page.value < m.pagination.totalPages && m.rows.length < MAX_ROWS
+})
 /** 已選列 id；空數組 = 服務端默認列集（本人可編輯列＋穗港） */
 const selectedColumnIds = ref<string[]>([])
 const cellFilter = ref<FaanjyutCellState | null>(null)
@@ -239,18 +288,20 @@ const cellFilterChips: Array<{ value: FaanjyutCellState; label: string; title: s
   { value: 'cleared', label: '已清空', title: '只顯示所選列中有已清空格的詞條' }
 ]
 
+/** 重置並載入第一塊（初始 / 篩選 / 列集變化 / 定位失敗兜底）；清空全部編輯態 */
 async function fetchMatrixData() {
   loading.value = true
   errorMessage.value = null
-  // 數據重載（翻頁/篩選/定位/列集變化）時清空全部編輯態（舊格可能已不在本頁）
+  // 數據重載（翻頁/篩選/定位/列集變化）時清空全部編輯態（舊格可能已不在本視圖）
   cellEdit.resetAll()
   try {
     matrixData.value = await fetchMatrix({
-      page: page.value,
+      page: 1,
       perPage: PER_PAGE,
       columnIds: selectedColumnIds.value,
       cellFilter: cellFilter.value
     })
+    page.value = 1
   } catch (error: any) {
     errorMessage.value = error?.data?.message || error?.message || '矩陣載入失敗'
   } finally {
@@ -258,12 +309,62 @@ async function fetchMatrixData() {
   }
 }
 
-function onPageChange(newPage: number) {
-  if (newPage === page.value) return
-  page.value = newPage
-  highlightLexemeId.value = null
-  highlightSourceCell.value = null
-  fetchMatrixData()
+/**
+ * 追加下一塊（「載入更多」）：rows 累加、不 reset 編輯態、不影響滾動位置。
+ * 返回是否成功追加（false = 已到末頁 / 達上限 / 請求失敗）。
+ * 不檢查 loading：定位流程（locateByQuery）中 loading=true 且逐塊 ensureLoadedTo，
+ * 檢查 loading 會卡住定位（2026-08-07 修復）；初始載入期間按鈕本就隱藏（v-if !loading）。
+ */
+async function loadMore(): Promise<boolean> {
+  const m = matrixData.value
+  if (!m || loadingMore.value) return false
+  if (page.value >= m.pagination.totalPages || m.rows.length >= MAX_ROWS) return false
+  loadingMore.value = true
+  try {
+    const data = await fetchMatrix({
+      page: page.value + 1,
+      perPage: PER_PAGE,
+      columnIds: selectedColumnIds.value,
+      cellFilter: cellFilter.value
+    })
+    matrixData.value = {
+      ...data,
+      rows: [...matrixData.value.rows, ...data.rows]
+    }
+    page.value += 1
+    return true
+  } catch (error: any) {
+    // 追加失敗不替換已有視圖（與初始載入失敗的整頁錯誤態區分）
+    const msg = error?.data?.message || error?.message || '載入更多失敗'
+    toast.add({ title: '載入更多失敗', description: msg, color: 'error' })
+    return false
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+/**
+ * 定位（?q=/?cell=）用：直接請求目標塊並替換視圖（2026-08-07 修復：
+ * 原 ensureLoadedTo 逐塊串行追加，服務端每塊 pivot ~2.6s，跨 14 塊要 30s+ 才看到結果；
+ * 定位本質是跳轉，單次請求秒級完成，目標塊之後可用「載入更多」繼續追加）。
+ * 返回替換後的數據；請求失敗返回 null。
+ */
+async function jumpToBlock(targetPage: number): Promise<FaanjyutMatrixData | null> {
+  if (!matrixData.value) return null
+  try {
+    const data = await fetchMatrix({
+      page: targetPage,
+      perPage: PER_PAGE,
+      columnIds: selectedColumnIds.value,
+      cellFilter: cellFilter.value
+    })
+    matrixData.value = data
+    page.value = targetPage
+    return data
+  } catch (error: any) {
+    toast.add({ title: '定位失敗', description: error?.data?.message || error?.message || '載入目標塊失敗', color: 'error' })
+    return null
+  }
 }
 
 function onColumnsChange(ids: string[]) {
@@ -274,7 +375,6 @@ function onColumnsChange(ids: string[]) {
 
 function toggleCellFilter(value: FaanjyutCellState) {
   cellFilter.value = cellFilter.value === value ? null : value
-  page.value = 1
   highlightLexemeId.value = null
   highlightSourceCell.value = null
   fetchMatrixData()
@@ -323,16 +423,21 @@ function restoreColumnSelection(): string[] {
 }
 
 /**
- * ?q=<sourceKey> 定位：搜索 → 取 key 維度首個命中 → 按 matrixOrder 二分定位頁碼 →
- * 跳轉該頁並高亮行。無法精確定位時保留高亮 id 並在頁面說明（§6 頁面規格 3）。
+ * ?q=<sourceKey> 定位：搜索 → 取 key 維度首個命中 → 按 matrixOrder 二分定位塊 →
+ * 從第一塊逐塊追加到目標塊並高亮行（2026-08-07 無限滾動版；原「跳頁」改為「確保加載到」）。
+ * 超過軟上限無法加載到目標行時保留提示，可點行首鍵前往詞條詳情（§6 頁面規格 3）。
  */
 async function locateByQuery(q: string) {
+  // 2026-08-07 修復：定位流程自管理 loading（原分頁版成功路徑不置 false，
+  // 無限滾動版會導致底部「載入更多」按鈕區被 v-if !loading 永久隱藏）
+  loading.value = true
+  errorMessage.value = null
   try {
     const res = await search(q, 5)
     const keyHit = res.groups.find((g) => g.dimension === 'key')?.hits[0]
     const hit = keyHit ?? res.groups.flatMap((g) => g.hits)[0]
     if (!hit) {
-      locateNote.value = `找不到「${q}」對應的詞條，已載入第一頁。`
+      locateNote.value = `找不到「${q}」對應的詞條，已載入第一塊。`
       await fetchMatrixData()
       return
     }
@@ -340,47 +445,47 @@ async function locateByQuery(q: string) {
 
     const matrixOrder = hit.extra?.matrixOrder
     if (typeof matrixOrder !== 'number') {
-      locateNote.value = `已找到詞條（${hit.snippet}），但此命中不含排序資訊，無法計算所在頁；可點行首鍵前往詞條詳情。`
+      locateNote.value = `已找到詞條（${hit.snippet}），但此命中不含排序資訊，無法定位所在塊；可點行首鍵前往詞條詳情。`
       await fetchMatrixData()
       return
     }
 
-    // 先取第一頁拿到 totalPages，再二分定位
+    // 先取第一塊拿到 totalPages，再二分定位目標塊
     const firstPage = await fetchMatrix({ page: 1, perPage: PER_PAGE, columnIds: selectedColumnIds.value })
     const totalPages = firstPage.pagination.totalPages
     const target = await locatePageByMatrixOrder(matrixOrder, PER_PAGE, totalPages)
-    page.value = target ?? 1
-    matrixData.value = page.value === 1
-      ? firstPage
-      : await fetchMatrix({ page: page.value, perPage: PER_PAGE, columnIds: selectedColumnIds.value })
+    matrixData.value = firstPage
+    page.value = 1
+    if (target && target > 1) {
+      await jumpToBlock(target)
+    }
 
-    // matrixOrder 重複值跨頁邊界時試相鄰頁
+    // matrixOrder 重複值跨塊邊界時試相鄰塊
     if (!matrixData.value.rows.some((r) => r.id === hit.lexemeId)) {
       for (const p of [page.value + 1, page.value - 1]) {
-        if (p < 1 || p > totalPages) continue
-        const data = await fetchMatrix({ page: p, perPage: PER_PAGE, columnIds: selectedColumnIds.value })
-        if (data.rows.some((r) => r.id === hit.lexemeId)) {
-          page.value = p
-          matrixData.value = data
-          break
-        }
+        if (!p || p < 1 || p > totalPages) continue
+        const data = await jumpToBlock(p)
+        if (!data) break
+        if (data.rows.some((r) => r.id === hit.lexemeId)) break
       }
     }
 
     if (matrixData.value.rows.some((r) => r.id === hit.lexemeId)) {
-      locateNote.value = `已定位「${q}」：第 ${page.value} 頁，目標行已高亮。`
+      locateNote.value = `已定位「${q}」：第 ${page.value} 塊，目標行已高亮。`
     } else {
-      locateNote.value = `已定位「${q}」附近頁（第 ${page.value} 頁），但目標行未在本頁顯示；可前往詞條詳情。`
+      locateNote.value = `已定位「${q}」附近（第 ${page.value} 塊），但目標行未顯示；可前往詞條詳情。`
     }
   } catch {
-    locateNote.value = `「${q}」搜索定位失敗，已載入第一頁。`
+    locateNote.value = `「${q}」搜索定位失敗，已載入第一塊。`
     await fetchMatrixData()
+  } finally {
+    loading.value = false
   }
 }
 
 /**
- * ?cell=<sourceCell> 定位（導入報告跳轉用，審計 M64）：頁內掃描優先；
- * 未命中 → locate-cell API 查所在頁並翻頁高亮（不再降級為「不在目前頁」）。
+ * ?cell=<sourceCell> 定位（導入報告跳轉用，審計 M64）：已加載行內掃描優先；
+ * 未命中 → locate-cell API 查所在塊並追加載入到該塊高亮（不再降級為「不在目前頁」）。
  */
 async function applyCellHighlight(sourceCell: string) {
   highlightSourceCell.value = sourceCell
@@ -395,14 +500,16 @@ async function applyCellHighlight(sourceCell: string) {
     const res = await $fetch<{ success: boolean; data: { page: number; sourceKey: string | null } }>(
       `/api/faanjyut/locate-cell?cell=${encodeURIComponent(sourceCell)}&perPage=${PER_PAGE}`
     )
-    page.value = res.data.page
-    await fetchMatrixData()
+    const targetPage = res.data.page
+    if (targetPage > page.value) {
+      await jumpToBlock(targetPage)
+    }
     const nowFound = (matrixData.value?.rows ?? []).some((row) =>
       Object.values(row.cells).some((cell) => cell.sourceCell === sourceCell)
     )
     locateNote.value = nowFound
-      ? `已定位原表格 ${sourceCell}：第 ${page.value} 頁，目標格已高亮。`
-      : `已定位到第 ${page.value} 頁附近（${res.data.sourceKey ?? '未知詞條'}），目標格未在本頁顯示。`
+      ? `已定位原表格 ${sourceCell}：第 ${page.value} 塊，目標格已高亮。`
+      : `已定位至第 ${page.value} 塊附近（${res.data.sourceKey ?? '未知詞條'}），目標格未顯示。`
   } catch {
     locateNote.value = `原表格 ${sourceCell} 定位失敗（找不到對應格或詞條），請配合 ?q=<詞條鍵> 定位。`
   }
@@ -431,7 +538,24 @@ async function handleQueryParams() {
 /** 審計 M53 修復：KeepAlive 下首次掛載 onMounted/onActivated 都會觸發，flag 跳過首次 onActivated 避免重複請求 */
 let mounted = false
 
+/** 2026-08-08：頁面級滾動後，滾動位置在 layout 共享的 main 容器上（原 wrap 內部滾動由
+ *  keepalive DOM 緩存自動保留）。離開矩陣頁時記下 main.scrollTop，返回時恢復。 */
+let savedMainScroll = 0
+let savedMainScrollLeft = 0
+
+onDeactivated(() => {
+  const main = document.querySelector('main')
+  savedMainScroll = main?.scrollTop ?? 0
+  savedMainScrollLeft = main?.scrollLeft ?? 0
+})
+
 onMounted(async () => {
+  syncFilterBarHeight()
+  if (typeof ResizeObserver !== 'undefined' && filterBarRef.value) {
+    filterBarObserver = new ResizeObserver(syncFilterBarHeight)
+    filterBarObserver.observe(filterBarRef.value)
+  }
+
   // 審計 M52：服務端偏好優先，無則回退本機
   selectedColumnIds.value = (await fetchServerColumnPreferences()) ?? restoreColumnSelection()
 
@@ -448,14 +572,61 @@ onMounted(async () => {
   mounted = true
 })
 
-// 審計 M53 修復：從詳情頁等返回（KeepAlive 命中）時 onMounted 不再觸發，需在此重新處理 ?q=/?cell=
+// 審計 M53 修復：從詳情頁等返回（KeepAlive 命中）時 onMounted 不再觸發，需在此重新處理 ?q=/?cell=。
+// 2026-08-07 無限滾動版：無 query 參數時保留 keepalive 緩存的已加載行與滾動位置，不重拉第一塊
+// （原「恢復頁碼」語義自然升級為「恢復已加載行數」）。
 onActivated(() => {
   if (!mounted) return
-  handleQueryParams()
+  const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
+  const cell = typeof route.query.cell === 'string' ? route.query.cell.trim() : ''
+  if (q || cell) {
+    handleQueryParams()
+  } else if (!matrixData.value) {
+    fetchMatrixData()
+  } else {
+    // 無 query：保留 keepalive 緩存的數據與列集，恢復離開時的滾動位置
+    const main = document.querySelector('main')
+    if (main) {
+      main.scrollTop = savedMainScroll
+      main.scrollLeft = savedMainScrollLeft
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  filterBarObserver?.disconnect()
+  filterBarObserver = null
 })
 </script>
 
 <style scoped>
+.fj-matrix-page {
+  --fj-main-gutter: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+.fj-viewport-layer {
+  position: sticky;
+  left: 0;
+  width: calc(100vw - var(--fj-main-gutter) * 2);
+  width: 100cqw;
+}
+.fj-filter-dock {
+  position: sticky;
+  top: calc(var(--fj-main-gutter) * -1);
+  left: calc(var(--fj-main-gutter) * -1);
+  z-index: 40;
+  width: calc(100cqw + var(--fj-main-gutter) * 2);
+  margin-left: calc(var(--fj-main-gutter) * -1);
+  padding: 0 var(--fj-main-gutter) 12px;
+  background: var(--jc-paper);
+}
+@media (min-width: 640px) {
+  .fj-matrix-page { --fj-main-gutter: 16px; }
+}
+@media (min-width: 768px) {
+  .fj-matrix-page { --fj-main-gutter: 24px; }
+}
 .fj-chip {
   display: inline-flex;
   align-items: center;

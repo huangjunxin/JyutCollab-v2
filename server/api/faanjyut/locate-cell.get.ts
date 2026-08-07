@@ -12,7 +12,8 @@ import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 
 const QuerySchema = z.object({
   cell: z.string().trim().min(1, '缺少 cell 參數'),
-  perPage: z.coerce.number().int().min(1).max(100).default(50)
+  // 2026-08-07 無限滾動（方案 A）：與 matrix.get.ts 的 perPage 上限一致（前端每塊 200 行）
+  perPage: z.coerce.number().int().min(1).max(200).default(50)
 })
 
 export default defineEventHandler(async (event) => {
