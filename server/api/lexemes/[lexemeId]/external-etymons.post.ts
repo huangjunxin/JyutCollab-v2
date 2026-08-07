@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import { ExternalEtymon } from '../../../utils/ExternalEtymon'
 import { Lexeme } from '../../../utils/Lexeme'
 import { convertToHongKongTraditional } from '../../../utils/textConversion'
+import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 
 const ParamsSchema = z.object({
   lexemeId: z.string().min(1)
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
   // 審計 M29：泛粵詞條（meta.sourceBook='faanjyut'）的域外材料一律 409，
   // 泛粵數據只能經泛粵模塊管理（普通寫入口攔截，與 §9 一致）
   const targetLexeme = await Lexeme.findOne({ id: lexemeId }).select('meta.sourceBook').lean()
-  if (targetLexeme?.meta?.sourceBook === 'faanjyut') {
+  if (targetLexeme?.meta?.sourceBook === FAANJYUT_SOURCE_BOOK) {
     throw createError({ statusCode: 409, message: '泛粵字表數據請前往泛粵模塊編輯' })
   }
 

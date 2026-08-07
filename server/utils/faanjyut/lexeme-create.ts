@@ -43,7 +43,7 @@ export interface CreateLexemeInput {
   compositePronunciation?: string
   representativeChar?: string
   note?: string
-  initialCells: Array<{ dialectId: string; raw: string }>
+  initialCells: Array<{ dialectId: string; raw: string; op?: 'set' | 'absent' }>
 }
 
 export interface CreateLexemeResult {
@@ -243,7 +243,6 @@ export async function createLexeme(
           lexemeId,
           columnId: column.id,
           userId: user.id,
-          raw: '_',
           projectionEntryId: null,
           flags: { modifiedPendingReview: true, explicitlyAbsent: true }
         })

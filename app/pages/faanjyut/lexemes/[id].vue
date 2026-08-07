@@ -363,7 +363,7 @@ function authorInitial(author: string | null | undefined): string {
                   size="sm"
                   class="w-20 jc-headword-rare-font text-center"
                   :disabled="repCharSaving"
-                  @keydown.enter="event.isComposing || saveLexemeField('representativeChar', repCharDraft, { editing: repCharEditing, saving: repCharSaving, error: repCharError })"
+                  @keydown.enter="$event.isComposing || saveLexemeField('representativeChar', repCharDraft, { editing: repCharEditing, saving: repCharSaving, error: repCharError })"
                   @keydown.esc="cancelRepCharEdit"
                 />
               </template>
@@ -434,7 +434,7 @@ function authorInitial(author: string | null | undefined): string {
                       class="w-40 jc-mono"
                       placeholder="綜合音（可含 ! ?）"
                       :disabled="compositeSaving"
-                      @keydown.enter="event.isComposing || saveCompositeEdit"
+                      @keydown.enter="$event.isComposing || saveCompositeEdit"
                       @keydown.esc="cancelCompositeEdit"
                     />
                     <UButton
@@ -510,7 +510,7 @@ function authorInitial(author: string | null | undefined): string {
                     class="w-40 jc-headword-rare-font"
                     placeholder="候選字（可多個）"
                     :disabled="commonCharSaving"
-                    @keydown.enter="event.isComposing || saveLexemeField('commonCharCandidates', commonCharDraft, { editing: commonCharEditing, saving: commonCharSaving, error: commonCharError })"
+                    @keydown.enter="$event.isComposing || saveLexemeField('commonCharCandidates', commonCharDraft, { editing: commonCharEditing, saving: commonCharSaving, error: commonCharError })"
                     @keydown.esc="cancelCommonCharEdit"
                   />
                   <div class="flex items-center gap-1.5 mt-1.5">

@@ -252,7 +252,8 @@ export function adaptMongooseCellsDb(connection: mongoose.Connection): CellsDb {
 
 /**
  * mongoose 連接 → LexemeCreateDb 適配器（P5 新建詞條用）。
- * 事務外列批查/max matrixOrder 走 lean；Lexeme + 逐格三件套走 withMongoTransaction
+ * 事務外列批查走 lean；matrixOrder 由純邏輯以 Date.now() 生成（審計 M38，不再查 max）；
+ * Lexeme + 逐格三件套走 withMongoTransaction
  * （adapter 已實現 createLexeme / nextSourceKeySeq，同一事務內原子遞增 JC- 計數器）。
  */
 export function adaptMongooseLexemeCreateDb(connection: mongoose.Connection): LexemeCreateDb {

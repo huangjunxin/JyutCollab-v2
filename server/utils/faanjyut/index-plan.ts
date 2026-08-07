@@ -140,8 +140,9 @@ export function computeIndexPlan(
 }
 
 /**
- * 期望索引來源（7 個導入 collection 的 Mongoose schema）。
- * collection 未建模（如 faanjyut_import_batches，P2 引入）時期望為空。
+ * 期望索引來源（FAANJYUT_INDEXED_COLLECTIONS 全部 9 個 collection 的 Mongoose schema；
+ * faanjyut_import_batches / faanjyut_export_batches 經 FAANJYUT_AUX_COLLECTIONS 納入，
+ * 均已建模，期望索引非空）。
  */
 export function expectedIndexPlan(importCollections: FaanJyutImportCollection[]): Record<string, ExpectedIndex[]> {
   const result: Record<string, ExpectedIndex[]> = {}

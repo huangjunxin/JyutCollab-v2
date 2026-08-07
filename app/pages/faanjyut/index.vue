@@ -281,15 +281,22 @@ function toggleCellFilter(value: FaanjyutCellState) {
   fetchMatrixData()
 }
 
-/** 列選擇持久化（審計 M52：服務端偏好 §6.2 + 本機 localStorage 兜底） */
+let persistColumnsTimeout: ReturnType<typeof setTimeout> | null = null
+
+/** 列選擇持久化（審計 M52：服務端偏好 §6.2 + 本機 localStorage 兜底）
+ *  審計 M53 修復：服務端 PUT debounce 500ms，快速切列合併為最後一次（避免亂序請求）；
+ *  本機 localStorage 即時寫入，不影響客戶端列選擇響應性 */
 function persistColumnSelection(ids: string[]) {
   if (!import.meta.client) return
   try {
     localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(ids))
   } catch { /* 忽略存儲失敗 */ }
-  // 服務端記住（普通 user preference）；失敗靜默（下次仍可用本機/默認列集）
-  $fetch('/api/faanjyut/preferences', { method: 'PUT', body: { matrixColumns: ids } })
-    .catch(() => { /* 偏好保存失敗不阻塞使用 */ })
+  if (persistColumnsTimeout) clearTimeout(persistColumnsTimeout)
+  persistColumnsTimeout = setTimeout(() => {
+    // 服務端記住（普通 user preference）；失敗靜默（下次仍可用本機/默認列集）
+    $fetch('/api/faanjyut/preferences', { method: 'PUT', body: { matrixColumns: ids } })
+      .catch(() => { /* 偏好保存失敗不阻塞使用 */ })
+  }, 500)
 }
 
 /** 服務端列偏好（§6.2）；無偏好/失敗 → null（前端回退 localStorage） */
@@ -402,6 +409,29 @@ async function applyCellHighlight(sourceCell: string) {
   }
 }
 
+/**
+ * 審計 M53 修復：?q=/?cell= query 參數處理（原 onMounted 內聯邏輯抽出）。
+ * KeepAlive 返回矩陣時 route.query 可能已變化（如從導入報告/詳情頁
+ * navigateTo({ path: '/faanjyut', query: { cell: 'xxx' } })），故首次掛載與重新激活共用。
+ */
+async function handleQueryParams() {
+  const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
+  const cell = typeof route.query.cell === 'string' ? route.query.cell.trim() : ''
+
+  if (q) {
+    cellFilter.value = null
+    await locateByQuery(q)
+  } else {
+    await fetchMatrixData()
+  }
+  if (cell) {
+    await applyCellHighlight(cell)
+  }
+}
+
+/** 審計 M53 修復：KeepAlive 下首次掛載 onMounted/onActivated 都會觸發，flag 跳過首次 onActivated 避免重複請求 */
+let mounted = false
+
 onMounted(async () => {
   // 審計 M52：服務端偏好優先，無則回退本機
   selectedColumnIds.value = (await fetchServerColumnPreferences()) ?? restoreColumnSelection()
@@ -415,18 +445,14 @@ onMounted(async () => {
     .catch(() => { /* 列選擇器降級為僅顯示目前列 */ })
     .finally(() => { columnsLoading.value = false })
 
-  const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
-  const cell = typeof route.query.cell === 'string' ? route.query.cell.trim() : ''
+  await handleQueryParams()
+  mounted = true
+})
 
-  if (q) {
-    cellFilter.value = null
-    await locateByQuery(q)
-  } else {
-    await fetchMatrixData()
-  }
-  if (cell) {
-    await applyCellHighlight(cell)
-  }
+// 審計 M53 修復：從詳情頁等返回（KeepAlive 命中）時 onMounted 不再觸發，需在此重新處理 ?q=/?cell=
+onActivated(() => {
+  if (!mounted) return
+  handleQueryParams()
 })
 </script>
 

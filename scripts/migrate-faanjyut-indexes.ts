@@ -92,12 +92,15 @@ function usage(): string {
     '  --dry-run              只讀輸出 existing/expected/create/drop 計劃（默認）',
     '  --apply                應用索引計劃（人工審閱後執行 create/drop）',
     '  --confirm-write <db>   apply 模式必填：必須等於實際連接的 db 名（防誤寫）',
+    '  --environment <env>    local|staging|production（默認 staging）',
+    '  --confirm-production   production 環境 --apply 時必填（二次確認）',
     '  --report-dir <dir>     產物目錄，默認 .artifacts/faanjyut/index-plan',
     '  --help',
     '',
     '示例：',
     '  npm run migrate:faanjyut-indexes -- --dry-run --report-dir .artifacts/faanjyut/index-plan',
     '  npm run migrate:faanjyut-indexes -- --apply --confirm-write <db>',
+    '  npm run migrate:faanjyut-indexes -- --apply --confirm-write <db> --environment production --confirm-production  # P6 生產切換（drop 前需備份完成）',
     ''
   ].join('\n')
 }

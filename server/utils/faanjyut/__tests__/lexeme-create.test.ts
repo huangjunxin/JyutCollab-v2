@@ -2,7 +2,8 @@
  * lexeme-create 新建詞條測試（FaanjyutV1Design §8、§12 `POST /api/faanjyut/lexemes`、§13 P5）：
  * 沿用 cells.test.ts 的內存 fake 基建——LexemeCreateDb 注入、不連真庫、不測 handler。
  * 覆蓋：四件套落庫 + JC- 序號遞增 + matrixOrder Date.now() + sourceBook、Zod 拒（釋義空/空陣列/
- * 重複方言/超 30 格）、無權限列 403、列不存在 400、事務回滾、撞 sourceKey unique → 409 語義。
+ * 重複方言/超 30 格）、無權限列 403、列不存在 400、事務回滾、撞 sourceKey unique → 409 語義、
+ * op=absent 只寫 CellState 不建 Entry（審計 M56）。
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -317,6 +318,37 @@ describe('faanjyut/lexeme-create 建立成功', () => {
     const entry = db.entries[0] as any
     expect(entry.headword).toMatchObject({ display: '', isPlaceholder: true })
     expect(result.entries[0].entryId).toBe(entryId('JC-00000001', 'guangzhou'))
+  })
+
+  it('審計 M56 absent 路徑：op=absent（raw `_`）只寫 CellState（explicitlyAbsent，不寫 raw），不建 Entry/歷史', async () => {
+    const db = makeDb()
+    const result = await createLexeme(db, input({
+      initialCells: [
+        { dialectId: 'guangzhou', raw: 'keoi5' },
+        { dialectId: 'taishan', raw: '_', op: 'absent' }
+      ]
+    }), admin)
+
+    // absent 格不進 result.entries，也不產生 Entry 文檔
+    expect(result.entries).toEqual([
+      { dialectId: 'guangzhou', entryId: entryId('JC-00000001', 'guangzhou') }
+    ])
+    expect(db.entries).toHaveLength(1)
+    expect(db.entries[0]).toMatchObject({ dialect: { name: 'guangzhou' } })
+
+    // CellState：兩格都有，absent 格 upsertCellState 帶 explicitlyAbsent flag、raw 不落（同 applyClearAbsent $unset 語義）
+    expect(db.cellStates).toHaveLength(2)
+    const absentCell = db.cellStates.find((cs) => cs.columnId === COL_TS) as any
+    expect(absentCell).toBeDefined()
+    expect(absentCell.raw).toBeUndefined()
+    expect(absentCell.projection).toBeUndefined()
+    expect(absentCell.status).toMatchObject({
+      workflow: 'unreviewed',
+      flags: { modifiedPendingReview: true, explicitlyAbsent: true }
+    })
+    // absent 格不寫 EditHistory（無 Entry 可掛）
+    expect(db.histories).toHaveLength(1)
+    expect((db.histories[0] as any).entryId).toBe(String((db.entries[0] as any)._id))
   })
 })
 
