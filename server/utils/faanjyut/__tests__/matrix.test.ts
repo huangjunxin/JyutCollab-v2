@@ -141,9 +141,9 @@ describe('faanjyut/matrix canEditColumn', () => {
     expect(canEditColumn(col('zhongshan'), user)).toBe(false)
   })
 
-  it('external 列恒不可編輯（含 admin 與命中方言）', () => {
+  it('external 列 admin 可編輯，非 admin 不可（含命中方言）', () => {
     const extCol = col('ext_thai', { sourceRole: 'external', dialectId: 'taishan', languageCode: 'th' })
-    expect(canEditColumn(extCol, admin)).toBe(false)
+    expect(canEditColumn(extCol, admin)).toBe(true)
     const user: MatrixUser = { role: 'contributor', dialectPermissions: [{ dialectName: 'taishan' }] }
     expect(canEditColumn(extCol, user)).toBe(false)
   })
@@ -457,7 +457,7 @@ describe('faanjyut/matrix listMatrixColumns（列選擇器全量清單）', () =
     expect(result.find((c) => c.id === 'd6')?.canEdit).toBe(false)
   })
 
-  it('域外列保留在清單中但 canEdit 恒為 false', () => {
+  it('域外列保留在清單中，admin canEdit 為 true', () => {
     const columns = [
       col('ext_thai', { sourceRole: 'external', dialectId: undefined, languageCode: 'th', order: { originalOrder: 2 } }),
       col('guangzhou', { order: { originalOrder: 1 } })
@@ -465,6 +465,6 @@ describe('faanjyut/matrix listMatrixColumns（列選擇器全量清單）', () =
     const result = listMatrixColumns({ allColumns: columns, user: admin })
     expect(result.map((c) => c.id)).toEqual(['guangzhou', 'ext_thai'])
     expect(result.find((c) => c.id === 'guangzhou')?.canEdit).toBe(true)
-    expect(result.find((c) => c.id === 'ext_thai')?.canEdit).toBe(false)
+    expect(result.find((c) => c.id === 'ext_thai')?.canEdit).toBe(true)
   })
 })

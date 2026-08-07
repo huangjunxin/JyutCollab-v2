@@ -286,11 +286,13 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
 
     // 寫入以 dialectId 鍵定格（服務端 CellEditSchema）；可編輯列必有 dialectId
     const column = getColumn(columnId)
-    if (!column?.dialectId) {
+    if (!column) {
       markFailed(lexemeId, columnId, value, '此方言列不存在或不可編輯')
       return
     }
-    const edit: FaanjyutCellEdit = { lexemeId, dialectId: column.dialectId, op: op.op, raw: op.raw }
+    const edit: FaanjyutCellEdit = column.dialectId
+      ? { lexemeId, dialectId: column.dialectId, op: op.op, raw: op.raw }
+      : { lexemeId, columnId: column.id, op: op.op, raw: op.raw }
     try {
       const ok = await runWrite(lexemeId, columnId, edit)
       if (ok) {
@@ -322,13 +324,15 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
 
   /** 撤銷：發反向 op 的 cells/batch（§6.4「撤銷本身也是一次正常寫入」）；失敗用 toast 提示 */
   async function runUndo(lexemeId: string, columnId: string, edit: { op: FaanjyutCellOp; raw?: string }) {
-    // buildUndoEdit 只產出 {op, raw}，補上目標格身份（dialectId 鍵）再發送
+    // buildUndoEdit 只產出 {op, raw}，補上目標格身份（dialectId 或 columnId 鍵）再發送
     const column = getColumn(columnId)
-    if (!column?.dialectId) {
+    if (!column) {
       toast.add({ title: '撤銷失敗', description: '此方言列已不在當前視圖', color: 'error' })
       return
     }
-    const fullEdit: FaanjyutCellEdit = { lexemeId, dialectId: column.dialectId, op: edit.op, raw: edit.raw }
+    const fullEdit: FaanjyutCellEdit = column.dialectId
+      ? { lexemeId, dialectId: column.dialectId, op: edit.op, raw: edit.raw }
+      : { lexemeId, columnId: column.id, op: edit.op, raw: edit.raw }
     try {
       const ok = await runWrite(lexemeId, columnId, fullEdit)
       if (ok) {

@@ -14,12 +14,18 @@ import { adaptMongooseCellsDb } from '../../../utils/faanjyut/mongo-db'
 
 const CellEditSchema = z.object({
   lexemeId: z.string().min(1),
-  dialectId: z.string().min(1),
+  /** 域內列鍵（dialectId 定格）；域外列不攜帶 */
+  dialectId: z.string().min(1).optional(),
+  /** 域外列鍵（columnId 定格）；域內列可省略 */
+  columnId: z.string().min(1).optional(),
   op: z.enum(['set', 'clear', 'absent']),
   // 審計 M37：raw 加長度上限（防單格超長觸發 16MB 單文檔上限；源表方音值遠小於此）
   raw: z.string().max(500).optional(),
   baseVersion: z.number().int().optional()
 }).superRefine((edit, ctx) => {
+  if (!edit.dialectId && !edit.columnId) {
+    ctx.addIssue({ code: 'custom', path: ['dialectId'], message: '必須提供 dialectId 或 columnId' })
+  }
   if (edit.op === 'set') {
     if (edit.raw === undefined || edit.raw.trim() === '') {
       ctx.addIssue({ code: 'custom', path: ['raw'], message: 'set 必須提供非空 raw' })
@@ -35,7 +41,7 @@ const BatchBodySchema = z.object({
   // 同一請求內不得重複編輯同一格（§12）
   const seen = new Set<string>()
   body.edits.forEach((edit, index) => {
-    const key = `${edit.lexemeId}::${edit.dialectId}`
+    const key = `${edit.lexemeId}::${edit.dialectId ?? edit.columnId}`
     if (seen.has(key)) {
       ctx.addIssue({ code: 'custom', path: ['edits', index], message: '同一請求內不得重複編輯同一格' })
     }

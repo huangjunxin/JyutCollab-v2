@@ -148,7 +148,12 @@ class FakeLexemeCreateDb implements LexemeCreateDb {
         buffer.createdLexemes.push(lexeme)
         return { id: lexeme.id as string }
       },
-      nextSourceKeySeq: async () => (this.counterSeq += 1)
+      nextSourceKeySeq: async () => (this.counterSeq += 1),
+      // 域外列寫入方法 stub（新建詞條只用域內列，永不調用）
+      findExternalEtymon: async () => null,
+      createExternalEtymon: async () => { throw new Error('域外列寫入不適用於新建詞條') },
+      updateExternalEtymon: async () => { throw new Error('域外列寫入不適用於新建詞條') },
+      deleteExternalEtymon: async () => { throw new Error('域外列寫入不適用於新建詞條') }
     }
 
     const result = await fn(tx)

@@ -1,9 +1,9 @@
 /**
  * cells 格級寫入測試（FaanjyutV1Design §12、§14.4 編輯與歷史）：
- * 沿用 write-import 的 DB 抽象測試基建——CellsDb 用內存 fake 注入，
+ * 沿用 write-import 的 DB 抽象測試基建--CellsDb 用內存 fake 注入，
  * 不連真庫、不測 handler（handler 的 flag 判定以 checkWriteFlag 純函數覆蓋）。
- * 覆蓋：set 改值/新建、clear/absent 空格與有值、越權部分成功、域外列拒絕、
- * 併發同空格（唯一鍵 11000 → 409 語義、終態單 Entry）、事務回滾、flag 關閉。
+ * 覆蓋：set 改值/新建、clear/absent 空格與有值、越權部分成功、域外列 admin 編輯、
+ * 併發同空格（唯一鍵 11000 -> 409 語義、終態單 Entry）、事務回滾、flag 關閉。
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -13,6 +13,7 @@ import {
   NO_PERMISSION_MESSAGE,
   WRITE_DISABLED_MESSAGE,
   buildNewEntryDoc,
+  buildNewExternalEtymonDoc,
   checkWriteFlag,
   runCellBatch,
   type CellEdit,
@@ -22,7 +23,7 @@ import {
   type CellsTx,
   type CellsUser
 } from '../cells'
-import { cellStateId, entryId } from '../stable-id'
+import { cellStateId, entryId, externalEtymonId } from '../stable-id'
 
 const KEY = '>416461483360343'
 const LEXEME_ID = 'fjl_lexeme1'
@@ -68,12 +69,11 @@ const columnTs: CellsColumnDoc = {
   regionCode: 'TS'
 }
 
-/** 域外列拒絕測試用：攜帶 dialectId 的 external 列（防禦性分支，真實數據域外列無 dialectId） */
-const columnOchWithDialect: CellsColumnDoc = {
+/** 域外列測試用：無 dialectId 的 external 列 */
+const columnOch: CellsColumnDoc = {
   id: COL_OCH,
   sourceRole: 'external',
   status: 'active',
-  dialectId: 'guangzhou',
   languageCode: 'och',
   label: '上古漢'
 }
@@ -100,6 +100,7 @@ class FakeCellsDb implements CellsDb {
   histories: Array<Record<string, unknown>> = []
   columns: CellsColumnDoc[] = []
   lexemes: CellsLexemeDoc[] = []
+  externalEtymons: Array<Record<string, unknown>> = []
   /** createEditHistory 拋錯（事務回滾測試） */
   failHistoryCreate = false
   /** findEntry 柵欄（併發測試：兩個並發事務都先看到空格） */
@@ -108,6 +109,10 @@ class FakeCellsDb implements CellsDb {
 
   async findColumnsByDialectIds(dialectIds: string[]): Promise<CellsColumnDoc[]> {
     return this.columns.filter((c) => c.dialectId && dialectIds.includes(c.dialectId))
+  }
+
+  async findColumnsByIds(ids: string[]): Promise<CellsColumnDoc[]> {
+    return this.columns.filter((c) => ids.includes(c.id))
   }
 
   async findLexemes(lexemeIds: string[]): Promise<CellsLexemeDoc[]> {
@@ -120,7 +125,10 @@ class FakeCellsDb implements CellsDb {
       updatedEntries: [] as Array<{ _id: unknown; doc: Record<string, unknown> }>,
       deletedEntryIds: [] as unknown[],
       cellUpserts: [] as Array<{ kind: 'insert' | 'update'; doc: Record<string, unknown> }>,
-      histories: [] as Array<Record<string, unknown>>
+      histories: [] as Array<Record<string, unknown>>,
+      createdExternalEtymons: [] as Array<Record<string, unknown>>,
+      updatedExternalEtymons: [] as Array<{ _id: unknown; doc: Record<string, unknown> }>,
+      deletedExternalEtymonIds: [] as unknown[]
     }
 
     const tx: CellsTx = {
@@ -189,17 +197,48 @@ class FakeCellsDb implements CellsDb {
         } else if (doc.projection) {
           delete (doc.projection as Record<string, unknown>).entryId
         }
+        if (args.projectionExternalEtymonIds != null) {
+          doc.projection = { ...(doc.projection ?? {}), externalEtymonIds: args.projectionExternalEtymonIds }
+        } else if (args.projectionExternalEtymonIds === null && doc.projection) {
+          delete (doc.projection as Record<string, unknown>).externalEtymonIds
+        }
         buffer.cellUpserts.push({ kind: existing ? 'update' : 'insert', doc })
       },
       createEditHistory: async (doc) => {
         if (this.failHistoryCreate) throw new Error('模擬 EditHistory 寫入失敗')
         buffer.histories.push(doc)
+      },
+      findExternalEtymon: async (lexemeId, languageCode) => {
+        const found = this.externalEtymons.find(
+          (e) => e.lexemeId === lexemeId && e.languageCode === languageCode && (e.meta as Record<string, unknown>)?.sourceBook === 'faanjyut'
+        )
+        return found ? (this.clone(found) as any) : null
+      },
+      createExternalEtymon: async (doc) => {
+        const etymon = {
+          ...this.clone(doc),
+          _id: `fake_oid_${(this.seq += 1)}`
+        }
+        buffer.createdExternalEtymons.push(etymon)
+        return this.clone(etymon) as any
+      },
+      updateExternalEtymon: async (etymon, changes) => {
+        const updated = this.clone(etymon)
+        updated.raw = changes.raw
+        updated.scriptForm = changes.raw
+        if (!updated.meta) updated.meta = {}
+        ;(updated.meta as Record<string, unknown>).editedAfterImport = true
+        buffer.updatedExternalEtymons.push({ _id: etymon._id, doc: updated })
+        return this.clone(updated) as any
+      },
+      deleteExternalEtymon: async (etymon) => {
+        buffer.deletedExternalEtymonIds.push(etymon._id)
       }
     }
 
     const result = await fn(tx)
 
-    // 提交階段：按 unique 鍵檢查；任一衝突拋 11000 → 整格回滾（buffer 丟棄）
+    // 提交階段：按 unique 鍵檢查；任一衝突拋 11000 -> 整格回滾（buffer 丟棄）
     for (const entry of buffer.createdEntries) {
       if (this.entries.some((e) => e.id === entry.id)) throw this.dupError()
       this.entries.push(this.clone(entry))
@@ -211,6 +250,17 @@ class FakeCellsDb implements CellsDb {
     for (const id of buffer.deletedEntryIds) {
       const index = this.entries.findIndex((e) => e._id === id)
       if (index >= 0) this.entries.splice(index, 1)
+    }
+    for (const etymon of buffer.createdExternalEtymons) {
+      this.externalEtymons.push(this.clone(etymon))
+    }
+    for (const { _id, doc } of buffer.updatedExternalEtymons) {
+      const index = this.externalEtymons.findIndex((e) => e._id === _id)
+      if (index >= 0) this.externalEtymons[index] = this.clone(doc)
+    }
+    for (const id of buffer.deletedExternalEtymonIds) {
+      const index = this.externalEtymons.findIndex((e) => e._id === id)
+      if (index >= 0) this.externalEtymons.splice(index, 1)
     }
     for (const { kind, doc } of buffer.cellUpserts) {
       const exists = this.cellStates.some(
@@ -463,7 +513,7 @@ describe('faanjyut/cells runCellBatch clear/absent', () => {
 })
 
 describe('faanjyut/cells runCellBatch 權限與列解析', () => {
-  it('越權寫：該格失敗（無此方言權限），批次其他格照常成功 → 部分成功', async () => {
+  it('越權寫：該格失敗（無此方言權限），批次其他格照常成功 -> 部分成功', async () => {
     const db = makeDb() // guangzhou + taishan 兩列
     const edits = [editSet('guangzhou', 'jyut6'), editSet('taishan', 'juot9')]
     const result = await runCellBatch(db, { edits, user: userNoGz }) // 僅 taishan 權限
@@ -479,15 +529,160 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
     expect(db.cellStates[0].columnId).toBe(COL_TS)
   })
 
-  it('域外列拒絕：sourceRole external 的列 → 此方言列不存在或不可編輯', async () => {
-    const db = makeDb({ columns: [columnOchWithDialect] })
-    const result = await runCellBatch(db, { edits: [editSet('guangzhou', 'jyut6')], user: admin })
+  it('admin set 域外列（新建）：ExternalEtymon + create 歷史 + 格 projection.externalEtymonIds', async () => {
+    const db = makeDb({ columns: [columnGz, columnOch] })
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'set', raw: 'prProto-OCH' }
+    const result = await runCellBatch(db, { edits: [edit], user: admin })
 
-    expect(result.results[0]).toMatchObject({ ok: false, error: COLUMN_NOT_FOUND_MESSAGE })
-    expect(db.entries).toHaveLength(0)
+    expect(result.succeeded).toBe(1)
+    expect(result.results[0]).toMatchObject({ lexemeId: LEXEME_ID, columnId: COL_OCH, ok: true })
+
+    expect(db.externalEtymons).toHaveLength(1)
+    const etymon = db.externalEtymons[0] as any
+    expect(etymon.id).toBe(externalEtymonId(KEY, 'och', 1))
+    expect(etymon.raw).toBe('prProto-OCH')
+    expect(etymon.scriptForm).toBe('prProto-OCH')
+    expect(etymon.languageCode).toBe('och')
+    expect(etymon.lexemeId).toBe(LEXEME_ID)
+    expect(etymon.meta).toMatchObject({ sourceBook: 'faanjyut', editedAfterImport: true })
+
+    expect(db.cellStates).toHaveLength(1)
+    const cell = db.cellStates[0] as any
+    expect(cell.columnId).toBe(COL_OCH)
+    expect(cell.raw).toBe('prProto-OCH')
+    expect(cell.projection.externalEtymonIds).toEqual([etymon.id])
+
+    expect(db.histories).toHaveLength(1)
+    expect(db.histories[0]).toMatchObject({
+      entryId: String(etymon._id),
+      userId: 'admin_1',
+      action: 'create',
+      changedFields: ['raw', 'scriptForm', 'languageCode']
+    })
   })
 
-  it('未知方言列拒絕：dialectId 查不到列 → 此方言列不存在或不可編輯', async () => {
+  it('admin set 域外列（已有 etymon）：更新 raw+scriptForm + update 歷史', async () => {
+    const db = makeDb({ columns: [columnGz, columnOch] })
+    const existingId = externalEtymonId(KEY, 'och', 1)
+    db.externalEtymons.push({
+      _id: 'fake_oid_ext1',
+      id: existingId,
+      lexemeId: LEXEME_ID,
+      languageCode: 'och',
+      scriptForm: 'oldProto',
+      raw: 'oldProto',
+      meta: { sourceBook: 'faanjyut', editedAfterImport: false }
+    })
+
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'set', raw: 'newProto' }
+    const result = await runCellBatch(db, { edits: [edit], user: admin })
+
+    expect(result.succeeded).toBe(1)
+    expect(db.externalEtymons).toHaveLength(1)
+    const etymon = db.externalEtymons[0] as any
+    expect(etymon.raw).toBe('newProto')
+    expect(etymon.scriptForm).toBe('newProto')
+    expect(etymon.meta.editedAfterImport).toBe(true)
+
+    expect(db.histories).toHaveLength(1)
+    expect(db.histories[0]).toMatchObject({
+      entryId: 'fake_oid_ext1',
+      userId: 'admin_1',
+      action: 'update',
+      changedFields: ['raw', 'scriptForm']
+    })
+    expect((db.histories[0].beforeSnapshot as any).raw).toBe('oldProto')
+    expect((db.histories[0].afterSnapshot as any).raw).toBe('newProto')
+  })
+
+  it('admin clear 域外列：刪 ExternalEtymon + delete 歷史 + 清 projection.externalEtymonIds', async () => {
+    const db = makeDb({ columns: [columnGz, columnOch] })
+    const existingId = externalEtymonId(KEY, 'och', 1)
+    db.externalEtymons.push({
+      _id: 'fake_oid_ext1',
+      id: existingId,
+      lexemeId: LEXEME_ID,
+      languageCode: 'och',
+      scriptForm: 'oldProto',
+      raw: 'oldProto',
+      meta: { sourceBook: 'faanjyut', editedAfterImport: false }
+    })
+    db.cellStates.push({
+      _id: 'fake_cell_ext1',
+      id: cellStateId(LEXEME_ID, COL_OCH),
+      lexemeId: LEXEME_ID,
+      columnId: COL_OCH,
+      status: { workflow: 'unreviewed', flags: {} },
+      raw: 'oldProto',
+      projection: { externalEtymonIds: [existingId] },
+      editedAfterImport: false,
+      version: 0,
+      createdBy: 'system:faanjyut_import'
+    })
+
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'clear' }
+    const result = await runCellBatch(db, { edits: [edit], user: admin })
+
+    expect(result.succeeded).toBe(1)
+    expect(db.externalEtymons).toHaveLength(0)
+    expect(db.histories).toHaveLength(1)
+    expect(db.histories[0]).toMatchObject({
+      entryId: 'fake_oid_ext1',
+      userId: 'admin_1',
+      action: 'delete'
+    })
+    expect((db.histories[0].beforeSnapshot as any).id).toBe(existingId)
+    expect(db.histories[0].afterSnapshot).toEqual({})
+
+    const cell = db.cellStates[0] as any
+    expect(cell.raw).toBeUndefined()
+    expect(cell.projection?.externalEtymonIds).toBeUndefined()
+    expect(cell.status.flags.explicitlyCleared).toBe(true)
+  })
+
+  it('admin absent 域外列（有 etymon）：刪 ExternalEtymon + 格 explicitlyAbsent', async () => {
+    const db = makeDb({ columns: [columnGz, columnOch] })
+    const existingId = externalEtymonId(KEY, 'och', 1)
+    db.externalEtymons.push({
+      _id: 'fake_oid_ext1',
+      id: existingId,
+      lexemeId: LEXEME_ID,
+      languageCode: 'och',
+      scriptForm: 'oldProto',
+      raw: 'oldProto',
+      meta: { sourceBook: 'faanjyut', editedAfterImport: false }
+    })
+
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'absent' }
+    const result = await runCellBatch(db, { edits: [edit], user: admin })
+
+    expect(result.succeeded).toBe(1)
+    expect(db.externalEtymons).toHaveLength(0)
+    expect(db.histories).toHaveLength(1)
+    expect(db.histories[0].action).toBe('delete')
+    expect(db.cellStates[0].status).toMatchObject({
+      workflow: 'unreviewed',
+      flags: { explicitlyAbsent: true, explicitlyCleared: false }
+    })
+    expect((db.cellStates[0].projection as any)?.externalEtymonIds).toBeUndefined()
+  })
+
+  it('admin absent 域外列（空格）：僅 upsert 格 explicitlyAbsent', async () => {
+    const db = makeDb({ columns: [columnGz, columnOch] })
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'absent' }
+    const result = await runCellBatch(db, { edits: [edit], user: admin })
+
+    expect(result.succeeded).toBe(1)
+    expect(db.externalEtymons).toHaveLength(0)
+    expect(db.histories).toHaveLength(0)
+    expect(db.cellStates).toHaveLength(1)
+    expect(db.cellStates[0].status).toMatchObject({
+      workflow: 'unreviewed',
+      flags: { explicitlyAbsent: true }
+    })
+  })
+
+  it('未知方言列拒絕：dialectId 查不到列 -> 此方言列不存在或不可編輯', async () => {
     const db = makeDb()
     const result = await runCellBatch(db, { edits: [editSet('nonexistent_dialect', 'x')], user: userGz })
 
@@ -495,7 +690,7 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
     expect(db.entries).toHaveLength(0)
   })
 
-  it('詞條不存在：lexemeId 未命中 → 該格失敗，不觸庫', async () => {
+  it('詞條不存在：lexemeId 未命中 -> 該格失敗，不觸庫', async () => {
     const db = makeDb({ withLexeme: false })
     const result = await runCellBatch(db, { edits: [editSet('guangzhou', 'jyut6')], user: userGz })
 
@@ -541,7 +736,7 @@ describe('faanjyut/cells 併發與事務', () => {
     expect(db.histories).toHaveLength(1)
   })
 
-  it('事務回滾：模擬 EditHistory.create 拋錯 → 該格失敗且 Entry/CellState 不落庫', async () => {
+  it('事務回滾：模擬 EditHistory.create 拋錯 -> 該格失敗且 Entry/CellState 不落庫', async () => {
     const db = makeDb()
     db.failHistoryCreate = true
     const result = await runCellBatch(db, { edits: [editSet('guangzhou', 'jyut6')], user: userGz })
@@ -554,8 +749,8 @@ describe('faanjyut/cells 併發與事務', () => {
   })
 })
 
-describe('faanjyut/cells flag 判定與新 Entry 構建', () => {
-  it('checkWriteFlag：flag 非 true（缺省/false）→ 503 文案；true → 放行', () => {
+describe('faanjyut/cells flag 判定與新 Entry/Etymon 構建', () => {
+  it('checkWriteFlag：flag 非 true（缺省/false）-> 503 文案；true -> 放行', () => {
     expect(checkWriteFlag({})).toBe(WRITE_DISABLED_MESSAGE)
     expect(checkWriteFlag({ faanjyutWriteEnabled: false })).toBe(WRITE_DISABLED_MESSAGE)
     expect(checkWriteFlag({ faanjyutWriteEnabled: undefined })).toBe(WRITE_DISABLED_MESSAGE)
@@ -587,5 +782,20 @@ describe('faanjyut/cells flag 判定與新 Entry 構建', () => {
     expect(doc2.headword).toMatchObject({ display: '', isPlaceholder: true })
     expect((doc2.meta as any).sourceCell).toBeUndefined()
     expect((doc2.dialect as any).regionCode).toBe('GZ') // DIALECT_REGION_CODES 回退
+  })
+
+  it('buildNewExternalEtymonDoc：穩定 ID、scriptForm=raw、meta.sourceBook/editedAfterImport', () => {
+    const doc = buildNewExternalEtymonDoc({ lexeme, column: columnOch, raw: 'prProto', userId: 'user_1', sourceKey: KEY })
+    expect(doc.id).toBe(externalEtymonId(KEY, 'och', 1))
+    expect(doc.lexemeId).toBe(LEXEME_ID)
+    expect(doc.languageCode).toBe('och')
+    expect(doc.scriptForm).toBe('prProto')
+    expect(doc.raw).toBe('prProto')
+    expect(doc.meta).toMatchObject({
+      sourceBook: 'faanjyut',
+      segmentIndex: 1,
+      editedAfterImport: true
+    })
+    expect(doc.createdBy).toBe('user_1')
   })
 })

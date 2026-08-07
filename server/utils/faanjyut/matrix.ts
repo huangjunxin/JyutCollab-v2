@@ -118,12 +118,13 @@ export interface MatrixRow {
 
 /**
  * 列級 canEdit（§4/§6.4）：
- * 僅 domestic 且 active 的列可編輯；admin 全部 domestic 列可編輯；
- * 否則要求 column.dialectId 命中本人 dialectPermissions[].dialectName。
+ * 僅 active 列可編輯；admin 可編輯全部 active 列（含域外）；
+ * 非 admin 僅限 domestic 且 dialectId 命中本人 dialectPermissions[].dialectName。
  */
 export function canEditColumn(column: MatrixColumnDoc, user: MatrixUser): boolean {
-  if (column.sourceRole !== 'domestic' || column.status !== 'active') return false
+  if (column.status !== 'active') return false
   if (user.role === 'admin') return true
+  if (column.sourceRole !== 'domestic') return false
   if (!column.dialectId) return false
   return (user.dialectPermissions ?? []).some((p) => p.dialectName === column.dialectId)
 }

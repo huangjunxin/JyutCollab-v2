@@ -88,14 +88,17 @@ export type FaanjyutCellOp = 'set' | 'clear' | 'absent'
 export interface FaanjyutCellEdit {
   lexemeId: string
   /** 方言 ID（矩陣列 dialectId；僅域內可編輯列持有） */
-  dialectId: string
+  dialectId?: string
+  /** 列 ID（域外列以 columnId 鍵定格） */
+  columnId?: string
   op: FaanjyutCellOp
   raw?: string
 }
 
 export interface FaanjyutCellWriteResult {
   lexemeId: string
-  dialectId: string
+  dialectId?: string
+  columnId?: string
   ok: boolean
   entryId?: string
   error?: string

@@ -1,5 +1,5 @@
 /**
- * mongoose 連接 → DryRunDb 適配器（只讀操作；dry-run 不調用任何寫方法）。
+ * mongoose 連接 -> DryRunDb 適配器（只讀操作；dry-run 不調用任何寫方法）。
  * 連接參數只讀自 FAANJYUT_MONGODB_URI / FAANJYUT_DB_NAME（ImportDataContract.md §8）。
  * P2 追加 adaptMongooseWriteDb：WriteDb + RollbackDb 的真實實現（寫入/回滾用）。
  */
@@ -14,6 +14,7 @@ import { FAANJYUT_SOURCE_BOOK } from '../../../shared/faanjyut'
 import { cellStateId } from './stable-id'
 import { Lexeme } from '../Lexeme'
 import { Entry } from '../Entry'
+import { ExternalEtymon } from '../ExternalEtymon'
 import { FaanJyutColumn } from '../FaanJyutColumn'
 import { FaanJyutCellState } from '../FaanJyutCellState'
 import { EditHistory } from '../EditHistory'
@@ -65,7 +66,7 @@ function setByPath(filter: Record<string, unknown>, path: string, value: unknown
 }
 
 /**
- * mongoose 連接 → WriteDb + RollbackDb 適配器（P2 寫入/回滾；契約 §9）。
+ * mongoose 連接 -> WriteDb + RollbackDb 適配器（P2 寫入/回滾；契約 §9）。
  * insertBatch 用原生 bulkWrite insertOne（ordered），不經 Mongoose model save，
  * 也不調 syncIndexes（索引由 scripts/migrate-faanjyut-indexes.ts 管理）。
  */
@@ -85,7 +86,7 @@ export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb &
       return result.insertedCount
     },
     async createImportBatch(doc) {
-      // 審計 M34：原生 insertOne 繞過 mongoose timestamps——顯式注入 createdAt/updatedAt
+      // 審計 M34：原生 insertOne 繞過 mongoose timestamps--顯式注入 createdAt/updatedAt
       const now = new Date()
       await db.collection(IMPORT_BATCH_COLLECTION).insertOne({ ...doc, createdAt: now, updatedAt: now })
     },
@@ -105,7 +106,7 @@ export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb &
   }
 }
 
-// ---- P4 格級寫入：單格事務（§11：MongoDB 須支持 transactions——replica set/Atlas） ----
+// ---- P4 格級寫入：單格事務（§11：MongoDB 須支持 transactions--replica set/Atlas） ----
 
 // ---- P5 新建詞條：JC- sourceKey 計數器（同一事務內原子遞增，回滾時序號一併回滾） ----
 
@@ -115,7 +116,7 @@ const LEXEME_SOURCE_KEY_COUNTER_ID = 'lexeme_sourceKey'
 /**
  * 泛粵寫入事務 helper（§13.1：全平台首個 transaction 先例；P5 復用於新建詞條）。
  * 每格的 Entry + CellState + EditHistory（P4），或 Lexeme + 多格三件套（P5），
- * 在同一 session 提交：withTransaction 內部任一操作拋錯 → 整事務回滾。
+ * 在同一 session 提交：withTransaction 內部任一操作拋錯 -> 整事務回滾。
  * 傳入的 tx 即 adaptMongooseCellsTx 全量（CellsTx & LexemeCreateTx），
  * P5 新建詞條以 `(tx) => fn(tx as LexemeCreateTx)` 包裝（見 adaptMongooseLexemeCreateDb）。
  */
@@ -184,6 +185,11 @@ function adaptMongooseCellsTx(
       } else {
         $unset['projection.entryId'] = ''
       }
+      if (args.projectionExternalEtymonIds != null) {
+        $set['projection.externalEtymonIds'] = args.projectionExternalEtymonIds
+      } else if (args.projectionExternalEtymonIds === null) {
+        $unset['projection.externalEtymonIds'] = ''
+      }
       const update: Record<string, unknown> = {
         $set,
         $inc: { version: 1 },
@@ -202,6 +208,28 @@ function adaptMongooseCellsTx(
     async createEditHistory(doc) {
       await EditHistory.create([doc as any], { session })
     },
+    async findExternalEtymon(lexemeId, languageCode) {
+      return ExternalEtymon.findOne({ lexemeId, languageCode, 'meta.sourceBook': FAANJYUT_SOURCE_BOOK })
+        .session(session) as any
+    },
+    async createExternalEtymon(doc) {
+      const created = new ExternalEtymon(doc as any)
+      await created.save({ session })
+      return created as any
+    },
+    async updateExternalEtymon(etymon, changes) {
+      const doc = etymon as any
+      doc.raw = changes.raw
+      doc.scriptForm = changes.raw
+      if (!doc.meta) doc.meta = {}
+      doc.meta.editedAfterImport = true
+      doc.markModified('meta')
+      await doc.save({ session })
+      return etymon
+    },
+    async deleteExternalEtymon(etymon) {
+      await (etymon as any).deleteOne({ session })
+    },
     async createLexeme(doc) {
       const created = new Lexeme(doc as any)
       await created.save({ session })
@@ -209,7 +237,7 @@ function adaptMongooseCellsTx(
     },
     async nextSourceKeySeq() {
       // 原生 driver v7：findOneAndUpdate 直接返回文檔；upsert + returnDocument after 取遞增後 seq。
-      // 同一 session → 計數器遞增與 Lexeme 落庫同生共死（事務回滾時序號不跳號）。
+      // 同一 session -> 計數器遞增與 Lexeme 落庫同生共死（事務回滾時序號不跳號）。
       // collection 以 { _id: string } 顯式定型，避免 Document 預設 _id: ObjectId 誤報。
       const counters = db.collection<{ _id: string; seq?: number }>(FAANJYUT_COUNTERS_COLLECTION)
       const doc = await counters.findOneAndUpdate(
@@ -227,7 +255,7 @@ function adaptMongooseCellsTx(
 }
 
 /**
- * mongoose 連接 → CellsDb 適配器（P4 格級寫入用）。
+ * mongoose 連接 -> CellsDb 適配器（P4 格級寫入用）。
  * 批次級等值查詢走 lean；每格寫入走 withMongoTransaction（單格事務）。
  */
 export function adaptMongooseCellsDb(connection: mongoose.Connection): CellsDb {
@@ -235,7 +263,13 @@ export function adaptMongooseCellsDb(connection: mongoose.Connection): CellsDb {
     async findColumnsByDialectIds(dialectIds) {
       if (dialectIds.length === 0) return []
       return FaanJyutColumn.find({ sourceBook: FAANJYUT_SOURCE_BOOK, dialectId: { $in: dialectIds } })
-        .select('id sourceRole status dialectId sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
+        .select('id sourceRole status dialectId languageCode sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
+        .lean()
+    },
+    async findColumnsByIds(ids) {
+      if (ids.length === 0) return []
+      return FaanJyutColumn.find({ sourceBook: FAANJYUT_SOURCE_BOOK, id: { $in: ids } })
+        .select('id sourceRole status dialectId languageCode sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
         .lean()
     },
     async findLexemes(lexemeIds) {
@@ -251,7 +285,7 @@ export function adaptMongooseCellsDb(connection: mongoose.Connection): CellsDb {
 }
 
 /**
- * mongoose 連接 → LexemeCreateDb 適配器（P5 新建詞條用）。
+ * mongoose 連接 -> LexemeCreateDb 適配器（P5 新建詞條用）。
  * 事務外列批查走 lean；matrixOrder 由純邏輯以 Date.now() 生成（審計 M38，不再查 max）；
  * Lexeme + 逐格三件套走 withMongoTransaction
  * （adapter 已實現 createLexeme / nextSourceKeySeq，同一事務內原子遞增 JC- 計數器）。
@@ -261,7 +295,7 @@ export function adaptMongooseLexemeCreateDb(connection: mongoose.Connection): Le
     async findColumnsByDialectIds(dialectIds) {
       if (dialectIds.length === 0) return []
       return FaanJyutColumn.find({ sourceBook: FAANJYUT_SOURCE_BOOK, dialectId: { $in: dialectIds } })
-        .select('id sourceRole status dialectId sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
+        .select('id sourceRole status dialectId languageCode sourceSheet sourceColumn sourceColumnIndex sourceColumnLetter regionCode')
         .lean()
     },
     withTransaction<T>(fn: (tx: LexemeCreateTx) => Promise<T>) {
@@ -274,7 +308,7 @@ export function adaptMongooseLexemeCreateDb(connection: mongoose.Connection): Le
 
 // ---- P5 backup 導出：只讀流式游標（§10.2 導出頁） ----
 
-/** 文件名 → 真實 collection（與 import-contract.ts FILE_TO_COLLECTION 一致） */
+/** 文件名 -> 真實 collection（與 import-contract.ts FILE_TO_COLLECTION 一致） */
 const EXPORT_FILE_TO_COLLECTION: Record<string, string> = {
   'columns.ndjson': 'faanjyut_columns',
   'lexemes.ndjson': 'lexemes',
@@ -296,7 +330,7 @@ const SOURCE_BOOK_DB_FILTER: Record<string, Record<string, unknown>> = {
 }
 
 /**
- * mongoose 連接 → ExportSource 適配器（P5 backup 導出用）。
+ * mongoose 連接 -> ExportSource 適配器（P5 backup 導出用）。
  * 每集合用 lean 游標分批迭代（entries 8 萬條流式，不整表 load 進內存）；
  * 泛粵 Entry._id 亦走游標（分塊收集，約 2MB）。
  */
