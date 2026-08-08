@@ -134,9 +134,15 @@
           @click="toggleCellFilter(chip.value)"
         >{{ chip.label }}</button>
       </div>
-      <span v-if="matrixData" class="ml-auto text-xs text-gray-500 dark:text-gray-400">
-        已顯示 <strong>{{ matrixData.rows.length.toLocaleString() }}</strong> / <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 行
-      </span>
+      <div v-if="matrixData" class="ml-auto flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+        <span v-if="syncing" class="inline-flex items-center gap-1.5 text-[var(--jc-accent)]" role="status">
+          <UIcon name="i-heroicons-arrow-path" class="h-3.5 w-3.5 animate-spin" />
+          正在同步
+        </span>
+        <span>
+          已顯示 <strong>{{ matrixData.rows.length.toLocaleString() }}</strong> / <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 行
+        </span>
+      </div>
       </div>
     </div>
 
@@ -252,8 +258,14 @@ defineOptions({ name: 'faanjyut-matrix' })
 import {
   type FaanjyutCellState,
   type FaanjyutMatrixColumn,
-  type FaanjyutMatrixData
+  type FaanjyutMatrixData,
+  type FetchMatrixParams
 } from '~/composables/useFaanjyutMatrix'
+import {
+  FAANJYUT_MATRIX_FRESH_TTL,
+  applyFaanjyutMatrixRowPatches,
+  getFaanjyutMatrixCacheRevision
+} from '~/utils/faanjyutMatrixCache'
 
 definePageMeta({
   layout: 'default',
@@ -275,7 +287,7 @@ const COLUMNS_STORAGE_KEY = 'faanjyut:matrix:columns'
 
 const route = useRoute()
 const router = useRouter()
-const { fetchMatrix, fetchColumns, writeCells } = useFaanjyutMatrix()
+const { fetchMatrix, fetchColumns, getCachedMatrix, getCacheScope, writeCells } = useFaanjyutMatrix()
 /** loadMore 追加失敗用 toast（不替換已有視圖） */
 const toast = useToast()
 
@@ -313,10 +325,23 @@ const canCreateLexeme = computed(() =>
 const matrixData = ref<FaanjyutMatrixData | null>(null)
 /** 初始即 true：首次 onMounted 請求完成前顯示載入態，避免閃「沒有符合條件的詞條」 */
 const loading = ref(true)
+const syncing = ref(false)
 const errorMessage = ref<string | null>(null)
+const lastLoadedAt = ref(0)
+const lastCacheRevision = ref(getFaanjyutMatrixCacheRevision())
+const lastCacheScope = ref(getCacheScope())
 
 /** P4 格編輯狀態機（§6.4 編輯微交互）；writeEnabled=false 時保持純只讀（§14.3） */
-const cellEdit = useFaanjyutCellEdit({ matrixData, writeCells })
+const cellEdit = useFaanjyutCellEdit({
+  matrixData,
+  writeCells,
+  onCellSaved: () => {
+    if (!appliedSearchQuery.value && !cellFilter.value) {
+      lastCacheRevision.value = getFaanjyutMatrixCacheRevision()
+      lastLoadedAt.value = Date.now()
+    }
+  }
+})
 
 const allColumns = ref<FaanjyutMatrixColumn[]>([])
 const allColumnsTotal = ref(0)
@@ -360,28 +385,59 @@ const emptyStateDescription = computed(() => {
 /** 重置並載入第一塊（初始 / 篩選 / 列集變化 / 定位失敗兜底）；清空全部編輯態 */
 let matrixRequestId = 0
 
-async function fetchMatrixData() {
+function matrixParams(pageNumber = 1): FetchMatrixParams {
+  return {
+    page: pageNumber,
+    perPage: PER_PAGE,
+    columnIds: selectedColumnIds.value,
+    cellFilter: cellFilter.value,
+    q: appliedSearchQuery.value || undefined
+  }
+}
+
+async function fetchMatrixData(options: { force?: boolean; background?: boolean } = {}) {
   const requestId = ++matrixRequestId
-  loading.value = true
   errorMessage.value = null
-  // 數據重載（翻頁/篩選/定位/列集變化）時清空全部編輯態（舊格可能已不在本視圖）
-  cellEdit.resetAll()
+  const params = matrixParams()
+  const cached = options.force ? null : getCachedMatrix(params)
+  if (cached) {
+    cellEdit.resetAll()
+    matrixData.value = cached.data
+    page.value = 1
+    lastLoadedAt.value = cached.cachedAt
+    lastCacheRevision.value = getFaanjyutMatrixCacheRevision()
+    lastCacheScope.value = getCacheScope()
+    loading.value = false
+    syncing.value = false
+    if (cached.freshness === 'stale') void fetchMatrixData({ force: true, background: true })
+    return
+  }
+
+  const background = options.background === true && matrixData.value !== null
+  if (background) syncing.value = true
+  else {
+    loading.value = true
+    syncing.value = false
+    cellEdit.resetAll()
+  }
   try {
-    const data = await fetchMatrix({
-      page: 1,
-      perPage: PER_PAGE,
-      columnIds: selectedColumnIds.value,
-      cellFilter: cellFilter.value,
-      q: appliedSearchQuery.value || undefined
-    })
+    const data = await fetchMatrix(params, { force: true })
     if (requestId !== matrixRequestId) return
     matrixData.value = data
     page.value = 1
+    lastLoadedAt.value = Date.now()
+    lastCacheRevision.value = getFaanjyutMatrixCacheRevision()
+    lastCacheScope.value = getCacheScope()
   } catch (error: any) {
     if (requestId !== matrixRequestId) return
-    errorMessage.value = error?.data?.message || error?.message || '矩陣載入失敗'
+    const message = error?.data?.message || error?.message || '矩陣載入失敗'
+    if (background) toast.add({ title: '同步失敗', description: message, color: 'error' })
+    else errorMessage.value = message
   } finally {
-    if (requestId === matrixRequestId) loading.value = false
+    if (requestId === matrixRequestId) {
+      loading.value = false
+      syncing.value = false
+    }
   }
 }
 
@@ -397,19 +453,15 @@ async function loadMore(): Promise<boolean> {
   const requestId = matrixRequestId
   loadingMore.value = true
   try {
-    const data = await fetchMatrix({
-      page: page.value + 1,
-      perPage: PER_PAGE,
-      columnIds: selectedColumnIds.value,
-      cellFilter: cellFilter.value,
-      q: appliedSearchQuery.value || undefined
-    })
+    const data = await fetchMatrix(matrixParams(page.value + 1))
     if (requestId !== matrixRequestId) return false
     matrixData.value = {
       ...data,
       rows: [...matrixData.value.rows, ...data.rows]
     }
     page.value += 1
+    lastLoadedAt.value = Date.now()
+    lastCacheRevision.value = getFaanjyutMatrixCacheRevision()
     return true
   } catch (error: any) {
     // 追加失敗不替換已有視圖（與初始載入失敗的整頁錯誤態區分）
@@ -430,13 +482,7 @@ async function loadMore(): Promise<boolean> {
 async function jumpToBlock(targetPage: number): Promise<FaanjyutMatrixData | null> {
   if (!matrixData.value) return null
   try {
-    const data = await fetchMatrix({
-      page: targetPage,
-      perPage: PER_PAGE,
-      columnIds: selectedColumnIds.value,
-      cellFilter: cellFilter.value,
-      q: appliedSearchQuery.value || undefined
-    })
+    const data = await fetchMatrix(matrixParams(targetPage))
     matrixData.value = data
     page.value = targetPage
     return data
@@ -623,16 +669,43 @@ onActivated(() => {
   if (!mounted) return
   const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
   const cell = typeof route.query.cell === 'string' ? route.query.cell.trim() : ''
-  if (q || cell) {
-    handleQueryParams()
+  if (q !== appliedSearchQuery.value) {
+    void handleQueryParams()
   } else if (!matrixData.value) {
-    fetchMatrixData()
+    void fetchMatrixData()
   } else {
-    // 無 query：保留 keepalive 緩存的數據與列集，恢復離開時的滾動位置
+    const patchedRows = applyFaanjyutMatrixRowPatches(matrixData.value.rows)
+    if (patchedRows > 0 && !appliedSearchQuery.value && !cellFilter.value) {
+      lastCacheRevision.value = getFaanjyutMatrixCacheRevision()
+      lastLoadedAt.value = Date.now()
+    }
     const main = document.querySelector('main')
     if (main) {
       main.scrollTop = savedMainScroll
       main.scrollLeft = savedMainScrollLeft
+    }
+    if (cell && cell !== highlightSourceCell.value) void applyCellHighlight(cell)
+
+    const cacheInvalidated = lastCacheRevision.value !== getFaanjyutMatrixCacheRevision()
+    const cacheExpired = Date.now() - lastLoadedAt.value > FAANJYUT_MATRIX_FRESH_TTL
+    const scopeChanged = lastCacheScope.value !== getCacheScope()
+    const membershipSensitive = Boolean(appliedSearchQuery.value || cellFilter.value)
+    if (scopeChanged) {
+      columnsLoading.value = true
+      fetchColumns()
+        .then((res) => {
+          allColumns.value = res.columns
+          allColumnsTotal.value = res.total
+        })
+        .catch(() => {})
+        .finally(() => { columnsLoading.value = false })
+    }
+    if (
+      scopeChanged
+      || (cacheInvalidated && membershipSensitive)
+      || (page.value === 1 && (cacheInvalidated || cacheExpired))
+    ) {
+      void fetchMatrixData({ force: true, background: true })
     }
   }
 })

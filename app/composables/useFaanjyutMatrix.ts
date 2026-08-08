@@ -1,3 +1,15 @@
+import {
+  buildFaanjyutMatrixCacheKey,
+  clearFaanjyutMatrixDataCache,
+  getFaanjyutColumnsCache,
+  getFaanjyutMatrixCache,
+  getFaanjyutMatrixCacheRevision,
+  reconcileFaanjyutMatrixRowPatches,
+  setFaanjyutColumnsCache,
+  setFaanjyutMatrixCache,
+  shareFaanjyutRequest
+} from '~/utils/faanjyutMatrixCache'
+
 /**
  * 泛粵字表矩陣頁數據層（FaanjyutV1Design §6，P3 只讀版）。
  * 直接消費已實現的只讀 API：
@@ -139,8 +151,37 @@ export interface FetchMatrixParams {
   q?: string
 }
 
+export interface FetchMatrixOptions {
+  force?: boolean
+}
+
 export function useFaanjyutMatrix() {
-  async function fetchMatrix(params: FetchMatrixParams): Promise<FaanjyutMatrixData> {
+  const { user } = useAuth()
+
+  function cacheScope(): string {
+    const current = user.value as any
+    const permissions = Array.isArray(current?.dialectPermissions)
+      ? current.dialectPermissions
+        .map((item: any) => `${item?.dialectName ?? ''}:${item?.role ?? ''}`)
+        .sort()
+      : []
+    return JSON.stringify([current?.id ?? 'anonymous', current?.role ?? '', permissions])
+  }
+
+  function getCachedMatrix(params: FetchMatrixParams) {
+    if (!import.meta.client) return null
+    return getFaanjyutMatrixCache(cacheScope(), params)
+  }
+
+  async function fetchMatrix(
+    params: FetchMatrixParams,
+    options: FetchMatrixOptions = {}
+  ): Promise<FaanjyutMatrixData> {
+    const scope = cacheScope()
+    if (import.meta.client && !options.force) {
+      const cached = getFaanjyutMatrixCache(scope, params)
+      if (cached?.freshness === 'fresh') return cached.data
+    }
     const query: Record<string, string | number> = {
       page: params.page,
       perPage: params.perPage
@@ -154,16 +195,35 @@ export function useFaanjyutMatrix() {
     if (params.q) {
       query.q = params.q
     }
-    const res = await $fetch<ApiEnvelope<FaanjyutMatrixData>>('/api/faanjyut/matrix', { query })
-    return res.data
+    const revision = getFaanjyutMatrixCacheRevision()
+    const requestKey = `matrix:${revision}:${buildFaanjyutMatrixCacheKey(scope, params)}`
+    return await shareFaanjyutRequest(requestKey, async () => {
+      const res = await $fetch<ApiEnvelope<FaanjyutMatrixData>>('/api/faanjyut/matrix', { query })
+      if (import.meta.client) reconcileFaanjyutMatrixRowPatches(res.data.rows, revision)
+      if (import.meta.client && revision === getFaanjyutMatrixCacheRevision()) {
+        setFaanjyutMatrixCache(scope, params, res.data)
+      }
+      return res.data
+    })
   }
 
   /** 全量列清單（列選擇器用） */
-  async function fetchColumns(): Promise<{ columns: FaanjyutMatrixColumn[]; total: number }> {
-    const res = await $fetch<ApiEnvelope<{ columns: FaanjyutMatrixColumn[]; total: number }>>(
-      '/api/faanjyut/columns'
-    )
-    return res.data
+  async function fetchColumns(options: FetchMatrixOptions = {}): Promise<{ columns: FaanjyutMatrixColumn[]; total: number }> {
+    const scope = cacheScope()
+    if (import.meta.client && !options.force) {
+      const cached = getFaanjyutColumnsCache(scope)
+      if (cached) return cached
+    }
+    const revision = getFaanjyutMatrixCacheRevision()
+    return await shareFaanjyutRequest(`columns:${revision}:${scope}`, async () => {
+      const res = await $fetch<ApiEnvelope<{ columns: FaanjyutMatrixColumn[]; total: number }>>(
+        '/api/faanjyut/columns'
+      )
+      if (import.meta.client && revision === getFaanjyutMatrixCacheRevision()) {
+        setFaanjyutColumnsCache(scope, res.data)
+      }
+      return res.data
+    })
   }
 
   /** 六維度搜索（下拉建議 / ?q= 定位） */
@@ -197,6 +257,7 @@ export function useFaanjyutMatrix() {
       method: 'POST',
       body: payload
     })
+    if (import.meta.client) clearFaanjyutMatrixDataCache()
     return res.data
   }
 
@@ -231,5 +292,14 @@ export function useFaanjyutMatrix() {
     return lo
   }
 
-  return { fetchMatrix, fetchColumns, search, writeCells, createLexeme, locatePageByMatrixOrder }
+  return {
+    fetchMatrix,
+    fetchColumns,
+    getCachedMatrix,
+    getCacheScope: cacheScope,
+    search,
+    writeCells,
+    createLexeme,
+    locatePageByMatrixOrder
+  }
 }

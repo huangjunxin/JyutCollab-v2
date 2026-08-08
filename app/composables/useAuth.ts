@@ -1,3 +1,5 @@
+import { clearFaanjyutMatrixCache } from '~/utils/faanjyutMatrixCache'
+
 export interface RegisterPayload {
   email: string
   username: string
@@ -51,6 +53,7 @@ export const useAuth = () => {
         body: { email, password, turnstileToken }
       })
       if (res.success) {
+        clearFaanjyutMatrixCache()
         await fetchSession()
         const route = getRoute()
         await router.push((route.query.redirect as string) || '/entries')
@@ -70,6 +73,7 @@ export const useAuth = () => {
         body: { ...data, turnstileToken: data.turnstileToken }
       })
       if (res.success) {
+        clearFaanjyutMatrixCache()
         await fetchSession()
         await router.push('/entries')
         return { success: true }
@@ -90,6 +94,7 @@ export const useAuth = () => {
       // 確保即使接口報錯也繼續清空本地並跳轉
     }
     profileUpdatedUser.value = null
+    clearFaanjyutMatrixCache()
     await clearSession()
     await router.push('/login')
   }

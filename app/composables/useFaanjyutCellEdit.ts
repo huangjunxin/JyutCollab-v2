@@ -19,6 +19,7 @@ import type {
   FaanjyutMatrixColumn,
   FaanjyutMatrixData
 } from './useFaanjyutMatrix'
+import { patchFaanjyutMatrixCachedCell } from '~/utils/faanjyutMatrixCache'
 
 export type FaanjyutCellRef = { lexemeId: string; columnId: string }
 
@@ -32,6 +33,7 @@ export interface FaanjyutCellEditOptions {
   /** 寫入函數（useFaanjyutMatrix().writeCells）；測試可注入 stub */
   writeCells: (edits: FaanjyutCellEdit[]) => Promise<FaanjyutCellWriteData>
   toast?: FaanjyutCellEditToast
+  onCellSaved?: () => void
 }
 
 export interface FaanjyutCellEditController {
@@ -296,7 +298,10 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
     try {
       const ok = await runWrite(lexemeId, columnId, edit)
       if (ok) {
-        patchCellLocally(lexemeId, columnId, viewForEdit(prev, op))
+        const nextView = viewForEdit(prev, op)
+        patchCellLocally(lexemeId, columnId, nextView)
+        if (import.meta.client) patchFaanjyutMatrixCachedCell(lexemeId, columnId, nextView)
+        options.onCellSaved?.()
         showUndoToast(lexemeId, columnId, prev)
       }
     } catch (error: any) {
@@ -336,7 +341,10 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
     try {
       const ok = await runWrite(lexemeId, columnId, fullEdit)
       if (ok) {
-        patchCellLocally(lexemeId, columnId, viewForEdit(getCell(lexemeId, columnId), fullEdit))
+        const nextView = viewForEdit(getCell(lexemeId, columnId), fullEdit)
+        patchCellLocally(lexemeId, columnId, nextView)
+        if (import.meta.client) patchFaanjyutMatrixCachedCell(lexemeId, columnId, nextView)
+        options.onCellSaved?.()
         markSuccess(lexemeId, columnId)
       }
     } catch (error: any) {

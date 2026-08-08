@@ -7,6 +7,10 @@ import {
   formatFaanJyutDateTime,
   resolveFaanJyutFieldPath
 } from '~/utils/faanjyutFormat'
+import {
+  invalidateFaanjyutMatrixCacheForLexeme,
+  patchFaanjyutMatrixCachedLexeme
+} from '~/utils/faanjyutMatrixCache'
 
 definePageMeta({
   layout: 'default',
@@ -83,6 +87,11 @@ async function saveCompositeEdit() {
       { method: 'PUT', body: { raw } }
     )
     lexeme.compositePronunciation = response.data.composite ?? undefined
+    if (response.changed) {
+      patchFaanjyutMatrixCachedLexeme(lexeme.id, {
+        compositePronunciation: response.data.composite ?? undefined
+      })
+    }
     compositeEditing.value = false
     if (response.changed) {
       const toast = useToast()
@@ -117,6 +126,9 @@ async function restoreComposite(raw: string) {
       { method: 'PUT', body: { raw } }
     )
     lexeme.compositePronunciation = response.data.composite ?? undefined
+    patchFaanjyutMatrixCachedLexeme(lexeme.id, {
+      compositePronunciation: response.data.composite ?? undefined
+    })
   } catch (error: any) {
     const toast = useToast()
     toast.add({
@@ -204,6 +216,17 @@ async function saveLexemeField(
     } else {
       lexeme.commonCharCandidates = response.data.value || undefined
     }
+    if (response.changed) {
+      if (field === 'definitionRaw') {
+        patchFaanjyutMatrixCachedLexeme(lexeme.id, { definitionRaw: response.data.value })
+      } else if (field === 'representativeChar') {
+        patchFaanjyutMatrixCachedLexeme(lexeme.id, {
+          representativeChar: { raw: response.data.value, display: response.data.value }
+        })
+      } else {
+        invalidateFaanjyutMatrixCacheForLexeme(lexeme.id)
+      }
+    }
     state.editing.value = false
     if (response.changed) {
       const toast = useToast()
@@ -246,6 +269,15 @@ async function restoreLexemeField(
       lexeme.representativeChar = { raw: response.data.value, display: response.data.value }
     } else {
       lexeme.commonCharCandidates = response.data.value || undefined
+    }
+    if (field === 'definitionRaw') {
+      patchFaanjyutMatrixCachedLexeme(lexeme.id, { definitionRaw: response.data.value })
+    } else if (field === 'representativeChar') {
+      patchFaanjyutMatrixCachedLexeme(lexeme.id, {
+        representativeChar: { raw: response.data.value, display: response.data.value }
+      })
+    } else {
+      invalidateFaanjyutMatrixCacheForLexeme(lexeme.id)
     }
   } catch (error: any) {
     const toast = useToast()
