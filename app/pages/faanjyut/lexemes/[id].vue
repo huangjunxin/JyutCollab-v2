@@ -266,6 +266,7 @@ const domesticPronunciations = computed(
 
 /** 空白卡（cell 四態為 null）默認隱藏，可切換顯示 */
 const showEmpty = ref(false)
+const pronunciationViewMode = ref<'value' | 'region'>('value')
 
 /**
  * 方言點 regionCode → 地理區域中文名（香港繁體）。
@@ -344,6 +345,15 @@ interface PronunciationGroup {
   visibleItems: FaanJyutLexemeDetail['pronunciations'][number][]
 }
 
+type PronunciationItem = FaanJyutLexemeDetail['pronunciations'][number]
+
+interface PronunciationValueGroup {
+  key: string
+  cell: PronunciationItem['cell']
+  items: PronunciationItem[]
+  firstOrder: number
+}
+
 const pronunciationGroups = computed<PronunciationGroup[]>(() => {
   const byRegion = new Map<string, FaanJyutLexemeDetail['pronunciations'][number][]>()
   for (const item of domesticPronunciations.value) {
@@ -368,6 +378,35 @@ const pronunciationGroups = computed<PronunciationGroup[]>(() => {
       const indexB = REGION_ORDER.indexOf(b.region)
       return (indexA === -1 ? REGION_ORDER.length : indexA) - (indexB === -1 ? REGION_ORDER.length : indexB)
     })
+})
+
+const pronunciationValueGroups = computed<PronunciationValueGroup[]>(() => {
+  const groups = new Map<string, PronunciationValueGroup>()
+  for (const item of domesticPronunciations.value) {
+    if (!showEmpty.value && item.cell.state === 'null') continue
+    const key = item.cell.state === 'normal'
+      ? `normal:${item.cell.raw ?? ''}`
+      : item.cell.state
+    const group = groups.get(key)
+    const order = item.originalOrder ?? Number.MAX_SAFE_INTEGER
+    if (group) {
+      group.items.push(item)
+      group.firstOrder = Math.min(group.firstOrder, order)
+    } else {
+      groups.set(key, { key, cell: item.cell, items: [item], firstOrder: order })
+    }
+  }
+
+  const stateOrder = { normal: 0, absent: 1, cleared: 2, null: 3 }
+  return [...groups.values()].sort((a, b) => {
+    const stateDelta = stateOrder[a.cell.state] - stateOrder[b.cell.state]
+    if (stateDelta !== 0) return stateDelta
+    if (a.cell.state === 'normal' && b.cell.state === 'normal') {
+      const countDelta = b.items.length - a.items.length
+      if (countDelta !== 0) return countDelta
+    }
+    return a.firstOrder - b.firstOrder
+  })
 })
 
 // ---- 區塊 3：域外材料 ----
@@ -731,50 +770,87 @@ function authorInitial(author: string | null | undefined): string {
         />
 
         <!-- 四態圖例（色塊含 dark 變體，與矩陣頁 fj-legend-* 一致） -->
-        <div class="jc-card px-3 py-2 mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--jc-body)] dark:text-slate-300">
+        <div class="jc-card px-3 py-2 mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--jc-body)] dark:text-slate-300">
           <span class="font-semibold text-[var(--jc-muted)]">圖例：</span>
           <span class="inline-flex items-center gap-1.5">
             <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 jc-mono text-[11px] bg-white dark:bg-slate-800">mai1</span>
-            normal（有值）
+            有值
           </span>
           <span class="inline-flex items-center gap-1.5">
             <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 jc-mono text-[11px] bg-slate-100 dark:bg-[#263242] text-gray-400">_</span>
-            <code class="jc-mono">_</code>（確定沒有）
+            確定沒有
           </span>
           <span class="inline-flex items-center gap-1.5">
             <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 jc-mono text-[11px] bg-amber-50 dark:bg-[#3A3421] text-gray-400">∅</span>
-            已清空（曾有內容）
+            已清空
           </span>
           <span class="inline-flex items-center gap-1.5">
             <span class="inline-flex items-center justify-center w-10 h-6 border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1B2530]"></span>
-            空白（原表無記錄）
+            無記錄
           </span>
-          <UButton
-            size="xs"
-            color="gray"
-            variant="soft"
-            class="ml-auto"
-            @click="showEmpty = !showEmpty"
-          >
-            <UIcon :name="showEmpty ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'" class="w-3.5 h-3.5" />
-            {{ showEmpty ? '隱藏空白' : '顯示空白' }}
-          </UButton>
+          <div class="ml-auto flex items-center gap-2">
+            <div class="inline-flex border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]" role="group" aria-label="方音排列方式">
+              <button
+                type="button"
+                class="h-7 w-[58px] text-[11px] font-medium"
+                :aria-pressed="pronunciationViewMode === 'value'"
+                :class="pronunciationViewMode === 'value'
+                  ? 'bg-[var(--jc-accent)] text-white'
+                  : 'bg-white dark:bg-slate-800 text-[var(--jc-body)] dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'"
+                @click="pronunciationViewMode = 'value'"
+              >按讀音</button>
+              <button
+                type="button"
+                class="h-7 w-[58px] text-[11px] font-medium border-l border-[var(--jc-border)] dark:border-[var(--jc-dark-border)]"
+                :aria-pressed="pronunciationViewMode === 'region'"
+                :class="pronunciationViewMode === 'region'
+                  ? 'bg-[var(--jc-accent)] text-white'
+                  : 'bg-white dark:bg-slate-800 text-[var(--jc-body)] dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'"
+                @click="pronunciationViewMode = 'region'"
+              >按地區</button>
+            </div>
+            <UButton size="xs" color="gray" variant="soft" @click="showEmpty = !showEmpty">
+              <UIcon :name="showEmpty ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'" class="w-3.5 h-3.5" />
+              {{ showEmpty ? '隱藏空白' : '顯示空白' }}
+            </UButton>
+          </div>
         </div>
 
-        <div v-if="pronunciationGroups.length" class="space-y-2.5">
-          <details
-            v-for="group in pronunciationGroups"
-            :key="group.region"
-            class="jc-card group"
-            :open="group.hasValueCount > 0"
+        <div v-if="pronunciationViewMode === 'value' && pronunciationValueGroups.length" class="jc-card divide-y divide-gray-200 dark:divide-slate-700">
+          <div
+            v-for="group in pronunciationValueGroups"
+            :key="group.key"
+            class="grid grid-cols-[minmax(126px,180px)_minmax(0,1fr)] sm:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] items-start gap-3 px-3 py-2"
           >
-            <summary class="px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-black/[.02] dark:hover:bg-black/20 select-none">
-              <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-[var(--jc-muted)] transition-transform group-open:rotate-90" />
-              <span class="text-sm font-semibold text-[var(--jc-ink-strong)] dark:text-slate-100">{{ group.region }}</span>
-              <span class="text-[11px] text-[var(--jc-muted)]">{{ group.hasValueCount }}/{{ group.items.length }} 有值</span>
-            </summary>
-            <div class="border-t border-gray-200 dark:border-slate-700 p-3">
-              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 min-w-0">
+              <div class="min-w-0">
+                <FaanjyutCellBadge :cell="group.cell" large />
+              </div>
+              <span class="shrink-0 text-[10px] tabular-nums text-[var(--jc-muted)]">×{{ group.items.length }}</span>
+            </div>
+            <div class="flex min-w-0 flex-wrap gap-1.5">
+              <span
+                v-for="item in group.items"
+                :key="item.columnId"
+                class="inline-flex max-w-full min-w-0 items-center gap-1 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] bg-[var(--jc-canvas-soft)] dark:bg-[var(--jc-dark-surface)] px-2 py-1 text-xs"
+                :title="item.shortLabel ? `${item.label} · ${item.shortLabel}` : item.label"
+              >
+                <span class="truncate font-medium text-[var(--jc-ink-strong)] dark:text-slate-100">{{ item.label }}</span>
+                <span v-if="item.shortLabel" class="truncate text-[10px] text-[var(--jc-muted)]">{{ item.shortLabel }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="pronunciationGroups.length" class="jc-card divide-y divide-gray-200 dark:divide-slate-700">
+          <section v-for="group in pronunciationGroups" :key="group.region">
+            <div class="px-3 py-1.5 flex items-center gap-2 bg-[var(--jc-canvas-soft)] dark:bg-[var(--jc-dark-surface)]">
+              <span class="w-1 h-4 bg-[var(--jc-accent)]" aria-hidden="true"></span>
+              <span class="text-xs font-semibold text-[var(--jc-ink-strong)] dark:text-slate-100">{{ group.region }}</span>
+              <span class="text-[10px] tabular-nums text-[var(--jc-muted)]">{{ group.hasValueCount }}/{{ group.items.length }}</span>
+            </div>
+            <div class="p-2">
+              <div class="fj-pronunciation-grid">
                 <FaanjyutPronunciationCard
                   v-for="item in group.visibleItems"
                   :key="item.columnId"
@@ -782,7 +858,7 @@ function authorInitial(author: string | null | undefined): string {
                 />
               </div>
             </div>
-          </details>
+          </section>
         </div>
         <p v-else class="text-sm text-[var(--jc-muted)]">
           {{ domesticPronunciations.length
@@ -1081,3 +1157,11 @@ function authorInitial(author: string | null | undefined): string {
     </template>
   </div>
 </template>
+
+<style scoped>
+.fj-pronunciation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px;
+}
+</style>

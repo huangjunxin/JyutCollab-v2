@@ -15,7 +15,7 @@ const props = withDefaults(defineProps<{
 })
 
 const sizeClass = computed(() =>
-  props.large ? 'text-lg py-2' : 'text-[11px] py-0.5'
+  props.large ? 'min-w-0 px-1 text-[15px] leading-5 py-1' : 'text-[11px] py-0.5'
 )
 
 function cellStateTitle(cell: FaanJyutCellView): string {
@@ -41,7 +41,7 @@ function cellStateTitle(cell: FaanJyutCellView): string {
     :title="cellStateTitle(cell)"
   >
     <template v-if="cell.state === 'normal'">
-      <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ cell.raw || '·' }}</span>
+      <span class="min-w-0 max-w-full whitespace-normal break-words text-center text-blue-600 dark:text-blue-400 font-semibold [overflow-wrap:anywhere]">{{ cell.raw || '·' }}</span>
     </template>
     <template v-else-if="cell.state === 'absent'">
       <span class="text-gray-400 dark:text-slate-400 font-semibold">_</span>

@@ -2,10 +2,6 @@
 import type { FaanJyutLexemeDetail } from '~/types/faanjyut'
 import type { FaanJyutCellView } from '~/types/faanjyut'
 
-/**
- * 方言點方音小卡（詞條詳情區塊 2）：列名 + shortLabel 徽章 + 四態格值 + 狀態提示。
- * 全部唯讀；列 label/shortLabel 來自導入列，狀態由四態格視圖推導。
- */
 const props = defineProps<{
   item: FaanJyutLexemeDetail['pronunciations'][number]
 }>()
@@ -18,15 +14,6 @@ const chipTone = computed(() => {
   return chipPalette[hash % chipPalette.length]
 })
 
-function stateHint(cell: FaanJyutCellView): string {
-  switch (cell.state) {
-    case 'normal': return '有值'
-    case 'absent': return '_（確定沒有）'
-    case 'cleared': return '已清空（曾有內容）'
-    default: return '空白'
-  }
-}
-
 function cellTitle(cell: FaanJyutCellView): string {
   switch (cell.state) {
     case 'normal': return 'normal：有值'
@@ -38,9 +25,12 @@ function cellTitle(cell: FaanJyutCellView): string {
 </script>
 
 <template>
-  <div class="jc-card p-2" :title="cellTitle(item.cell)">
-    <div class="flex items-center justify-between gap-1 mb-2">
-      <span class="text-sm font-medium text-[var(--jc-ink-strong)] dark:text-slate-100 truncate">
+  <div
+    class="min-w-0 border border-[var(--jc-border)] dark:border-[var(--jc-dark-border)] bg-white dark:bg-[var(--jc-dark-surface)] p-2 hover:border-slate-400 dark:hover:border-slate-500"
+    :title="cellTitle(item.cell)"
+  >
+    <div class="flex items-center justify-between gap-1.5 mb-1.5">
+      <span class="text-[13px] font-medium text-[var(--jc-ink-strong)] dark:text-slate-100 truncate">
         {{ item.label }}
       </span>
       <FaanjyutToneChip
@@ -49,9 +39,6 @@ function cellTitle(cell: FaanJyutCellView): string {
         :label="item.shortLabel"
       />
     </div>
-    <FaanjyutCellBadge :cell="item.cell" />
-    <div class="text-[10px] text-center mt-1 text-[var(--jc-muted)] dark:text-slate-400">
-      {{ stateHint(item.cell) }}
-    </div>
+    <FaanjyutCellBadge :cell="item.cell" large />
   </div>
 </template>
