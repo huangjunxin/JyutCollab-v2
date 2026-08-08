@@ -136,6 +136,7 @@ export interface FetchMatrixParams {
   /** 逗號分隔 columnId；空數組/未設 = 服務端默認列集 */
   columnIds?: string[]
   cellFilter?: FaanjyutCellState | null
+  q?: string
 }
 
 export function useFaanjyutMatrix() {
@@ -149,6 +150,9 @@ export function useFaanjyutMatrix() {
     }
     if (params.cellFilter) {
       query.cellFilter = params.cellFilter
+    }
+    if (params.q) {
+      query.q = params.q
     }
     const res = await $fetch<ApiEnvelope<FaanjyutMatrixData>>('/api/faanjyut/matrix', { query })
     return res.data

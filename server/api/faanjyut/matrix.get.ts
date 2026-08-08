@@ -11,6 +11,7 @@ import {
   type MatrixCellStateName,
   type MatrixSelectedColumn
 } from '../../utils/faanjyut/matrix'
+import { buildSearchRegex } from '../../utils/faanjyut/search'
 
 /**
  * 審計 M25：cellFilter 的 DB 層選擇器（與 pivotMatrix 的內存 filter 同語義，後者保留作兜底）。
@@ -69,8 +70,42 @@ const QuerySchema = z.object({
   // 2026-08-07 無限滾動（方案 A）：前端每塊 200 行，上限隨之放寬
   perPage: z.coerce.number().int().min(1).max(200).default(50),
   columns: z.string().optional(),
-  cellFilter: z.enum(['null', 'normal', 'absent', 'cleared']).optional()
+  cellFilter: z.enum(['null', 'normal', 'absent', 'cleared']).optional(),
+  q: z.string().trim().min(1).max(100).optional()
 })
+
+async function searchLexemeIds(q: string): Promise<string[]> {
+  const regex = buildSearchRegex(q)
+  const [lexemeIds, entryLexemeIds, cellLexemeIds] = await Promise.all([
+    Lexeme.distinct('id', {
+      'meta.sourceBook': FAANJYUT_SOURCE_BOOK,
+      $or: [
+        { id: { $regex: regex } },
+        { 'meta.sourceKey': { $regex: regex } },
+        { 'meta.compositePronunciation.display': { $regex: regex } },
+        { 'meta.compositePronunciation.raw': { $regex: regex } },
+        { 'meta.representativeChar.display': { $regex: regex } },
+        { 'meta.representativeChar.raw': { $regex: regex } },
+        { 'meta.commonCharCandidates': { $regex: regex } },
+        { 'meta.definitionRaw': { $regex: regex } }
+      ]
+    }),
+    Entry.distinct('lexemeId', {
+      sourceBook: FAANJYUT_SOURCE_BOOK,
+      $or: [
+        { 'headword.display': { $regex: regex } },
+        { 'phonetic.original': { $regex: regex } }
+      ]
+    }),
+    FaanJyutCellState.distinct('lexemeId', {
+      raw: { $regex: regex },
+      'status.flags.explicitlyAbsent': { $ne: true },
+      'status.flags.explicitlyCleared': { $ne: true }
+    })
+  ])
+  return [...new Set([...lexemeIds, ...entryLexemeIds, ...cellLexemeIds])]
+    .filter((id): id is string => typeof id === 'string')
+}
 
 export default defineEventHandler(async (event) => {
   const user = event.context.auth
@@ -85,7 +120,7 @@ export default defineEventHandler(async (event) => {
       message: formatZodErrorToMessage(validated.error)
     })
   }
-  const { page, perPage, columns: columnsParam, cellFilter } = validated.data
+  const { page, perPage, columns: columnsParam, cellFilter, q } = validated.data
 
   await connectDB()
 
@@ -118,11 +153,18 @@ export default defineEventHandler(async (event) => {
   // 審計 M25：cellFilter 下沉 DB 層——total/分頁按「滿足狀態篩選的詞條」計算，
   // 不再先取全量頁內 50 行再內存過濾（原實現翻頁大部分頁為空）。
   const lexemeFilter: Record<string, unknown> = { 'meta.sourceBook': FAANJYUT_SOURCE_BOOK }
-  if (cellFilter) {
-    const selector = await cellFilterLexemeSelector(cellFilter, selectedColumns)
-    if (selector.match !== null) lexemeFilter.id = { $in: selector.match }
-    else if (selector.exclude !== null) lexemeFilter.id = { $nin: selector.exclude }
+  const lexemeIdConditions: Array<Record<string, unknown>> = []
+  const [matchedSearchIds, cellSelector] = await Promise.all([
+    q ? searchLexemeIds(q) : Promise.resolve(null),
+    cellFilter ? cellFilterLexemeSelector(cellFilter, selectedColumns) : Promise.resolve(null)
+  ])
+  if (matchedSearchIds) lexemeIdConditions.push({ id: { $in: matchedSearchIds } })
+  if (cellSelector) {
+    const selector = cellSelector
+    if (selector.match !== null) lexemeIdConditions.push({ id: { $in: selector.match } })
+    else if (selector.exclude !== null) lexemeIdConditions.push({ id: { $nin: selector.exclude } })
   }
+  if (lexemeIdConditions.length > 0) lexemeFilter.$and = lexemeIdConditions
   const [total, lexemeDocs] = await Promise.all([
     Lexeme.countDocuments(lexemeFilter),
     Lexeme.find(lexemeFilter)

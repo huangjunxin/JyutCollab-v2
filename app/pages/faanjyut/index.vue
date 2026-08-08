@@ -24,7 +24,10 @@
         </div>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
           來源 <span class="jc-mono">泛粵字表 21</span>
-          <template v-if="matrixData">
+          <template v-if="matrixData && appliedSearchQuery">
+            · 搜尋結果 <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 詞條
+          </template>
+          <template v-else-if="matrixData">
             · <strong>{{ matrixData.pagination.total.toLocaleString() }}</strong> 詞條
           </template>
           <template v-if="allColumnsTotal > 0">
@@ -102,7 +105,11 @@
           </div>
         </template>
       </UPopover>
-      <FaanjyutSearchSuggest />
+      <FaanjyutSearchFilter
+        v-model="searchInput"
+        :loading="loading"
+        @submit="applySearchQuery"
+      />
       <FaanjyutColumnPicker
         v-model="selectedColumnIds"
         :all-columns="allColumns"
@@ -133,7 +140,7 @@
       </div>
     </div>
 
-    <!-- ?q= / ?cell= 定位提示 -->
+    <!-- ?cell= 定位提示 -->
     <div
       v-if="locateNote"
       class="fj-viewport-layer border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950 px-4 py-2.5 mb-3 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2"
@@ -149,25 +156,66 @@
       <UButton size="sm" color="neutral" variant="soft" @click="fetchMatrixData">重試</UButton>
     </div>
 
+    <div
+      v-else-if="loading"
+      class="fj-viewport-layer fj-matrix-state"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div class="fj-state-content">
+        <span class="fj-state-icon fj-state-icon-loading" aria-hidden="true">
+          <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin" />
+        </span>
+        <div>
+          <p class="text-base font-semibold text-[var(--jc-ink-strong)] dark:text-white">{{ loadingStateTitle }}</p>
+          <p class="mt-1 text-xs text-[var(--jc-muted)] dark:text-slate-400">正在整理詞條與方言列…</p>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-else-if="!matrixData || matrixData.rows.length === 0"
+      class="fj-viewport-layer fj-matrix-state"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="fj-state-content fj-state-content-empty">
+        <span class="fj-state-icon" aria-hidden="true">
+          <UIcon name="i-heroicons-magnifying-glass-minus" class="h-6 w-6" />
+        </span>
+        <div class="max-w-xl">
+          <p class="break-words text-base font-semibold text-[var(--jc-ink-strong)] [overflow-wrap:anywhere] dark:text-white">{{ emptyStateTitle }}</p>
+          <p class="mt-1 break-words text-xs leading-5 text-[var(--jc-muted)] [overflow-wrap:anywhere] dark:text-slate-400">{{ emptyStateDescription }}</p>
+        </div>
+        <UButton
+          v-if="hasActiveFilters"
+          type="button"
+          size="sm"
+          color="neutral"
+          variant="soft"
+          icon="i-heroicons-arrow-path"
+          @click="resetTableFilters"
+        >
+          重設篩選
+        </UButton>
+      </div>
+    </div>
+
     <!-- 矩陣表（頁面級滾動：表格自然高度，main 縱向滾動；列頭吸頂見篩選欄註釋） -->
     <FaanjyutMatrixTable
       v-else
       :columns="displayedColumns"
-      :rows="matrixData?.rows ?? []"
-      :loading="loading"
+      :rows="matrixData.rows"
       :highlight-lexeme-id="highlightLexemeId"
       :highlight-source-cell="highlightSourceCell"
-      :write-enabled="matrixData?.writeEnabled ?? false"
+      :write-enabled="matrixData.writeEnabled"
       :cell-edit="cellEdit"
     />
-    <p class="fj-viewport-layer text-[10px] text-gray-400 mt-2 mb-4">
-      篩選 chip 只影響當前顯示的行（在所選列中至少一格命中該態才顯示），總數仍為全表詞條數。
-    </p>
-
     <!-- 2026-08-07 無限滾動（方案 A）：底部「載入更多」塊追加，替代分頁跳頁；
          已顯示行數 + 軟上限提示（全表 8 千+ 行 × 最多 101 列，全量渲染不可行）。
          定位（?q=/?cell=）單塊跳轉後 page 可能已在末塊：按「可追加 / 達上限 / 末塊」三態展示 -->
-    <div v-if="matrixData && !loading" class="fj-viewport-layer flex flex-col items-center gap-2 py-4">
+    <div v-if="matrixData && !loading && matrixData.rows.length > 0" class="fj-viewport-layer flex flex-col items-center gap-2 py-4">
       <template v-if="canLoadMore">
         <UButton
           size="sm"
@@ -178,21 +226,17 @@
         >
           載入更多（已顯示 {{ matrixData.rows.length.toLocaleString() }} / {{ matrixData.pagination.total.toLocaleString() }} 行）
         </UButton>
-        <p class="text-[11px] text-gray-400">
-          每塊 {{ PER_PAGE }} 行；連續瀏覽大表請使用搜索定位（{{ matrixData.pagination.total.toLocaleString() }} 行全表）
-        </p>
       </template>
       <template v-else-if="matrixData.rows.length > 0">
         <p v-if="matrixData.rows.length >= MAX_ROWS" class="text-xs text-amber-600 dark:text-amber-400">
           已載入 {{ matrixData.rows.length.toLocaleString() }} 行（達到 {{ MAX_ROWS.toLocaleString() }} 行性能上限）。
         </p>
         <p v-else-if="page >= matrixData.pagination.totalPages" class="text-xs text-gray-500 dark:text-gray-400">
-          已載入至末塊（第 {{ page }} 塊，共 {{ matrixData.rows.length.toLocaleString() }} 行）。
+          已顯示全部 {{ matrixData.rows.length.toLocaleString() }} 行。
         </p>
         <p v-else class="text-xs text-gray-500 dark:text-gray-400">
           已載入 {{ matrixData.rows.length.toLocaleString() }} 行。
         </p>
-        <p class="text-[11px] text-gray-400">如需查閱其他行，請使用上方搜索或 ?q= 詞條鍵定位。</p>
       </template>
     </div>
 
@@ -230,7 +274,8 @@ const MAX_ROWS = 3000
 const COLUMNS_STORAGE_KEY = 'faanjyut:matrix:columns'
 
 const route = useRoute()
-const { fetchMatrix, fetchColumns, search, writeCells, locatePageByMatrixOrder } = useFaanjyutMatrix()
+const router = useRouter()
+const { fetchMatrix, fetchColumns, writeCells } = useFaanjyutMatrix()
 /** loadMore 追加失敗用 toast（不替換已有視圖） */
 const toast = useToast()
 
@@ -256,6 +301,8 @@ const canLoadMore = computed(() => {
 /** 已選列 id；空數組 = 服務端默認列集（本人可編輯列＋穗港） */
 const selectedColumnIds = ref<string[]>([])
 const cellFilter = ref<FaanjyutCellState | null>(null)
+const searchInput = ref('')
+const appliedSearchQuery = ref('')
 
 /** P5 新建詞條彈窗（§8：按鈕僅在寫入旗標開啟且至少一列可編輯時顯示） */
 const createModalOpen = ref(false)
@@ -288,45 +335,76 @@ const cellFilterChips: Array<{ value: FaanjyutCellState; label: string; title: s
   { value: 'cleared', label: '已清空', title: '只顯示所選列中有已清空格的詞條' }
 ]
 
+const activeCellFilterLabel = computed(() =>
+  cellFilterChips.find((chip) => chip.value === cellFilter.value)?.label ?? ''
+)
+const hasActiveFilters = computed(() => Boolean(appliedSearchQuery.value || cellFilter.value))
+const loadingStateTitle = computed(() =>
+  hasActiveFilters.value ? '正在套用篩選' : '正在載入泛粵字表'
+)
+const emptyStateTitle = computed(() => {
+  if (appliedSearchQuery.value && cellFilter.value) return '沒有符合全部篩選條件的詞條'
+  if (appliedSearchQuery.value) return `沒有找到與「${appliedSearchQuery.value}」匹配的詞條`
+  if (cellFilter.value) return `沒有符合「${activeCellFilterLabel.value}」狀態的詞條`
+  return '字表目前沒有詞條'
+})
+const emptyStateDescription = computed(() => {
+  if (appliedSearchQuery.value && cellFilter.value) {
+    return `搜尋「${appliedSearchQuery.value}」與「${activeCellFilterLabel.value}」狀態篩選沒有共同結果。`
+  }
+  if (appliedSearchQuery.value) return '沒有詞條鍵、讀音、代表字、釋義或方音格內容與此字詞匹配。'
+  if (cellFilter.value) return '目前所選方言列中沒有詞條符合此格狀態。'
+  return '目前沒有可顯示的泛粵字表資料。'
+})
+
 /** 重置並載入第一塊（初始 / 篩選 / 列集變化 / 定位失敗兜底）；清空全部編輯態 */
+let matrixRequestId = 0
+
 async function fetchMatrixData() {
+  const requestId = ++matrixRequestId
   loading.value = true
   errorMessage.value = null
   // 數據重載（翻頁/篩選/定位/列集變化）時清空全部編輯態（舊格可能已不在本視圖）
   cellEdit.resetAll()
   try {
-    matrixData.value = await fetchMatrix({
+    const data = await fetchMatrix({
       page: 1,
       perPage: PER_PAGE,
       columnIds: selectedColumnIds.value,
-      cellFilter: cellFilter.value
+      cellFilter: cellFilter.value,
+      q: appliedSearchQuery.value || undefined
     })
+    if (requestId !== matrixRequestId) return
+    matrixData.value = data
     page.value = 1
   } catch (error: any) {
+    if (requestId !== matrixRequestId) return
     errorMessage.value = error?.data?.message || error?.message || '矩陣載入失敗'
   } finally {
-    loading.value = false
+    if (requestId === matrixRequestId) loading.value = false
   }
 }
 
 /**
  * 追加下一塊（「載入更多」）：rows 累加、不 reset 編輯態、不影響滾動位置。
  * 返回是否成功追加（false = 已到末頁 / 達上限 / 請求失敗）。
- * 不檢查 loading：定位流程（locateByQuery）中 loading=true 且逐塊 ensureLoadedTo，
- * 檢查 loading 會卡住定位（2026-08-07 修復）；初始載入期間按鈕本就隱藏（v-if !loading）。
+ * 初始載入期間按鈕由 v-if !loading 隱藏。
  */
 async function loadMore(): Promise<boolean> {
   const m = matrixData.value
   if (!m || loadingMore.value) return false
   if (page.value >= m.pagination.totalPages || m.rows.length >= MAX_ROWS) return false
+  const requestId = matrixRequestId
   loadingMore.value = true
   try {
     const data = await fetchMatrix({
       page: page.value + 1,
       perPage: PER_PAGE,
       columnIds: selectedColumnIds.value,
-      cellFilter: cellFilter.value
+      cellFilter: cellFilter.value,
+      q: appliedSearchQuery.value || undefined
     })
+    if (requestId !== matrixRequestId) return false
     matrixData.value = {
       ...data,
       rows: [...matrixData.value.rows, ...data.rows]
@@ -344,7 +422,7 @@ async function loadMore(): Promise<boolean> {
 }
 
 /**
- * 定位（?q=/?cell=）用：直接請求目標塊並替換視圖（2026-08-07 修復：
+ * 定位（?cell=）用：直接請求目標塊並替換視圖（2026-08-07 修復：
  * 原 ensureLoadedTo 逐塊串行追加，服務端每塊 pivot ~2.6s，跨 14 塊要 30s+ 才看到結果；
  * 定位本質是跳轉，單次請求秒級完成，目標塊之後可用「載入更多」繼續追加）。
  * 返回替換後的數據；請求失敗返回 null。
@@ -356,7 +434,8 @@ async function jumpToBlock(targetPage: number): Promise<FaanjyutMatrixData | nul
       page: targetPage,
       perPage: PER_PAGE,
       columnIds: selectedColumnIds.value,
-      cellFilter: cellFilter.value
+      cellFilter: cellFilter.value,
+      q: appliedSearchQuery.value || undefined
     })
     matrixData.value = data
     page.value = targetPage
@@ -423,67 +502,6 @@ function restoreColumnSelection(): string[] {
 }
 
 /**
- * ?q=<sourceKey> 定位：搜索 → 取 key 維度首個命中 → 按 matrixOrder 二分定位塊 →
- * 從第一塊逐塊追加到目標塊並高亮行（2026-08-07 無限滾動版；原「跳頁」改為「確保加載到」）。
- * 超過軟上限無法加載到目標行時保留提示，可點行首鍵前往詞條詳情（§6 頁面規格 3）。
- */
-async function locateByQuery(q: string) {
-  // 2026-08-07 修復：定位流程自管理 loading（原分頁版成功路徑不置 false，
-  // 無限滾動版會導致底部「載入更多」按鈕區被 v-if !loading 永久隱藏）
-  loading.value = true
-  errorMessage.value = null
-  try {
-    const res = await search(q, 5)
-    const keyHit = res.groups.find((g) => g.dimension === 'key')?.hits[0]
-    const hit = keyHit ?? res.groups.flatMap((g) => g.hits)[0]
-    if (!hit) {
-      locateNote.value = `找不到「${q}」對應的詞條，已載入第一塊。`
-      await fetchMatrixData()
-      return
-    }
-    highlightLexemeId.value = hit.lexemeId
-
-    const matrixOrder = hit.extra?.matrixOrder
-    if (typeof matrixOrder !== 'number') {
-      locateNote.value = `已找到詞條（${hit.snippet}），但此命中不含排序資訊，無法定位所在塊；可點行首鍵前往詞條詳情。`
-      await fetchMatrixData()
-      return
-    }
-
-    // 先取第一塊拿到 totalPages，再二分定位目標塊
-    const firstPage = await fetchMatrix({ page: 1, perPage: PER_PAGE, columnIds: selectedColumnIds.value })
-    const totalPages = firstPage.pagination.totalPages
-    const target = await locatePageByMatrixOrder(matrixOrder, PER_PAGE, totalPages)
-    matrixData.value = firstPage
-    page.value = 1
-    if (target && target > 1) {
-      await jumpToBlock(target)
-    }
-
-    // matrixOrder 重複值跨塊邊界時試相鄰塊
-    if (!matrixData.value.rows.some((r) => r.id === hit.lexemeId)) {
-      for (const p of [page.value + 1, page.value - 1]) {
-        if (!p || p < 1 || p > totalPages) continue
-        const data = await jumpToBlock(p)
-        if (!data) break
-        if (data.rows.some((r) => r.id === hit.lexemeId)) break
-      }
-    }
-
-    if (matrixData.value.rows.some((r) => r.id === hit.lexemeId)) {
-      locateNote.value = `已定位「${q}」：第 ${page.value} 塊，目標行已高亮。`
-    } else {
-      locateNote.value = `已定位「${q}」附近（第 ${page.value} 塊），但目標行未顯示；可前往詞條詳情。`
-    }
-  } catch {
-    locateNote.value = `「${q}」搜索定位失敗，已載入第一塊。`
-    await fetchMatrixData()
-  } finally {
-    loading.value = false
-  }
-}
-
-/**
  * ?cell=<sourceCell> 定位（導入報告跳轉用，審計 M64）：已加載行內掃描優先；
  * 未命中 → locate-cell API 查所在塊並追加載入到該塊高亮（不再降級為「不在目前頁」）。
  */
@@ -511,7 +529,7 @@ async function applyCellHighlight(sourceCell: string) {
       ? `已定位原表格 ${sourceCell}：第 ${page.value} 塊，目標格已高亮。`
       : `已定位至第 ${page.value} 塊附近（${res.data.sourceKey ?? '未知詞條'}），目標格未顯示。`
   } catch {
-    locateNote.value = `原表格 ${sourceCell} 定位失敗（找不到對應格或詞條），請配合 ?q=<詞條鍵> 定位。`
+    locateNote.value = `原表格 ${sourceCell} 定位失敗（找不到對應格或詞條）。`
   }
 }
 
@@ -524,15 +542,41 @@ async function handleQueryParams() {
   const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
   const cell = typeof route.query.cell === 'string' ? route.query.cell.trim() : ''
 
-  if (q) {
-    cellFilter.value = null
-    await locateByQuery(q)
-  } else {
-    await fetchMatrixData()
-  }
+  appliedSearchQuery.value = q
+  searchInput.value = q
+  await fetchMatrixData()
   if (cell) {
     await applyCellHighlight(cell)
   }
+}
+
+async function applySearchQuery() {
+  const nextQuery = searchInput.value.trim()
+  if (nextQuery === appliedSearchQuery.value && matrixData.value && !errorMessage.value) return
+  appliedSearchQuery.value = nextQuery
+  highlightLexemeId.value = null
+  highlightSourceCell.value = null
+  locateNote.value = null
+
+  const nextRouteQuery = { ...route.query }
+  if (nextQuery) nextRouteQuery.q = nextQuery
+  else delete nextRouteQuery.q
+  router.replace({ query: nextRouteQuery }).catch(() => {})
+  await fetchMatrixData()
+}
+
+async function resetTableFilters() {
+  searchInput.value = ''
+  appliedSearchQuery.value = ''
+  cellFilter.value = null
+  highlightLexemeId.value = null
+  highlightSourceCell.value = null
+  locateNote.value = null
+
+  const nextRouteQuery = { ...route.query }
+  delete nextRouteQuery.q
+  router.replace({ query: nextRouteQuery }).catch(() => {})
+  await fetchMatrixData()
 }
 
 /** 審計 M53 修復：KeepAlive 下首次掛載 onMounted/onActivated 都會觸發，flag 跳過首次 onActivated 避免重複請求 */
@@ -620,6 +664,49 @@ onBeforeUnmount(() => {
   margin-left: calc(var(--fj-main-gutter) * -1);
   padding: 0 var(--fj-main-gutter) 12px;
   background: var(--jc-paper);
+}
+.fj-matrix-state {
+  min-height: clamp(280px, 42vh, 420px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--jc-border);
+  background: #fff;
+  box-shadow: var(--jc-shadow-hard-lg);
+}
+.fj-state-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 28px;
+}
+.fj-state-content-empty {
+  flex-direction: column;
+  text-align: center;
+}
+.fj-state-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--jc-accent);
+  background: var(--jc-accent-soft-strong);
+  color: var(--jc-accent);
+}
+.fj-state-icon-loading {
+  border-color: var(--jc-border);
+  background: var(--jc-canvas-soft);
+  color: var(--jc-muted);
+}
+.dark .fj-matrix-state {
+  border-color: var(--jc-dark-border);
+  background: var(--jc-dark-surface);
+}
+.dark .fj-state-icon-loading {
+  border-color: var(--jc-dark-border);
+  background: var(--jc-dark-bg);
 }
 @media (min-width: 640px) {
   .fj-matrix-page { --fj-main-gutter: 16px; }
