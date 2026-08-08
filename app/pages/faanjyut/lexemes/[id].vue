@@ -11,6 +11,10 @@ import {
   invalidateFaanjyutMatrixCacheForLexeme,
   patchFaanjyutMatrixCachedLexeme
 } from '~/utils/faanjyutMatrixCache'
+import {
+  FAANJYUT_MATRIX_RETURN_STATE_KEY,
+  getFaanjyutMatrixReturnPath
+} from '~/utils/faanjyutMatrixNavigation'
 
 definePageMeta({
   layout: 'default',
@@ -21,7 +25,9 @@ definePageMeta({
 const SYSTEM_IMPORT_USER = 'system:faanjyut_import'
 
 const route = useRoute()
+const router = useRouter()
 const { data, loading, errorMessage, writeEnabled, canEditComposite, fetchLexeme } = useFaanjyutLexemeDetail()
+const matrixReturnPath = ref('/faanjyut')
 
 const lexemeId = computed(() => String(route.params.id ?? ''))
 
@@ -30,8 +36,26 @@ watch(lexemeId, () => {
 })
 
 onMounted(() => {
+  matrixReturnPath.value = getFaanjyutMatrixReturnPath(window.history.state) ?? '/faanjyut'
   fetchLexeme(lexemeId.value)
 })
+
+function returnToMatrix() {
+  const state = window.history.state as Record<string, unknown> | null
+  const immediateBackPath = getFaanjyutMatrixReturnPath({ back: state?.back })
+  if (immediateBackPath === matrixReturnPath.value) {
+    router.back()
+    return
+  }
+  void navigateTo(matrixReturnPath.value)
+}
+
+function lexemeDetailTarget(id: string) {
+  return {
+    path: `/faanjyut/lexemes/${id}`,
+    state: { [FAANJYUT_MATRIX_RETURN_STATE_KEY]: matrixReturnPath.value }
+  }
+}
 
 useHead(() => ({
   title: data.value
@@ -496,13 +520,14 @@ function authorInitial(author: string | null | undefined): string {
   <div>
     <!-- 返回行 + 唯讀 chip -->
     <div class="flex items-center justify-between gap-2 mb-4">
-      <NuxtLink
-        to="/faanjyut"
+      <button
+        type="button"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-[var(--jc-border)] bg-white dark:bg-[var(--jc-dark-surface)] text-[var(--jc-body)] dark:text-slate-300 hover:bg-black/5 dark:hover:bg-black/20 shadow-[var(--jc-shadow-hard)]"
+        @click="returnToMatrix"
       >
         <UIcon name="i-heroicons-arrow-left" class="w-4 h-4" />
         返回矩陣
-      </NuxtLink>
+      </button>
       <FaanjyutToneChip tone="slate" label="唯讀 · v1">
         <UIcon name="i-heroicons-lock-closed" class="w-3 h-3" />
         唯讀 · v1
@@ -520,7 +545,7 @@ function authorInitial(author: string | null | undefined): string {
     <div v-else-if="errorMessage" class="jc-card p-6 text-center">
       <p class="text-sm font-semibold text-red-600 dark:text-red-400">{{ errorMessage }}</p>
       <p class="text-xs text-[var(--jc-muted)] mt-1">詞條可能不存在，或你未有查看權限。</p>
-      <NuxtLink to="/faanjyut" class="inline-block mt-4 text-sm text-blue-600 underline">
+      <NuxtLink :to="matrixReturnPath" class="inline-block mt-4 text-sm text-blue-600 underline">
         返回矩陣
       </NuxtLink>
     </div>
@@ -988,7 +1013,7 @@ function authorInitial(author: string | null | undefined): string {
               <UIcon name="i-heroicons-arrow-right" class="w-6 h-6 shrink-0 text-[var(--jc-accent)]" />
               <div class="text-center min-w-0">
                 <template v-if="link.targetLexeme">
-                  <NuxtLink :to="`/faanjyut/lexemes/${link.targetLexeme.id}`" class="group inline-block">
+                  <NuxtLink :to="lexemeDetailTarget(link.targetLexeme.id)" class="group inline-block">
                     <div class="jc-headword-rare-font font-bold text-2xl group-hover:text-[var(--jc-accent)] dark:text-slate-100">
                       {{ linkTargetRepChar(link) || link.targetRaw || '？' }}
                     </div>
@@ -1183,7 +1208,7 @@ function authorInitial(author: string | null | undefined): string {
       <section class="mb-6">
         <div class="bg-[#F1F5F9] dark:bg-slate-800/60 border border-[var(--jc-border)] px-4 py-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           本頁沒有：審核狀態流轉、提交／通過／退回按鈕、發佈動作——皆為有意省略（v1 設計 §3）。詞條資料唯讀展示，編輯一律回
-          <NuxtLink to="/faanjyut" class="underline text-blue-600">矩陣頁</NuxtLink>進行。
+          <NuxtLink :to="matrixReturnPath" class="underline text-blue-600">矩陣頁</NuxtLink>進行。
         </div>
       </section>
     </template>

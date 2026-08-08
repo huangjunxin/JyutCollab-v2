@@ -91,7 +91,7 @@
           </td>
           <td class="fj-sk2 px-2 py-2 text-center jc-headword-rare-font text-xl font-bold text-[var(--jc-ink-strong)] dark:text-white">
             <NuxtLink
-              :to="`/faanjyut/lexemes/${row.id}`"
+              :to="lexemeDetailTarget(row.id)"
               :title="row.sourceKey ? `詞條鍵：${row.sourceKey}` : undefined"
               class="hover:underline"
             >{{ row.representativeChar?.display || row.representativeChar?.raw || '—' }}</NuxtLink>
@@ -145,6 +145,7 @@
 import type { FaanjyutMatrixColumn, FaanjyutMatrixRow } from '~/composables/useFaanjyutMatrix'
 import type { FaanjyutCellEditController } from '~/composables/useFaanjyutCellEdit'
 import { simplifyDefinitionForMatrix } from '~/utils/faanjyutFormat'
+import { FAANJYUT_MATRIX_RETURN_STATE_KEY } from '~/utils/faanjyutMatrixNavigation'
 import { useMobileBreakpoint } from '~/composables/useMobileBreakpoint'
 
 const props = withDefaults(defineProps<{
@@ -167,6 +168,14 @@ const props = withDefaults(defineProps<{
 })
 
 const wrapRef = ref<HTMLElement | null>(null)
+const route = useRoute()
+
+function lexemeDetailTarget(lexemeId: string) {
+  return {
+    path: `/faanjyut/lexemes/${lexemeId}`,
+    state: { [FAANJYUT_MATRIX_RETURN_STATE_KEY]: route.fullPath }
+  }
+}
 
 /* ---------------- P4 編輯渲染 ---------------- */
 

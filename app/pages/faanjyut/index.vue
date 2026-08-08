@@ -632,15 +632,57 @@ let mounted = false
  *  keepalive DOM 緩存自動保留）。離開矩陣頁時記下 main.scrollTop，返回時恢復。 */
 let savedMainScroll = 0
 let savedMainScrollLeft = 0
+let mainScrollContainer: HTMLElement | null = null
+
+function getMainScrollContainer() {
+  return filterBarRef.value?.closest('main') as HTMLElement | null
+}
+
+function captureMainScroll() {
+  const main = mainScrollContainer ?? getMainScrollContainer()
+  if (!main) return
+  savedMainScroll = main.scrollTop
+  savedMainScrollLeft = main.scrollLeft
+}
+
+function stopMainScrollTracking() {
+  mainScrollContainer?.removeEventListener('scroll', captureMainScroll)
+  mainScrollContainer = null
+}
+
+function startMainScrollTracking() {
+  const main = getMainScrollContainer()
+  if (!main || main === mainScrollContainer) return
+  stopMainScrollTracking()
+  mainScrollContainer = main
+  main.addEventListener('scroll', captureMainScroll, { passive: true })
+}
+
+async function restoreMainScroll() {
+  await nextTick()
+  const main = getMainScrollContainer()
+  if (!main) return
+  main.scrollTop = savedMainScroll
+  main.scrollLeft = savedMainScrollLeft
+  requestAnimationFrame(() => {
+    main.scrollTop = savedMainScroll
+    main.scrollLeft = savedMainScrollLeft
+    startMainScrollTracking()
+  })
+}
+
+onBeforeRouteLeave(() => {
+  captureMainScroll()
+  stopMainScrollTracking()
+})
 
 onDeactivated(() => {
-  const main = document.querySelector('main')
-  savedMainScroll = main?.scrollTop ?? 0
-  savedMainScrollLeft = main?.scrollLeft ?? 0
+  stopMainScrollTracking()
 })
 
 onMounted(async () => {
   syncFilterBarHeight()
+  startMainScrollTracking()
   if (typeof ResizeObserver !== 'undefined' && filterBarRef.value) {
     filterBarObserver = new ResizeObserver(syncFilterBarHeight)
     filterBarObserver.observe(filterBarRef.value)
@@ -679,11 +721,7 @@ onActivated(() => {
       lastCacheRevision.value = getFaanjyutMatrixCacheRevision()
       lastLoadedAt.value = Date.now()
     }
-    const main = document.querySelector('main')
-    if (main) {
-      main.scrollTop = savedMainScroll
-      main.scrollLeft = savedMainScrollLeft
-    }
+    void restoreMainScroll()
     if (cell && cell !== highlightSourceCell.value) void applyCellHighlight(cell)
 
     const cacheInvalidated = lastCacheRevision.value !== getFaanjyutMatrixCacheRevision()
@@ -711,6 +749,7 @@ onActivated(() => {
 })
 
 onBeforeUnmount(() => {
+  stopMainScrollTracking()
   filterBarObserver?.disconnect()
   filterBarObserver = null
 })
