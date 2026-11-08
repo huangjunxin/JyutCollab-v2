@@ -2469,6 +2469,7 @@ async function saveAllChanges() {
     await flushPendingIgnored()
     await Promise.all(dirtyEntries.map(entry => {
       const putBody: Record<string, unknown> = {
+        baseVersion: entry.version ?? 0,
         headword: entry.headword,
         dialect: entry.dialect,
         phonetic: entry.phonetic,
@@ -2485,9 +2486,11 @@ async function saveAllChanges() {
       if (entry.morphemeRefs !== undefined) {
         putBody.morphemeRefs = entry.morphemeRefs || []
       }
-      return $fetch<unknown>(`/api/entries/${entry.id}`, {
+      return $fetch<{ success: boolean; data?: { version?: number } }>(`/api/entries/${entry.id}`, {
         method: 'PUT',
         body: putBody
+      }).then(response => {
+        entry.version = response.data?.version ?? (entry.version ?? 0) + 1
       })
     }))
 
@@ -2531,6 +2534,7 @@ async function saveEntryChanges(entry: Entry) {
     // 在 PUT 之前送出所有 pending ignored 標記，避免服務端 auto-match 將它們誤判為 pending
     await flushPendingIgnored()
     const putBody: Record<string, unknown> = {
+      baseVersion: entry.version ?? 0,
       headword: entry.headword,
       dialect: entry.dialect,
       phonetic: entry.phonetic,
@@ -2549,13 +2553,14 @@ async function saveEntryChanges(entry: Entry) {
     if (entry.morphemeRefs !== undefined) {
       putBody.morphemeRefs = entry.morphemeRefs || []
     }
-    const response = await $fetch<{ success: boolean; data?: { status?: string } }>(`/api/entries/${entry.id}`, {
+    const response = await $fetch<{ success: boolean; data?: { status?: string; version?: number } }>(`/api/entries/${entry.id}`, {
       method: 'PUT',
       body: putBody
     })
 
     if (response.success) {
       entry._isDirty = false
+      entry.version = response.data?.version ?? (entry.version ?? 0) + 1
       if (response.data?.status) entry.status = response.data.status as Entry['status']
       // 從本地儲存中移除已保存嘅詞條
       removeEntryFromLocalStorage(entry.id || '')

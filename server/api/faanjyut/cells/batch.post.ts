@@ -21,7 +21,7 @@ const CellEditSchema = z.object({
   op: z.enum(['set', 'clear', 'absent']),
   // 審計 M37：raw 加長度上限（防單格超長觸發 16MB 單文檔上限；源表方音值遠小於此）
   raw: z.string().max(500).optional(),
-  baseVersion: z.number().int().optional()
+  baseVersion: z.number().int().min(0)
 }).superRefine((edit, ctx) => {
   if (!edit.dialectId && !edit.columnId) {
     ctx.addIssue({ code: 'custom', path: ['dialectId'], message: '必須提供 dialectId 或 columnId' })

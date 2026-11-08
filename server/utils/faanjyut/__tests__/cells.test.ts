@@ -83,13 +83,13 @@ const userNoGz: CellsUser = { id: 'user_2', role: 'contributor', dialectPermissi
 const admin: CellsUser = { id: 'admin_1', role: 'admin', dialectPermissions: [] }
 
 function editSet(dialectId: string, raw: string): CellEdit {
-  return { lexemeId: LEXEME_ID, dialectId, op: 'set', raw }
+  return { lexemeId: LEXEME_ID, dialectId, op: 'set', raw, baseVersion: 0 }
 }
 function editClear(dialectId: string): CellEdit {
-  return { lexemeId: LEXEME_ID, dialectId, op: 'clear' }
+  return { lexemeId: LEXEME_ID, dialectId, op: 'clear', baseVersion: 0 }
 }
 function editAbsent(dialectId: string): CellEdit {
-  return { lexemeId: LEXEME_ID, dialectId, op: 'absent' }
+  return { lexemeId: LEXEME_ID, dialectId, op: 'absent', baseVersion: 0 }
 }
 
 // ---- 內存 fake：模擬 Mongo unique 鍵（entries.id / cellStates {lexemeId,columnId}）與單格事務 ----
@@ -164,6 +164,9 @@ class FakeCellsDb implements CellsDb {
       },
       upsertCellState: async (args) => {
         const existing = this.cellStates.find((cs) => cs.lexemeId === args.lexemeId && cs.columnId === args.columnId)
+        if (Number(existing?.version ?? 0) !== args.baseVersion) {
+          throw Object.assign(new Error('CELL_VERSION_CONFLICT'), { code: 'VERSION_CONFLICT' })
+        }
         const base = existing
           ? this.clone(existing)
           : {
@@ -531,7 +534,7 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
 
   it('admin set 域外列（新建）：ExternalEtymon + create 歷史 + 格 projection.externalEtymonIds', async () => {
     const db = makeDb({ columns: [columnGz, columnOch] })
-    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'set', raw: 'prProto-OCH' }
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, baseVersion: 0, op: 'set', raw: 'prProto-OCH' }
     const result = await runCellBatch(db, { edits: [edit], user: admin })
 
     expect(result.succeeded).toBe(1)
@@ -574,7 +577,7 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
       meta: { sourceBook: 'faanjyut', editedAfterImport: false }
     })
 
-    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'set', raw: 'newProto' }
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, baseVersion: 0, op: 'set', raw: 'newProto' }
     const result = await runCellBatch(db, { edits: [edit], user: admin })
 
     expect(result.succeeded).toBe(1)
@@ -620,7 +623,7 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
       createdBy: 'system:faanjyut_import'
     })
 
-    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'clear' }
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, baseVersion: 0, op: 'clear' }
     const result = await runCellBatch(db, { edits: [edit], user: admin })
 
     expect(result.succeeded).toBe(1)
@@ -653,7 +656,7 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
       meta: { sourceBook: 'faanjyut', editedAfterImport: false }
     })
 
-    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'absent' }
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, baseVersion: 0, op: 'absent' }
     const result = await runCellBatch(db, { edits: [edit], user: admin })
 
     expect(result.succeeded).toBe(1)
@@ -669,7 +672,7 @@ describe('faanjyut/cells runCellBatch 權限與列解析', () => {
 
   it('admin absent 域外列（空格）：僅 upsert 格 explicitlyAbsent', async () => {
     const db = makeDb({ columns: [columnGz, columnOch] })
-    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, op: 'absent' }
+    const edit: CellEdit = { lexemeId: LEXEME_ID, columnId: COL_OCH, baseVersion: 0, op: 'absent' }
     const result = await runCellBatch(db, { edits: [edit], user: admin })
 
     expect(result.succeeded).toBe(1)
@@ -734,6 +737,43 @@ describe('faanjyut/cells 併發與事務', () => {
     expect(db.entries).toHaveLength(1)
     expect(db.cellStates).toHaveLength(1)
     expect(db.histories).toHaveLength(1)
+  })
+
+  it('舊 baseVersion 寫入現有格：返回 VERSION_CONFLICT，Entry/CellState/History 均不變', async () => {
+    const db = makeDb()
+    db.entries.push({
+      _id: 'fake_oid_versioned',
+      id: entryId(KEY, 'guangzhou'),
+      lexemeId: LEXEME_ID,
+      sourceBook: 'faanjyut',
+      dialect: { name: 'guangzhou' },
+      phonetic: { original: 'jyut6' },
+      createdBy: 'system:faanjyut_import'
+    })
+    db.cellStates.push({
+      id: cellStateId(LEXEME_ID, COL_GZ),
+      lexemeId: LEXEME_ID,
+      columnId: COL_GZ,
+      status: { workflow: 'unreviewed', flags: {} },
+      raw: 'jyut6',
+      editedAfterImport: false,
+      version: 2,
+      createdBy: 'system:faanjyut_import'
+    })
+
+    const result = await runCellBatch(db, {
+      edits: [{ ...editSet('guangzhou', 'jyut5'), baseVersion: 1 }],
+      user: userGz
+    })
+    expect(result.results[0]).toMatchObject({
+      ok: false,
+      code: 'VERSION_CONFLICT',
+      error: CELL_CONFLICT_MESSAGE
+    })
+    expect((db.entries[0].phonetic as any).original).toBe('jyut6')
+    expect(db.cellStates[0].version).toBe(2)
+    expect(db.cellStates[0].raw).toBe('jyut6')
+    expect(db.histories).toHaveLength(0)
   })
 
   it('事務回滾：模擬 EditHistory.create 拋錯 -> 該格失敗且 Entry/CellState 不落庫', async () => {

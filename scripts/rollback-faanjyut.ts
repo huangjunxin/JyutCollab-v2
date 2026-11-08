@@ -3,7 +3,7 @@
  * 泛粵字表按 batchId 回滾（P2 實現，見 ImportDataContract.md §9）。
  *
  * 按寫入順序的反向刪除帶 batchId 的業務文檔；ImportBatch 本身保留並標 rolled_back
- * （含前後各 collection 計數）。批次僅 completed/failed 可回滾。
+ * （含前後各 collection 計數）。批次僅 completed/failed/interrupted 可回滾。
  * 防誤寫：--confirm-write 必須等於實際連接的 db 名。
  *
  * 退出碼：0 回滾完成 / 1 運行錯誤（含批次不存在、狀態不允許、db 名不符）。
@@ -70,7 +70,7 @@ function usage(): string {
   return [
     '用法：npm run rollback:faanjyut -- [options]',
     '',
-    '  --batch-id <fjb_...>   要回滾的導入批次（僅 completed/failed 可回滾）',
+    '  --batch-id <fjb_...>   要回滾的導入批次（僅 completed/failed/interrupted 可回滾）',
     '  --confirm-write <db>   必填：必須等於實際連接的 db 名（防誤寫）',
     '  --report-dir <dir>     產物目錄，默認 .artifacts/faanjyut/rollback',
     '  --help',

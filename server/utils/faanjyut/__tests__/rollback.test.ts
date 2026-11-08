@@ -68,6 +68,13 @@ describe('faanjyut/rollback 回滾', () => {
     expect(db.deleteCalls).toEqual(ROLLBACK_ORDER)
   })
 
+  it('interrupted 批次可回滾', async () => {
+    const db = fakeRollbackDb({ batch: { batchId: 'fjb_ok', status: 'interrupted' } })
+    const result = await runRollback(db, 'fjb_ok')
+    expect(result.status).toBe('rolled_back')
+    expect(db.deleteCalls).toEqual(ROLLBACK_ORDER)
+  })
+
   it('批次不存在：拋錯，不刪任何文檔', async () => {
     const db = fakeRollbackDb({ batch: null })
     await expect(runRollback(db, 'fjb_missing')).rejects.toThrow('不存在')

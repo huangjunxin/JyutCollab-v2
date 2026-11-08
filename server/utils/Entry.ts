@@ -245,6 +245,7 @@ const EntrySchema = new mongoose.Schema<IEntry>({
   likeCount: { type: Number, default: 0 }
 }, {
   timestamps: true,
+  optimisticConcurrency: true,
   collection: 'entries'
 })
 

@@ -357,6 +357,7 @@ const jyutpingInput = computed({
 
 const saving = ref(false)
 const error = ref('')
+const baseVersion = ref(0)
 
 const aiLoading = reactive({
   categorize: false,
@@ -434,6 +435,7 @@ function resetForm() {
   form.meta.usage = ''
   form.meta.notes = ''
   form.status = 'draft'
+  baseVersion.value = 0
   error.value = ''
   aiSuggestion.value = ''
 }
@@ -489,7 +491,8 @@ async function handleSubmit() {
         usage: form.meta.usage,
         notes: form.meta.notes
       },
-      status: 'pending_review'
+      status: 'pending_review',
+      ...(isEditing.value ? { baseVersion: baseVersion.value } : {})
     }
 
     if (isEditing.value) {
@@ -692,6 +695,7 @@ watch(() => props.entryId, async (id) => {
       const response = await $fetch(`/api/entries/${id}`)
       if (response.success) {
         const entry = response.data
+        baseVersion.value = entry.version ?? entry.__v ?? 0
         // Support both old and new formats
         form.headword.display = entry.headword?.display || entry.text || ''
         form.headword.normalized = entry.headword?.normalized || ''

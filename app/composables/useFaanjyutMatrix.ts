@@ -105,6 +105,7 @@ export interface FaanjyutCellEdit {
   columnId?: string
   op: FaanjyutCellOp
   raw?: string
+  baseVersion: number
 }
 
 export interface FaanjyutCellWriteResult {
@@ -113,7 +114,9 @@ export interface FaanjyutCellWriteResult {
   columnId?: string
   ok: boolean
   entryId?: string
+  version?: number
   error?: string
+  code?: 'VERSION_CONFLICT'
 }
 
 export interface FaanjyutCellWriteData {

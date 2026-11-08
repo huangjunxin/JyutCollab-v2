@@ -201,10 +201,10 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
     expect(writeCells).toHaveBeenCalledTimes(1)
     expect(writeCells.mock.calls[0][0]).toEqual([
-      { lexemeId: 'lex-1', dialectId: 'guangzhou', op: 'set', raw: 'mou5' }
+      { lexemeId: 'lex-1', dialectId: 'guangzhou', op: 'set', raw: 'mou5', baseVersion: 0 }
     ])
     // 本地 patch：不重拉矩陣（§13.1）
-    expect(matrixData.value!.rows[0].cells['col-guangzhou']).toEqual({ state: 'normal', raw: 'mou5' })
+    expect(matrixData.value!.rows[0].cells['col-guangzhou']).toEqual({ state: 'normal', raw: 'mou5', version: 1 })
     expect(ctrl.editingCell.value).toBeNull()
     expect(ctrl.pendingFor('lex-1', 'col-guangzhou')).toBe(false)
 
@@ -232,7 +232,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
     await new Promise((r) => setTimeout(r, 250))
     await flushAsync()
     expect(c.writeCells.mock.calls[0][0][0]).toMatchObject({ op: 'clear' })
-    expect(c.matrixData.value!.rows[0].cells['col-guangzhou']).toEqual({ state: 'cleared' })
+    expect(c.matrixData.value!.rows[0].cells['col-guangzhou']).toEqual({ state: 'cleared', version: 1 })
   })
 
   it('unchanged value exits edit silently without any write or toast', async () => {
@@ -256,7 +256,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
     ctrl.handleEditorKeydown(enterEvent(), 'lex-1', 'col-guangzhou')
     await flushAsync()
     expect(ctrl.pendingFor('lex-1', 'col-guangzhou')).toBe(true)
-    resolveWrite(okResult([{ lexemeId: 'lex-1', columnId: 'col-guangzhou', op: 'set', raw: 'mou5' }]))
+    resolveWrite(okResult([{ lexemeId: 'lex-1', columnId: 'col-guangzhou', op: 'set', raw: 'mou5', baseVersion: 0 }]))
     await flushAsync()
     expect(ctrl.pendingFor('lex-1', 'col-guangzhou')).toBe(false)
   })
@@ -301,9 +301,9 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
 
     expect(writeCells).toHaveBeenCalledTimes(2)
     expect(writeCells.mock.calls[1][0]).toEqual([
-      { lexemeId: 'lex-1', dialectId: 'guangzhou', op: 'set', raw: 'mai1' }
+      { lexemeId: 'lex-1', dialectId: 'guangzhou', op: 'set', raw: 'mai1', baseVersion: 1 }
     ])
-    expect(matrixData.value!.rows[0].cells['col-guangzhou']).toEqual({ state: 'normal', raw: 'mai1' })
+    expect(matrixData.value!.rows[0].cells['col-guangzhou']).toEqual({ state: 'normal', raw: 'mai1', version: 2 })
   })
 
   it('undo of a set on a previously-null cell degrades to clear（v1 簡化，§6.4）', async () => {
@@ -319,7 +319,7 @@ describe('useFaanjyutCellEdit 編輯狀態機（§6.4）', () => {
     await flushAsync()
 
     expect(writeCells.mock.calls[1][0]).toEqual([
-      { lexemeId: 'lex-2', dialectId: 'guangzhou', op: 'clear' }
+      { lexemeId: 'lex-2', dialectId: 'guangzhou', op: 'clear', baseVersion: 1 }
     ])
     expect(matrixData.value!.rows[1].cells['col-guangzhou'].state).toBe('cleared')
   })

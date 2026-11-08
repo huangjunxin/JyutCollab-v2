@@ -3,12 +3,14 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
+import mongoose from 'mongoose'
 
 const root = resolve(import.meta.dirname, '..', '..', '..', '..')
 const tsxCli = join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const seedScript = join(root, 'scripts', 'import-faanjyut.ts')
 const migrateScript = join(root, 'scripts', 'migrate-faanjyut-indexes.ts')
 const rollbackScript = join(root, 'scripts', 'rollback-faanjyut.ts')
+const recoverScript = join(root, 'scripts', 'recover-faanjyut.ts')
 
 function runCli(script: string, args: string[], env: Record<string, string | undefined> = {}, timeout = 30_000): { code: number; stdout: string; stderr: string } {
   const result = spawnSync(process.execPath, [tsxCli, script, ...args], {
@@ -76,6 +78,21 @@ describe('CLI 退出碼契約（不依賴 MongoDB 的分支）', () => {
     const { code, stderr } = runCli(migrateScript, ['--dry-run'], { FAANJYUT_MONGODB_URI: '', MONGODB_URI: '' })
     expect(code).toBe(1)
     expect(stderr).toContain('MONGODB_URI')
+  })
+
+  it('recover --help → 退出碼 0', () => {
+    const { code, stdout } = runCli(recoverScript, ['--help'])
+    expect(code).toBe(0)
+    expect(stdout).toContain('recover:faanjyut')
+  })
+
+  it('recover 缺少確認參數 → 退出碼 1', () => {
+    const missingBatch = runCli(recoverScript, [])
+    expect(missingBatch.code).toBe(1)
+    expect(missingBatch.stderr).toContain('batch-id')
+    const missingWriterConfirmation = runCli(recoverScript, ['--batch-id', 'fjb_test', '--confirm-write', 'staging_db'])
+    expect(missingWriterConfirmation.code).toBe(1)
+    expect(missingWriterConfirmation.stderr).toContain('confirm-no-active-writer')
   })
 
   // ---- 哈希核驗門（2026-08-07 補實現，審計 M48 / Runbook §8）----
@@ -164,5 +181,47 @@ describe('CLI 集成（需真實 MongoDB；默認跳過）', () => {
     expect(match, `stdout 無 batchId：\n${write.stdout}\n${write.stderr}`).toBeTruthy()
     const rollback = runCli(rollbackScript, ['--batch-id', match![1], '--confirm-write', 'faanjyut_integration'], env, 900_000)
     expect(rollback.code).toBe(0)
+  })
+
+  it('僵死 running 批次：recover → interrupted → rollback 歸零', { skip: !runIntegration, timeout: 120_000 }, async () => {
+    const mongoUri = process.env.FAANJYUT_MONGODB_URI || process.env.MONGODB_URI
+    if (!mongoUri) throw new Error('缺少 MongoDB URI')
+    const batchId = `fjb_recovery_${Date.now()}`
+    const env = { FAANJYUT_DB_NAME: 'faanjyut_integration' }
+    await mongoose.connect(mongoUri, {
+      dbName: 'faanjyut_integration',
+      autoIndex: false,
+      autoCreate: false
+    })
+    const db = mongoose.connection.db!
+    try {
+      await db.collection('faanjyut_import_batches').insertOne({
+        batchId,
+        status: 'running',
+        startedAt: new Date(Date.now() - 10 * 60 * 1000),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      await db.collection('faanjyut_columns').insertOne({ id: batchId, importBatchId: batchId })
+      const recovered = runCli(recoverScript, [
+        '--batch-id', batchId,
+        '--confirm-write', 'faanjyut_integration',
+        '--confirm-no-active-writer', batchId
+      ], env)
+      expect(recovered.code).toBe(0)
+      expect(recovered.stdout).toContain('interrupted')
+      expect(await db.collection('faanjyut_import_batches').findOne({ batchId })).toMatchObject({ status: 'interrupted' })
+      const rolledBack = runCli(rollbackScript, [
+        '--batch-id', batchId,
+        '--confirm-write', 'faanjyut_integration'
+      ], env)
+      expect(rolledBack.code).toBe(0)
+      expect(await db.collection('faanjyut_columns').countDocuments({ importBatchId: batchId })).toBe(0)
+      expect(await db.collection('faanjyut_import_batches').findOne({ batchId })).toMatchObject({ status: 'rolled_back' })
+    } finally {
+      await db.collection('faanjyut_columns').deleteMany({ importBatchId: batchId })
+      await db.collection('faanjyut_import_batches').deleteMany({ batchId })
+      await mongoose.disconnect()
+    }
   })
 })

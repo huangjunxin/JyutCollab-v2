@@ -115,6 +115,7 @@ export interface Entry {
   likeCount: number
   createdAt: string
   updatedAt: string
+  version?: number
   // 兼容舊格式字段
   text?: string
   textNormalized?: string

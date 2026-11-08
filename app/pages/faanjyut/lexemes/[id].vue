@@ -1109,7 +1109,7 @@ function authorInitial(author: string | null | undefined): string {
         />
 
         <div class="bg-[#EFF6FF] dark:bg-slate-800/60 border border-[#93C5FD] dark:border-slate-700 px-3 py-2 mb-3 text-xs text-[#1E40AF] dark:text-blue-300">
-          使用説明：本區復用平台 EditHistory（entryId）；v1 採 last-write-wins，每次寫入（包括撤銷）都留歷史快照，被覆蓋的值可人工恢復。
+          使用説明：本區復用平台 EditHistory（entryId）；每次寫入（包括撤銷）都留歷史快照，版本衝突會被拒絕，請刷新後再套用修改。
         </div>
 
         <div v-if="data.editHistory.length" class="jc-card p-4">

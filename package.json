@@ -11,6 +11,7 @@
     "test": "vitest run",
     "seed:faanjyut": "tsx scripts/import-faanjyut.ts",
     "rollback:faanjyut": "tsx scripts/rollback-faanjyut.ts",
+    "recover:faanjyut": "tsx scripts/recover-faanjyut.ts",
     "migrate:faanjyut-indexes": "tsx scripts/migrate-faanjyut-indexes.ts",
     "generate:headword-font": "node scripts/generate-headword-rare-font.mjs",
     "postinstall": "nuxt prepare"

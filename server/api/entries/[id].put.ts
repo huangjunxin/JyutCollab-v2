@@ -6,6 +6,7 @@ import { connectDB } from '../../utils/db'
 import { AISuggestion } from '../../utils/AISuggestion'
 import { createNotificationSafely, getEntryNotificationRecipients } from '../../utils/Notification'
 import { assertNotFaanJyutEntry } from '../../utils/faanjyut/intercept'
+import { ENTRY_VERSION_CONFLICT_MESSAGE, entryVersion, isEntryVersionConflict } from '../../utils/entry-version'
 
 function formatMongoDuplicateMessage(error: any) {
   const key = error.keyValue || {}
@@ -83,6 +84,7 @@ async function resolvePendingAISuggestions(entryDoc: any, entryId: string) {
 }
 
 const UpdateEntrySchema = z.object({
+  baseVersion: z.number().int().min(0),
   // 新格式
   headword: z.object({
     // 允許僅更新異形詞而不改 display
@@ -215,6 +217,13 @@ export default defineEventHandler(async (event) => {
     }
 
     const data = validated.data
+
+    if (entryVersion(existingEntry) !== data.baseVersion) {
+      throw createError({
+        statusCode: 409,
+        message: ENTRY_VERSION_CONFLICT_MESSAGE
+      })
+    }
 
     if (existingEntry.status === 'approved' && !isReviewerOrAdmin) {
       throw createError({
@@ -524,12 +533,20 @@ export default defineEventHandler(async (event) => {
       data: {
         id: existingEntry.id,
         headword: existingEntry.headword,
-        status: existingEntry.status
+        status: existingEntry.status,
+        version: (existingEntry as any).__v ?? data.baseVersion + 1
       }
     }
   } catch (error: any) {
     console.error('Update entry error:', error)
     if (error.statusCode) throw error
+
+    if (isEntryVersionConflict(error)) {
+      throw createError({
+        statusCode: 409,
+        message: ENTRY_VERSION_CONFLICT_MESSAGE
+      })
+    }
 
     if (error.code === 11000) {
       throw createError({

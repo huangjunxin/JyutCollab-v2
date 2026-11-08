@@ -3,7 +3,7 @@
  *
  * 按寫入順序的反向（ROLLBACK_ORDER）刪除帶 batchId 的業務文檔；
  * ImportBatch 本身保留並標 rolled_back（含前後計數快照）。批次必須處於
- * completed/failed 狀態才允許回滾；running 批次拒絕（避免刪到寫一半的數據流），
+ * completed/failed/interrupted 狀態才允許回滾；running 批次拒絕（避免刪到寫一半的數據流），
  * rolled_back 批次拒絕（重複回滾無意義）。
  *
  * 通過 RollbackDb 抽象訪問數據庫（真實實現見 mongo-db.ts；單元測試用 fake）。
@@ -37,8 +37,8 @@ export async function runRollback(db: RollbackDb, batchId: string): Promise<Roll
     throw new Error(`ImportBatch 不存在：${batchId}`)
   }
   const status = String(batch.status ?? '')
-  if (status !== 'completed' && status !== 'failed') {
-    throw new Error(`ImportBatch ${batchId} 狀態為 '${status}'，僅 completed/failed 可回滾；未刪除任何文檔`)
+  if (status !== 'completed' && status !== 'failed' && status !== 'interrupted') {
+    throw new Error(`ImportBatch ${batchId} 狀態為 '${status}'，僅 completed/failed/interrupted 可回滾；未刪除任何文檔`)
   }
 
   const startedAt = new Date()

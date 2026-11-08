@@ -66,6 +66,7 @@ export default defineEventHandler(async (event) => {
       success: true,
       data: {
         id: entry.id || entry._id.toString(),
+        version: (entry as any).__v ?? 0,
         // 新格式字段
         sourceBook: entry.sourceBook,
         lexemeId: entry.lexemeId,

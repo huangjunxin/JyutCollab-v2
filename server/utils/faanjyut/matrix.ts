@@ -249,7 +249,7 @@ export function pivotMatrix(args: {
         // 與詳情頁 cellNeedsEntryFallback 條件一致（P5 修復只做了一半，此處補齊）
         const entryView = col.sourceRole === 'domestic' && col.dialectId ? entryCellView(entry) : null
         const needEntryFallback = view.state === 'null' || (view.state === 'normal' && !view.raw)
-        cellViews[col.id] = needEntryFallback && entryView?.raw ? entryView : view
+        cellViews[col.id] = needEntryFallback && entryView?.raw ? { ...entryView, version: view.version ?? 0 } : view
       } else if (col.sourceRole === 'domestic' && col.dialectId) {
         // ② domestic 正常值回退 Entry
         cellViews[col.id] = entryCellView(entry)

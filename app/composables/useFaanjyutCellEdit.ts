@@ -234,7 +234,7 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
 
   /** op + 保存結果 → 本地四態視圖（Cell.vue 已有四態渲染，直接餵給它） */
   function viewForEdit(prev: FaanjyutMatrixCell | undefined, edit: { op: FaanjyutCellOp; raw?: string }): FaanjyutMatrixCell {
-    const base = prev ?? {}
+    const base = { ...prev, version: (prev?.version ?? 0) + 1 }
     if (edit.op === 'set') return { ...base, state: 'normal', raw: edit.raw ?? '' }
     // clear/absent：服務端 upsert 時卸載 raw（cells.ts applyClearAbsent raw 不傳 → mongo $unset），
     // 本地視圖同步為無 raw（Cell.vue 的 cleared 顯示佔位、absent 顯示 `_`）
@@ -293,8 +293,8 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
       return
     }
     const edit: FaanjyutCellEdit = column.dialectId
-      ? { lexemeId, dialectId: column.dialectId, op: op.op, raw: op.raw }
-      : { lexemeId, columnId: column.id, op: op.op, raw: op.raw }
+      ? { lexemeId, dialectId: column.dialectId, op: op.op, raw: op.raw, baseVersion: prev?.version ?? 0 }
+      : { lexemeId, columnId: column.id, op: op.op, raw: op.raw, baseVersion: prev?.version ?? 0 }
     try {
       const ok = await runWrite(lexemeId, columnId, edit)
       if (ok) {
@@ -335,9 +335,10 @@ export function useFaanjyutCellEdit(options: FaanjyutCellEditOptions): FaanjyutC
       toast.add({ title: '撤銷失敗', description: '此方言列已不在當前視圖', color: 'error' })
       return
     }
+    const current = getCell(lexemeId, columnId)
     const fullEdit: FaanjyutCellEdit = column.dialectId
-      ? { lexemeId, dialectId: column.dialectId, op: edit.op, raw: edit.raw }
-      : { lexemeId, columnId: column.id, op: edit.op, raw: edit.raw }
+      ? { lexemeId, dialectId: column.dialectId, op: edit.op, raw: edit.raw, baseVersion: current?.version ?? 0 }
+      : { lexemeId, columnId: column.id, op: edit.op, raw: edit.raw, baseVersion: current?.version ?? 0 }
     try {
       const ok = await runWrite(lexemeId, columnId, fullEdit)
       if (ok) {

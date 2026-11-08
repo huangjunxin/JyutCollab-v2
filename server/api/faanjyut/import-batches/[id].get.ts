@@ -111,6 +111,7 @@ export default defineEventHandler(async (event) => {
           startedAt: iso(batch.startedAt),
           completedAt: iso(batch.completedAt),
           failedAt: iso(batch.failedAt),
+          interruptedAt: iso(batch.interruptedAt),
           rolledBackAt: iso(batch.rolledBackAt),
           createdAt: iso(batch.createdAt),
           updatedAt: iso(batch.updatedAt)

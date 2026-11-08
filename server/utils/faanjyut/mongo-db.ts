@@ -7,6 +7,7 @@ import type mongoose from 'mongoose'
 import type { DryRunDb, DryRunIndexDescription } from './dry-run'
 import type { WriteDb } from './write-import'
 import type { RollbackDb } from './rollback'
+import type { ImportRecoveryDb } from './recovery'
 import type { CellsDb, CellsTx, CellStateUpsertArgs } from './cells'
 import type { LexemeCreateDb, LexemeCreateTx } from './lexeme-create'
 import type { ExportSource, ExportFileName } from './export-backup'
@@ -70,7 +71,7 @@ function setByPath(filter: Record<string, unknown>, path: string, value: unknown
  * insertBatch 用原生 bulkWrite insertOne（ordered），不經 Mongoose model save，
  * 也不調 syncIndexes（索引由 scripts/migrate-faanjyut-indexes.ts 管理）。
  */
-export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb & RollbackDb {
+export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb & RollbackDb & ImportRecoveryDb {
   const db = connection.db
   if (!db) {
     throw new Error('MongoDB 未連接：connection.db 為空（請先 await mongoose.connect(...)）')
@@ -92,6 +93,13 @@ export function adaptMongooseWriteDb(connection: mongoose.Connection): WriteDb &
     },
     async updateImportBatch(batchId, set) {
       await db.collection(IMPORT_BATCH_COLLECTION).updateOne({ batchId }, { $set: set })
+    },
+    async markImportBatchInterrupted(batchId, set) {
+      const result = await db.collection(IMPORT_BATCH_COLLECTION).updateOne(
+        { batchId, status: 'running' },
+        { $set: set }
+      )
+      return result.matchedCount === 1
     },
     async getImportBatch(batchId) {
       return db.collection(IMPORT_BATCH_COLLECTION).findOne({ batchId }) as Promise<Record<string, unknown> | null>
@@ -198,12 +206,21 @@ function adaptMongooseCellsTx(
       if (Object.keys($unset).length > 0) {
         update.$unset = $unset
       }
-      // 撞 {lexemeId,columnId} unique（E11000）由 processCellEdit 映射為該格 409 語義
-      await FaanJyutCellState.findOneAndUpdate(
-        { lexemeId: args.lexemeId, columnId: args.columnId },
+      const filter: any = args.baseVersion === 0
+        ? {
+            lexemeId: args.lexemeId,
+            columnId: args.columnId,
+            $or: [{ version: 0 }, { version: { $exists: false } }]
+          }
+        : { lexemeId: args.lexemeId, columnId: args.columnId, version: args.baseVersion }
+      const updated = await FaanJyutCellState.findOneAndUpdate(
+        filter,
         update,
-        { upsert: true, session }
+        { upsert: args.baseVersion === 0, session, returnDocument: 'after' }
       )
+      if (!updated) {
+        throw Object.assign(new Error('CELL_VERSION_CONFLICT'), { code: 'VERSION_CONFLICT' })
+      }
     },
     async createEditHistory(doc) {
       await EditHistory.create([doc as any], { session })

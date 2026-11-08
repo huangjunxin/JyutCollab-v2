@@ -243,6 +243,7 @@ export async function createLexeme(
           lexemeId,
           columnId: column.id,
           userId: user.id,
+          baseVersion: 0,
           projectionEntryId: null,
           flags: { modifiedPendingReview: true, explicitlyAbsent: true }
         })
@@ -263,6 +264,7 @@ export async function createLexeme(
         lexemeId,
         columnId: column.id,
         userId: user.id,
+        baseVersion: 0,
         raw,
         projectionEntryId: created.id,
         flags: { modifiedPendingReview: true }

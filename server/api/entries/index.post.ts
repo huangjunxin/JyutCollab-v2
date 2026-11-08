@@ -355,7 +355,8 @@ export default defineEventHandler(async (event) => {
         meta: entry.meta,
         status: entry.status,
         createdAt: entry.createdAt,
-        createdBy: entry.createdBy
+        createdBy: entry.createdBy,
+        version: (entry as any).__v ?? 0
       }
     }
   } catch (error: any) {

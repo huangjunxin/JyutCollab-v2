@@ -228,7 +228,8 @@ export default defineEventHandler(async (event) => {
       viewCount: entry.viewCount ?? 0,
       likeCount: entry.likeCount ?? 0,
       createdAt: entry.createdAt?.toISOString?.() ?? entry.createdAt,
-      updatedAt: entry.updatedAt?.toISOString?.() ?? entry.updatedAt
+      updatedAt: entry.updatedAt?.toISOString?.() ?? entry.updatedAt,
+      version: entry.__v ?? 0
     })
 
     if (groupBy === 'headword') {

@@ -122,7 +122,7 @@ export interface FaanJyutImportBatchSummary {
   batchId: string
   mode: string
   environment: string
-  status: 'running' | 'completed' | 'failed' | 'rolled_back' | string
+  status: 'running' | 'completed' | 'failed' | 'interrupted' | 'rolled_back' | string
   // 審計 M32：基線與創建者（舊批次缺省 → null）
   baselineLevel: string | null
   createdBy: string | null
@@ -159,7 +159,7 @@ export interface FaanJyutImportBatchDetail {
     batchId: string
     mode: string
     environment: string
-    status: 'running' | 'completed' | 'failed' | 'rolled_back' | string
+    status: 'running' | 'completed' | 'failed' | 'interrupted' | 'rolled_back' | string
     source: {
       sourceWorkbook: string
       sourceFileSha256: string
@@ -173,6 +173,9 @@ export interface FaanJyutImportBatchDetail {
     startedAt: string | null
     completedAt: string | null
     failedAt: string | null
+    interruptedAt: string | null
+    interruptedBy?: string
+    interruptionReason?: string
     rolledBackAt: string | null
     rollbackCounts?: {
       before: Record<string, number>

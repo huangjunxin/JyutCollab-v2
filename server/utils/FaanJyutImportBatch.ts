@@ -16,7 +16,7 @@ export interface IFaanJyutImportBatch {
   sourceExportedAt?: Date
   mode: 'initial' | 'final_cutover'
   environment: 'local' | 'staging' | 'production'
-  status: 'running' | 'completed' | 'failed' | 'rolled_back'
+  status: 'running' | 'completed' | 'failed' | 'interrupted' | 'rolled_back'
   source: {
     sourceWorkbook: string
     sourceFileSha256: string
@@ -48,6 +48,9 @@ export interface IFaanJyutImportBatch {
   startedAt: Date
   completedAt?: Date
   failedAt?: Date
+  interruptedAt?: Date
+  interruptedBy?: string
+  interruptionReason?: string
   rolledBackAt?: Date
   rollbackCounts?: {
     before: Record<string, number>
@@ -67,7 +70,7 @@ const FaanJyutImportBatchSchema = new mongoose.Schema<IFaanJyutImportBatch>({
   sourceExportedAt: { type: Date },
   mode: { type: String, enum: ['initial', 'final_cutover'], required: true },
   environment: { type: String, enum: ['local', 'staging', 'production'], required: true },
-  status: { type: String, enum: ['running', 'completed', 'failed', 'rolled_back'], required: true },
+  status: { type: String, enum: ['running', 'completed', 'failed', 'interrupted', 'rolled_back'], required: true },
   source: {
     sourceWorkbook: { type: String, required: true },
     sourceFileSha256: { type: String, required: true },
@@ -96,6 +99,9 @@ const FaanJyutImportBatchSchema = new mongoose.Schema<IFaanJyutImportBatch>({
   startedAt: { type: Date, required: true },
   completedAt: { type: Date },
   failedAt: { type: Date },
+  interruptedAt: { type: Date },
+  interruptedBy: { type: String },
+  interruptionReason: { type: String },
   rolledBackAt: { type: Date },
   rollbackCounts: {
     before: { type: mongoose.Schema.Types.Mixed },

@@ -33,8 +33,7 @@ export interface CellEdit {
   op: CellOp
   /** set 必填（trim 後非空）；clear/absent 禁止攜帶 */
   raw?: string
-  /** 樂觀鎖協議預留（§11 last-write-wins）：v1 服務端忽略 */
-  baseVersion?: number
+  baseVersion: number
 }
 
 /** 用戶形狀：與 event.context.auth 一致，兼容 canEditColumn 的 MatrixUser */
@@ -98,6 +97,7 @@ export interface CellStateUpsertArgs {
   lexemeId: string
   columnId: string
   userId: string
+  baseVersion: number
   /** set：寫入的原文；clear/absent：不傳 -> 卸載 raw */
   raw?: string
   /** set：關聯 Entry 的應用層 id；clear/absent：null -> 清 projection.entryId */
@@ -139,7 +139,9 @@ export interface CellResult {
   columnId?: string
   ok: boolean
   entryId?: string
+  version?: number
   error?: string
+  code?: 'VERSION_CONFLICT'
 }
 
 export interface CellBatchResult {
@@ -303,6 +305,7 @@ async function applySet(
     lexemeId: edit.lexemeId,
     columnId: column.id,
     userId: user.id,
+    baseVersion: edit.baseVersion,
     raw,
     projectionEntryId: entryIdValue,
     flags: { modifiedPendingReview: true }
@@ -357,6 +360,7 @@ async function applySetExternal(
     lexemeId: edit.lexemeId,
     columnId: column.id,
     userId: user.id,
+    baseVersion: edit.baseVersion,
     raw,
     projectionEntryId: null,
     projectionExternalEtymonIds: [etymonId],
@@ -395,6 +399,7 @@ async function applyClearAbsent(
     lexemeId: edit.lexemeId,
     columnId: column.id,
     userId: user.id,
+    baseVersion: edit.baseVersion,
     projectionEntryId: null,
     flags
   })
@@ -428,6 +433,7 @@ async function applyClearAbsentExternal(
     lexemeId: edit.lexemeId,
     columnId: column.id,
     userId: user.id,
+    baseVersion: edit.baseVersion,
     projectionEntryId: null,
     projectionExternalEtymonIds: null,
     flags
@@ -468,7 +474,7 @@ export async function processCellEdit(
   const isExternal = column.sourceRole === 'external'
 
   try {
-    return await db.withTransaction(async (tx) => {
+    const result = await db.withTransaction(async (tx) => {
       if (edit.op === 'set') {
         return isExternal
           ? applySetExternal(tx, edit, { column, lexeme, user: ctx.user })
@@ -490,9 +496,10 @@ export async function processCellEdit(
             edit.op === 'clear' ? { explicitlyCleared: true } : { explicitlyAbsent: true }
           )
     })
+    return { ...result, version: edit.baseVersion + 1 }
   } catch (error: any) {
-    if (error?.code === 11000) {
-      return cellError(edit, CELL_CONFLICT_MESSAGE)
+    if (error?.code === 11000 || error?.code === 'VERSION_CONFLICT') {
+      return { ...cellError(edit, CELL_CONFLICT_MESSAGE), code: 'VERSION_CONFLICT' }
     }
     const detail = typeof error?.message === 'string' && error.message ? error.message : ''
     return cellError(edit, detail ? `${CELL_WRITE_FAILED_MESSAGE}：${detail}` : CELL_WRITE_FAILED_MESSAGE)
